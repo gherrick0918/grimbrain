@@ -255,12 +255,25 @@ def rerank(query, hits):
     sorted_hits = sorted(hits, key=score, reverse=True)
 
     if single and qtok:
+        exact_idx = None
         for idx, h in enumerate(sorted_hits):
             name = (_node_meta(h).get("name") or "")
             if _norm(name) == qtok:
-                if idx != 0:
-                    sorted_hits.insert(0, sorted_hits.pop(idx))
+                exact_idx = idx
                 break
+
+        if exact_idx is None:
+            for idx, h in enumerate(sorted_hits):
+                meta = _node_meta(h)
+                base = meta.get("variant_of") or meta.get("canonical_id") or ""
+                base_norm = _norm(base.split("|")[0])
+                if base_norm == qtok:
+                    meta["name"] = base.split("|")[0]
+                    exact_idx = idx
+                    break
+
+        if exact_idx is not None and exact_idx != 0:
+            sorted_hits.insert(0, sorted_hits.pop(exact_idx))
 
     return sorted_hits
 
