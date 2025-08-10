@@ -115,6 +115,31 @@ def get_query_engine(collection_name: str, embed_model=None, top_k: int | None =
 def pick_top_k(q: str) -> int:
     return 50 if any(len(t) >= 4 for t in _tokens(q)) else 15
 
+
+def retrieve_with_backoff(collection: str, embed_model, query: str, token: str, start_k: int) -> List[Any]:
+    """Retrieve with progressively larger ``top_k`` until a NAME matches ``token``.
+
+    Mirrors the test helper but checks for an exact name match via ``_norm``.  The
+    query engine is rebuilt for each attempt with an increased ``top_k`` and stops
+    once a hit's normalized name exactly equals the single token or the limit is
+    reached (200).
+    """
+    limit = 200
+    ks: List[int] = [start_k]
+    while ks[-1] < limit:
+        next_k = min(limit, ks[-1] * 2)
+        if next_k == ks[-1]:
+            break
+        ks.append(next_k)
+
+    hits: List[Any] = []
+    for k in ks:
+        qe = get_query_engine(collection, embed_model=embed_model, top_k=k)
+        hits = qe.retrieve(query)
+        if any(_norm(_node_meta(h).get("name") or "") == token for h in hits):
+            break
+    return hits
+
 def rerank(query, hits):
     """
     Heuristic reranker that:
@@ -400,20 +425,26 @@ def run_query(
         # For retrieval, it's often useful to include aliases as extra tokens
         retrieve_query = effective_query if not alias_extra else f"{effective_query} " + " ".join(alias_extra)
 
+        q_tokens = _tokens(effective_query)
+        single = len(q_tokens) == 1
+        qtok = q_tokens[0] if single else None
+        rare = [t for t in q_tokens if len(t) >= 4]
+        k = pick_top_k(effective_query)
+
         # Try LLM-powered query first (if not FakeLLM)
         try:
             if isinstance(Settings.llm, MockLLM):
                 print("✅ Using mock LLM — skipping query() and using retrieve() instead")
                 print("⚠️ Skipping query() — using retrieve() due to MockLLM")
-                q_tokens = _tokens(effective_query)
-                rare = [t for t in q_tokens if len(t) >= 4]
-                k = 50 if rare else 15
-                query_engine = get_query_engine(collection_name, embed_model, top_k=k)
-                results = query_engine.retrieve(retrieve_query)
+                if single and qtok:
+                    results = retrieve_with_backoff(collection_name, embed_model, retrieve_query, qtok, start_k=k)
+                else:
+                    query_engine = get_query_engine(collection_name, embed_model, top_k=k)
+                    results = query_engine.retrieve(retrieve_query)
 
                 if not results:
                     return "❌ No relevant entries found."
-                
+
                 results = rerank(effective_query, results)
 
                 # Optional coverage expansion if rare tokens aren't jointly covered
@@ -468,7 +499,10 @@ def run_query(
                 response = query_engine.query(effective_query)
                 raw_text = str(response)
                 if query_type == "spell" and len(raw_text.strip()) < 100:
-                    results = query_engine.retrieve(retrieve_query)
+                    if single and qtok:
+                        results = retrieve_with_backoff(collection_name, embed_model, retrieve_query, qtok, start_k=k)
+                    else:
+                        results = query_engine.retrieve(retrieve_query)
                     if not results:
                         return "❌ No relevant entries found."
                     ranked = rerank(effective_query, results)
@@ -480,7 +514,10 @@ def run_query(
 
         except Exception as e:
             print(f"⚠️ LLM query failed — falling back to similarity: {e}")
-            results = query_engine.retrieve(retrieve_query)
+            if single and qtok:
+                results = retrieve_with_backoff(collection_name, embed_model, retrieve_query, qtok, start_k=k)
+            else:
+                results = query_engine.retrieve(retrieve_query)
             if not results:
                 return "❌ No relevant entries found."
             ranked = rerank(effective_query, results)
