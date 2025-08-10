@@ -1,0 +1,77 @@
+🔍 Top 5 Retrieved Results for query: 'fireball'
+
+
+#1 - Fireball | src=PHB
+Fireball
+Level 3 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: {'v': True, 's': True, 'm': 'a tiny ball of bat guano and sulfur'}
+Duration: [{'type': 'instant'}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A bright streak flashes from your pointing finger to a point you choose within range and then blossoms with a low roar into an explosion of flame. Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A target takes {@damage 8d6} fire damage on a failed save, or half as much damage on a successful one.
+The fire spreads around corners. It ignites flammable objects in the area that aren't being worn or carried.
+------------------------------------------------------------
+Metadata: {'source': 'PHB', 'name': 'Fireball', 'type': 'spell', 'level': '3', 'school': 'V', 'range': "{'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}", 'damage': 'Unknown', 'components': "{'v': True, 's': True, 'm': 'a tiny ball of bat guano and sulfur'}", 'duration': "[{'type': 'instant'}]", 'casting_time': "[{'number': 1, 'unit': 'action'}]", 'doc_type': 'spell', 'priority': 0, 'canonical_id': 'Fireball|PHB'}
+
+
+#2 - Fireball | src=XPHB
+Fireball
+Level 3 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: {'v': True, 's': True, 'm': 'a ball of bat guano and sulfur'}
+Duration: [{'type': 'instant'}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A bright streak flashes from you to a point you choose within range and then blossoms with a low roar into a fiery explosion. Each creature in a 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} centered on that point makes a Dexterity saving throw, taking {@damage 8d6} Fire damage on a failed save or half as much damage on a successful one.
+Flammable objects in the area that aren't being worn or carried start {@hazard burning|XPHB}.
+------------------------------------------------------------
+Metadata: {'source': 'XPHB', 'name': 'Fireball', 'type': 'spell', 'level': '3', 'school': 'V', 'range': "{'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}", 'damage': 'Unknown', 'components': "{'v': True, 's': True, 'm': 'a ball of bat guano and sulfur'}", 'duration': "[{'type': 'instant'}]", 'casting_time': "[{'number': 1, 'unit': 'action'}]", 'doc_type': 'spell', 'priority': 0, 'canonical_id': 'Fireball|XPHB'}
+
+
+#3 - Delayed Blast Fireball | src=PHB
+Delayed Blast Fireball
+Level 7 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: {'v': True, 's': True, 'm': 'a tiny ball of bat guano and sulfur'}
+Duration: [{'type': 'timed', 'duration': {'type': 'minute', 'amount': 1}, 'concentration': True}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A beam of yellow light flashes from your pointing finger, then condenses to linger at a chosen point within range as a glowing bead for the duration. When the spell ends, either because your {@status concentration} is broken or because you decide to end it, the bead blossoms with a low roar into an explosion of flame that spreads around corners. Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A creature takes fire damage equal to the total accumulated damage on a failed save, or half as much damage on a successful one.
+The spell's base damage is {@damage 12d6}. If at the end of your turn the bead
+------------------------------------------------------------
+Metadata: {'source': 'PHB', 'name': 'Delayed Blast Fireball', 'type': 'spell', 'level': '7', 'school': 'V', 'range': "{'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}", 'damage': 'Unknown', 'components': "{'v': True, 's': True, 'm': 'a tiny ball of bat guano and sulfur'}", 'duration': "[{'type': 'timed', 'duration': {'type': 'minute', 'amount': 1}, 'concentration': True}]", 'casting_time': "[{'number': 1, 'unit': 'action'}]", 'doc_type': 'spell', 'priority': 0, 'canonical_id': 'Delayed Blast Fireball|PHB'}
+
+
+#4 - Delayed Blast Fireball | src=XPHB
+Delayed Blast Fireball
+Level 7 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: {'v': True, 's': True, 'm': 'a ball of bat guano and sulfur'}
+Duration: [{'type': 'timed', 'duration': {'type': 'minute', 'amount': 1}, 'concentration': True}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A beam of yellow light flashes from you, then condenses at a chosen point within range as a glowing bead for the duration. When the spell ends, the bead explodes, and each creature in a 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} centered on that point makes a Dexterity saving throw. A creature takes Fire damage equal to the total accumulated damage on a failed save or half as much damage on a successful one.
+The spell's base damage is {@damage 12d6}, and the damage increases by {@damage 1d6} whenever your turn ends and the spell hasn't ended.
+If a creature touches the glowing bead before the spell ends, that creature makes a Dext
+------------------------------------------------------------
+Metadata: {'source': 'XPHB', 'name': 'Delayed Blast Fireball', 'type': 'spell', 'level': '7', 'school': 'V', 'range': "{'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}", 'damage': 'Unknown', 'components': "{'v': True, 's': True, 'm': 'a ball of bat guano and sulfur'}", 'duration': "[{'type': 'timed', 'duration': {'type': 'minute', 'amount': 1}, 'concentration': True}]", 'casting_time': "[{'number': 1, 'unit': 'action'}]", 'doc_type': 'spell', 'priority': 0, 'canonical_id': 'Delayed Blast Fireball|XPHB'}
+
+
+#5 - Magic Missile | src=XPHB
+Magic Missile
+Level 1 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 120}}
+Damage: Unknown
+Components: {'v': True, 's': True}
+Duration: [{'type': 'instant'}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+You create three glowing darts of magical force. Each dart strikes a creature of your choice that you can see within range. A dart deals {@damage 1d4 + 1} Force damage to its target. The darts all strike simultaneously, and you can direct them to hit one creature or several.
+------------------------------------------------------------
+Metadata: {'source': 'XPHB', 'name': 'Magic Missile', 'type': 'spell', 'level': '1', 'school': 'V', 'range': "{'type': 'point', 'distance': {'type': 'feet', 'amount': 120}}", 'damage': 'Unknown', 'components': "{'v': True, 's': True}", 'duration': "[{'type': 'instant'}]", 'casting_time': "[{'number': 1, 'unit': 'action'}]", 'doc_type': 'spell', 'priority': 0, 'canonical_id': 'Magic Missile|XPHB'}
+

@@ -1,0 +1,62 @@
+🔍 Top 5 Retrieved Results for query: 'booyahg whip'
+
+
+#1 - Kuo-toa Whip | src=MM
+Kuo-toa Whip
+
+
+AC: 11
+HP: 65
+Speed: walk: 30, swim: 30
+STR: 14, DEX: 10, CON: 14, INT: 12, WIS: 14, CHA: 11
+------------------------------------------------------------
+Metadata: {'source': 'MM', 'name': 'Kuo-toa Whip', 'type': 'monster', 'hp': '65', 'ac': '11', 'speed': 'walk: 30, swim: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Kuo-toa Whip|MM'}
+
+
+#2 - Kuo-toa Whip | src=XMM
+Kuo-toa Whip
+
+
+AC: 11
+HP: 45
+Speed: walk: 30, swim: 30
+STR: 14, DEX: 10, CON: 14, INT: 12, WIS: 14, CHA: 11
+------------------------------------------------------------
+Metadata: {'source': 'XMM', 'name': 'Kuo-toa Whip', 'type': 'monster', 'hp': '45', 'ac': '11', 'speed': 'walk: 30, swim: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Kuo-toa Whip|XMM'}
+
+
+#3 - Booyahg Slave of the Fiend | src=VGM
+Booyahg Slave of the Fiend
+
+
+AC: 12, 15
+HP: 78
+Speed: walk: 30
+STR: 10, DEX: 14, CON: 15, INT: 12, WIS: 12, CHA: 18
+------------------------------------------------------------
+Metadata: {'source': 'VGM', 'name': 'Booyahg Slave of the Fiend', 'type': 'monster', 'hp': '78', 'ac': '12, 15', 'speed': 'walk: 30', 'doc_type': 'monster', 'is_variant': True, 'variant_of': 'Warlock of the Fiend|VGM', 'priority': -1, 'canonical_id': 'Booyahg Slave of the Fiend|VGM'}
+
+
+#4 - Booyahg Slave of the Great Old One | src=VGM
+Booyahg Slave of the Great Old One
+
+
+AC: 12, 15
+HP: 91
+Speed: walk: 30
+STR: 9, DEX: 14, CON: 15, INT: 12, WIS: 12, CHA: 18
+------------------------------------------------------------
+Metadata: {'source': 'VGM', 'name': 'Booyahg Slave of the Great Old One', 'type': 'monster', 'hp': '91', 'ac': '12, 15', 'speed': 'walk: 30', 'doc_type': 'monster', 'is_variant': True, 'variant_of': 'Warlock of the Great Old One|VGM', 'priority': -1, 'canonical_id': 'Booyahg Slave of the Great Old One|VGM'}
+
+
+#5 - Booyahg Slave of the Archfey | src=VGM
+Booyahg Slave of the Archfey
+
+
+AC: 11, 14
+HP: 49
+Speed: walk: 30
+STR: 9, DEX: 13, CON: 11, INT: 11, WIS: 12, CHA: 18
+------------------------------------------------------------
+Metadata: {'source': 'VGM', 'name': 'Booyahg Slave of the Archfey', 'type': 'monster', 'hp': '49', 'ac': '11, 14', 'speed': 'walk: 30', 'doc_type': 'monster', 'is_variant': True, 'variant_of': 'Warlock of the Archfey|VGM', 'priority': -1, 'canonical_id': 'Booyahg Slave of the Archfey|VGM'}
+

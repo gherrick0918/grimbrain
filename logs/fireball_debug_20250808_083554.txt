@@ -1,0 +1,62 @@
+🔍 Top 5 Retrieved Results for query: 'Goblin'
+
+
+#1 - Goblin | src=MM
+Goblin
+
+
+AC: 15
+HP: 7
+Speed: walk: 30
+STR: 8, DEX: 14, CON: 10, INT: 10, WIS: 8, CHA: 8
+------------------------------------------------------------
+Metadata: {'source': 'MM', 'name': 'Goblin', 'type': 'monster', 'hp': '7', 'ac': '15', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Goblin|MM'}
+
+
+#2 - Goblin Boss | src=MM
+Goblin Boss
+
+
+AC: 17
+HP: 21
+Speed: walk: 30
+STR: 10, DEX: 14, CON: 10, INT: 10, WIS: 8, CHA: 10
+------------------------------------------------------------
+Metadata: {'source': 'MM', 'name': 'Goblin Boss', 'type': 'monster', 'hp': '21', 'ac': '17', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Goblin Boss|MM'}
+
+
+#3 - Goblin Gang Member | src=KKW
+Goblin Gang Member
+
+
+AC: 14
+HP: 10
+Speed: walk: 30
+STR: 8, DEX: 16, CON: 10, INT: 10, WIS: 10, CHA: 8
+------------------------------------------------------------
+Metadata: {'source': 'KKW', 'name': 'Goblin Gang Member', 'type': 'monster', 'hp': '10', 'ac': '14', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Goblin Gang Member|KKW'}
+
+
+#4 - Goblin Boss | src=XMM
+Goblin Boss
+
+
+AC: 17
+HP: 21
+Speed: walk: 30
+STR: 10, DEX: 15, CON: 10, INT: 10, WIS: 8, CHA: 10
+------------------------------------------------------------
+Metadata: {'source': 'XMM', 'name': 'Goblin Boss', 'type': 'monster', 'hp': '21', 'ac': '17', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Goblin Boss|XMM'}
+
+
+#5 - Goblin Psi Commander | src=PaBTSO
+Goblin Psi Commander
+
+
+AC: 16
+HP: 58
+Speed: walk: 30
+STR: 12, DEX: 19, CON: 13, INT: 17, WIS: 15, CHA: 10
+------------------------------------------------------------
+Metadata: {'source': 'PaBTSO', 'name': 'Goblin Psi Commander', 'type': 'monster', 'hp': '58', 'ac': '16', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Goblin Psi Commander|PaBTSO'}
+
