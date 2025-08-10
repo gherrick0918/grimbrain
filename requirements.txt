@@ -1,0 +1,6 @@
+llama-index
+chromadb
+sentence-transformers
+ollama
+fastapi
+uvicorn

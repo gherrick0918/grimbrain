@@ -1,0 +1,510 @@
+import sys
+from utils import maybe_stitch_monster_actions
+from typing import Any, Dict, List, Optional
+
+# LlamaIndex global settings
+try:
+    from llama_index.core import Settings
+except Exception:
+    Settings = None
+
+try:
+    from embedding import CustomLocalEmbedding
+except Exception:
+    CustomLocalEmbedding = None
+
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+import re
+from formatters import auto_format
+from utils import ensure_collection, hit_text
+from llama_index.core.llms.mock import MockLLM
+from llama_index.core import VectorStoreIndex
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from chromadb import PersistentClient
+
+LOCAL_EMBED_MODEL = "all-MiniLM-L6-v2"
+
+# safe logger for this module
+try:
+    from utils import _log as _log  # reuse if present
+except Exception:
+    def _log(msg: str) -> None:
+        try:
+            print(msg)
+        except Exception:
+            pass
+
+# Supported types and their corresponding collections
+COLLECTION_MAP = {
+    "spell": "grim_spells",
+    "monster": "grim_bestiary",
+    "rule": "grim_rules",
+    "item": "grim_items",
+    "feat": "grim_feats",
+    "class": "grim_class",
+    "table": "grim_tables",
+}
+
+# Simple keyword triggers for auto-detection
+AUTO_KEYWORDS = {
+    "spell": ["fireball", "cast", "spell", "magic", "level"],
+    "monster": ["hp", "ac", "attack", "monster", "statblock", "goblin", "dragon"],
+    "rule": ["grapple", "resting", "rules", "mechanic", "how does"],
+    "item": ["item", "magic item", "holding", "sword", "potion"],
+    "feat": ["feat", "ability", "sentinel", "lucky", "tough"],
+    "class": ["barbarian", "ranger", "class", "sorcerer", "wizard"],
+    "table": ["roll", "table", "trinket", "loot", "result"],
+}
+
+def detect_type_auto(query: str) -> str:
+    lowered = query.lower()
+    for type_, keywords in AUTO_KEYWORDS.items():
+        if any(word in lowered for word in keywords):
+            return type_
+    return "rule"  # default fallback
+
+def get_query_engine(collection_name: str, embed_model=None, top_k: int | None = None):
+    # Always use local embeddings (no OpenAI) unless explicitly overridden.
+    if Settings and CustomLocalEmbedding:
+        try:
+            if not getattr(Settings, "embed_model", None):
+                Settings.embed_model = CustomLocalEmbedding(model_name=LOCAL_EMBED_MODEL)
+                _log(f"✅ Using local embedding: {LOCAL_EMBED_MODEL}")
+            else:
+                _log("✅ Using preconfigured embedding model")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize local embedding: {e}", file=sys.stderr)
+    else:
+        print("⚠️ Embedding not configured (Settings/CustomLocalEmbedding unavailable). Proceeding anyway.", file=sys.stderr)
+
+    client = PersistentClient(path="chroma_store")
+    embedder = embed_model or (Settings.embed_model if Settings else None)
+    collection = ensure_collection(client, collection_name, embedder)
+    vector_store = ChromaVectorStore.from_collection(collection)
+
+    k = top_k if top_k is not None else 10
+    return VectorStoreIndex.from_vector_store(
+        vector_store, embed_model=embedder
+    ).as_query_engine(similarity_top_k=k)
+
+def pick_top_k(q: str) -> int:
+    return 50 if any(len(t) >= 4 for t in _tokens(q)) else 15
+
+def _node_meta(hit):
+    node = getattr(hit, "node", None)
+    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
+
+SOURCE_BOOSTS = {"MM": 0.5, "MPMM": 0.3, "VGM": 0.3}
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+def _node_meta(hit):
+    node = getattr(hit, "node", None)
+    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
+
+STOPWORDS = {
+    "the","a","an","of","and","or","to","for","from","with","in","on","at",
+    "by","as","is","are","was","were","be","it","this","that","these","those"
+}
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+def _tokens(s: str):
+    return [t for t in _norm(s).split() if t and t not in STOPWORDS]
+
+SOURCE_BOOSTS = {
+    "MM": 1.0,      # Monster Manual
+    "MPMM": 0.6,    # Monsters of the Multiverse
+    "VGM": 0.4,     # Volo's Guide (for Booyahg variants)
+}
+
+def _node_meta(hit):
+    node = getattr(hit, "node", None)
+    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
+
+def rerank(query, hits):
+    """
+    Heuristic reranker that:
+      • Single-token queries (e.g., "goblin"): hard-prefer name matches, huge boost for exact/prefix.
+      • Multi-token queries (e.g., "booyahg whip"): hard-prefer names covering ALL query tokens.
+      • Caps raw vector score so heuristics can win amid noisy neighbors.
+    Requires helpers: _norm, _tokens, _node_meta, hit_text.
+    """
+    if not hits:
+        return []
+
+    q_norm   = _norm(query)
+    q_tokens = _tokens(query)
+    single   = len(q_tokens) == 1
+    qtok     = q_tokens[0] if single else None
+
+    # “rare” = longer tokens; for multi-token focus, use rare else all
+    rare  = [t for t in q_tokens if len(t) >= 4]
+    focus = rare or q_tokens
+
+    base_canonical_guess = f"{query.strip().title()}|MM"
+
+    # ---------- HARD PRE-ORDER ----------
+    if single and qtok:
+        # Put anything with the token IN THE NAME before everything else
+        name_matches, others = [], []
+        for h in hits:
+            name = (_node_meta(h).get("name") or "")
+            if qtok in set(_tokens(name)):
+                name_matches.append(h)
+            else:
+                others.append(h)
+        if name_matches:
+            hits = name_matches + others
+    elif len(q_tokens) > 1:
+        # Put items whose NAME covers ALL focus tokens first, then partial, then others
+        full, partial, other = [], [], []
+        for h in hits:
+            name = (_node_meta(h).get("name") or "")
+            ntoks = set(_tokens(name))
+            if all(t in ntoks for t in focus):
+                full.append(h)
+            elif any(t in ntoks for t in focus):
+                partial.append(h)
+            else:
+                other.append(h)
+        if full or partial:
+            hits = full + partial + other
+
+    # ---------- SOFT SCORING ----------
+    def score(h):
+        # Keep some influence from the vector similarity but cap it
+        base_vec = float(getattr(h, "score", 0.0))
+        s = min(base_vec, 3.0)
+
+        meta = _node_meta(h)
+        name = meta.get("name") or ""
+        src  = meta.get("source") or ""
+        nn   = _norm(name)
+
+        # Token sets and a small slice of body for coverage check
+        name_tokens = set(_tokens(name))
+        body_tokens = set(_tokens(hit_text(h)[:400]))
+
+        # Exact/phrase boosts
+        if q_norm and q_norm == nn:
+            s += 6.0
+        elif q_norm and q_norm in nn:
+            s += 1.5
+        elif nn.startswith(q_norm + " "):
+            s += 1.0
+
+        if single and qtok:
+            # VERY strong single-token name bias
+            if nn == qtok:
+                s += 40.0              # exact “goblin”
+            elif nn.startswith(qtok + " "):
+                s += 25.0              # “goblin boss”
+            elif qtok in name_tokens:
+                s += 12.0              # token appears in name
+            else:
+                s -= 30.0              # name doesn't contain token → shove down
+        else:
+            # Multi-token: reward full coverage IN NAME heavily, partial moderately
+            if focus:
+                name_cov = sum(t in name_tokens for t in focus)
+                body_cov = sum(t in body_tokens for t in focus)
+                if name_cov == len(focus):
+                    s += 20.0
+                elif name_cov >= 1:
+                    s += 8.0
+                elif body_cov >= 1:
+                    s += 2.0
+                else:
+                    s -= 6.0
+
+        # Light source nudges
+        s += {"MM": 0.5, "MPMM": 0.3, "VGM": 0.3}.get(src, 0.0)
+
+        # Base vs. variant nudges
+        if meta.get("canonical_id") == base_canonical_guess:
+            s += 2.0
+        if meta.get("variant_of") == base_canonical_guess:
+            s -= 0.4
+
+        # Explicit flags
+        s += 0.2 * int(meta.get("priority", 0))
+        if meta.get("is_variant"):
+            s -= 0.3
+
+        return s
+
+    return sorted(hits, key=score, reverse=True)
+
+def covers_all(r, rare_tokens):
+    meta = _node_meta(r)
+    name = meta.get("name","")
+    body = hit_text(r)[:400]
+    toks = set(_tokens(name)) | set(_tokens(body))
+    return all(t in toks for t in rare_tokens)
+
+def _load_alias_map(alias_map):
+    if alias_map is not None:
+        return alias_map
+    try:
+        here = Path(__file__).parent
+        p = here / "data" / "aliases.json"
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _resolve_alias(q: str, qtype: str, alias_map, alias_map_enabled: bool):
+    """
+    Returns (canonical_query, also_list).
+    Looks up exact lowercase key; also tries a space-insensitive match.
+    Schema expectation:
+      { "<type>": { "<alias>": {"canonical": "...", "also": ["...","..."] } } }
+    """
+    if not alias_map_enabled:
+        return q, []
+    amap = _load_alias_map(alias_map) or {}
+    bucket = amap.get(qtype, {})
+    ql = q.strip().lower()
+
+    entry = bucket.get(ql)
+    if not entry:
+        # try space-insensitive match (e.g., "fire ball" vs "fireball")
+        for k, v in bucket.items():
+            if k.replace(" ", "") == ql.replace(" ", ""):
+                entry = v
+                break
+    if entry:
+        return entry.get("canonical") or q, list(entry.get("also") or [])
+    return q, []
+
+def _norm_source(s: str) -> str:
+    s = (s or "").strip()
+    m = {
+        "player's handbook": "PHB",
+        "phb": "PHB",
+        "monster manual": "MM",
+        "mm": "MM",
+        "dungeon master's guide": "DMG",
+        "dmg": "DMG",
+        "basic rules": "Basic Rules",
+    }
+    return m.get(s.lower(), s)
+
+def _apply_source_preference(results, pref):
+    """Stable tiebreak: group by preferred sources (in listed order if a list)."""
+    if not pref:
+        return results
+    order = [pref] if isinstance(pref, str) else list(pref)
+    order = [_norm_source(s) for s in order]
+    order_map = {s: i for i, s in enumerate(order)}
+    return sorted(results, key=lambda h: order_map.get(_norm_source(_node_meta(h).get("source")), 9999))
+
+def _write_debug_log(results, effective_query):
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    debug_log_path = Path(SCRIPT_DIR) / "logs" / f"fireball_debug_{timestamp}.txt"
+    debug_log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Attempting to write debug log to: {debug_log_path}")
+
+    try:
+        with open(debug_log_path, "w", encoding="utf-8") as f:
+            f.write(f"🔍 Top 5 Retrieved Results for query: '{effective_query}'\n\n")
+            for i, r in enumerate(results[:5], 1):
+                meta = _node_meta(r)
+                text = r.node.get_text() if getattr(r, "node", None) else (getattr(r, "text", "") or "")
+                f.write(f"\n#{i} - {meta.get('name','?')} | src={meta.get('source','N/A')}\n")
+                f.write(text[:1000])
+                f.write("\n" + "-" * 60 + "\n")
+                f.write(f"Metadata: {meta}\n\n")
+        print(f"📝 Saved debug log to {debug_log_path}")
+    except Exception as log_exc:
+        print(f"❌ Failed to write debug log: {log_exc}")
+
+def _maybe_learn_alias(user_q: str, qtype: str, top_meta: dict, learn_aliases: bool):
+    """Append alias to data/aliases.json if the chosen top name ≠ user query (safe/lenient, opt-in)."""
+    if not learn_aliases:
+        return
+    uq = (user_q or "").strip().lower()
+    nm = (top_meta.get("name") or "").strip().lower()
+    if not uq or not nm or uq == nm:
+        return
+    try:
+        from difflib import SequenceMatcher
+        sim = SequenceMatcher(None, uq, nm).ratio()
+        if sim < 0.55:
+            return  # too different; likely not an alias
+        import json
+        from pathlib import Path
+        here = Path(__file__).parent
+        p = here / "data" / "aliases.json"
+        data = {}
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+        bucket = data.setdefault(qtype, {})
+        entry = bucket.setdefault(uq, {"canonical": top_meta.get("name", user_q), "also": []})
+        if "also" not in entry or not isinstance(entry["also"], list):
+            entry["also"] = []
+        if uq not in entry["also"]:
+            entry["also"].append(uq)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"🧠 Learned alias: '{user_q}' → '{top_meta.get('name')}'")
+    except Exception as _:
+        pass
+
+def run_query(
+    query: str,
+    type: str = "auto",
+    embed_model=None,
+    *,
+    prefer_source=None,
+    alias_map: dict | None = None,
+    alias_map_enabled: bool = True,
+    learn_aliases: bool = False
+) -> str:
+    """
+    Query wrapper with:
+      • Rare-term aware top_k
+      • Retrieve → rerank path for MockLLM (and fallback)
+      • Canonical bubble-up heuristic (unchanged)
+      • NEW: source-preference tiebreak
+      • NEW: alias normalization (file-backed or provided dict)
+      • NEW: optional alias learning
+    """
+    pref_meta = {}
+    query_type = type.lower()
+    if query_type == "auto":
+        query_type = detect_type_auto(query)
+
+    if query_type not in COLLECTION_MAP:
+        return f"❌ Unsupported query type: '{type}'"
+
+    collection_name = COLLECTION_MAP[query_type]
+
+    try:
+        query_engine = get_query_engine(collection_name, embed_model)
+
+        # --- Alias normalization (non-destructive) ---
+        alias_extra = []
+        effective_query = query
+        if alias_map_enabled:
+            effective_query, alias_extra = _resolve_alias(query, query_type, alias_map, alias_map_enabled)
+
+        # For retrieval, it's often useful to include aliases as extra tokens
+        retrieve_query = effective_query if not alias_extra else f"{effective_query} " + " ".join(alias_extra)
+
+        # Try LLM-powered query first (if not FakeLLM)
+        try:
+            if isinstance(Settings.llm, MockLLM):
+                print("✅ Using mock LLM — skipping query() and using retrieve() instead")
+                print("⚠️ Skipping query() — using retrieve() due to MockLLM")
+                q_tokens = _tokens(effective_query)
+                rare = [t for t in q_tokens if len(t) >= 4]
+                k = 50 if rare else 15
+                query_engine = get_query_engine(collection_name, embed_model, top_k=k)
+                results = query_engine.retrieve(retrieve_query)
+
+                if not results:
+                    return "❌ No relevant entries found."
+                
+                results = rerank(effective_query, results)
+
+                # Optional coverage expansion if rare tokens aren't jointly covered
+                if rare and not any(covers_all(r, rare) for r in results):
+                    def key(r):
+                        m = _node_meta(r)
+                        return m.get("canonical_id") or (m.get("name"), m.get("source"))
+                    seen = set()
+                    merged = list(results)
+                    for topk in [max(100, k), max(200, k)]:
+                        for q2 in (retrieve_query, " ".join(rare)):
+                            qe2 = get_query_engine(collection_name, embed_model, top_k=topk)
+                            more = qe2.retrieve(q2)
+                            for r in more:
+                                kk = key(r)
+                                if kk in seen:
+                                    continue
+                                seen.add(kk)
+                                merged.append(r)
+                    results = merged
+
+                # final rerank
+                results = rerank(effective_query, results)
+                # NEW: source preference stable tiebreak
+                results = _apply_source_preference(results, prefer_source)
+
+                # Canonical bubble-up check (unchanged, but uses effective_query)
+                for r in results:
+                    meta = _node_meta(r)
+                    if meta.get("canonical_id") == f"{effective_query.strip().title()}|MM":
+                        results.sort(
+                            key=lambda h: 1 if _node_meta(h).get("canonical_id") == meta["canonical_id"] else 0,
+                            reverse=True
+                        )
+                        break
+
+                _write_debug_log(results, effective_query)
+
+                preferred = results[0]
+                pref_meta = _node_meta(preferred)
+                pref_meta["provenance"] = [_node_meta(r) for r in results[:3]]
+                _maybe_learn_alias(query, query_type, pref_meta, learn_aliases)
+                raw_text = preferred.node.get_text() if getattr(preferred, "node", None) else (getattr(preferred, "text", "") or "")
+                if query_type == "monster":
+                    # Stitch using the actual text plus node metadata (not the NodeWithScore itself)
+                    pref_meta = _node_meta(preferred)
+                    stitched = maybe_stitch_monster_actions(raw_text, meta=pref_meta)
+                    if stitched:
+                        raw_text = stitched
+            else:
+                # Non-mock LLM path: try query(), then optional similarity fallback
+                response = query_engine.query(effective_query)
+                raw_text = str(response)
+                if query_type == "spell" and len(raw_text.strip()) < 100:
+                    results = query_engine.retrieve(retrieve_query)
+                    if not results:
+                        return "❌ No relevant entries found."
+                    ranked = rerank(effective_query, results)
+                    ranked = _apply_source_preference(ranked, prefer_source)
+                    pref_meta = _node_meta(ranked[0])
+                    pref_meta["provenance"] = [_node_meta(r) for r in ranked[:3]]
+                    _maybe_learn_alias(query, query_type, pref_meta, learn_aliases)
+                    raw_text = hit_text(ranked[0])
+
+        except Exception as e:
+            print(f"⚠️ LLM query failed — falling back to similarity: {e}")
+            results = query_engine.retrieve(retrieve_query)
+            if not results:
+                return "❌ No relevant entries found."
+            ranked = rerank(effective_query, results)
+            ranked = _apply_source_preference(ranked, prefer_source)
+            raw_text = hit_text(ranked[0])
+            pref_meta = _node_meta(ranked[0])
+            pref_meta["provenance"] = [_node_meta(r) for r in ranked[:3]]
+            _maybe_learn_alias(query, query_type, pref_meta, learn_aliases)
+
+        print("🧪 Retrieved text:\n", raw_text[:500])
+        print(f"Detected format type for '{query}': {query_type}")
+        return auto_format(raw_text, metadata=pref_meta)
+
+    except Exception as e:
+        return f"❌ Failed to query collection '{collection_name}': {e}"
+
+# CLI interface
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python query_router.py <type> <query>")
+        print("Example: python query_router.py spell 'What does Fireball do?'")
+    else:
+        type_arg = sys.argv[1]
+        query_arg = " ".join(sys.argv[2:])
+        print(run_query(query_arg, type_arg))
