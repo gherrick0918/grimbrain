@@ -180,5 +180,5 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-chroma_store/
-logs/
+chroma_store/*
+logs/*
