@@ -1,14 +1,15 @@
 # tests/test_smoke.py
 import os
-from query_router import get_query_engine, rerank, _node_meta, run_query, _tokens
+from query_router import get_query_engine, rerank, _node_meta, run_query, _norm
 
 def retrieve_with_backoff(collection, embedder, query, token, ks=(25, 50, 100, 200)):
-    """Rebuild the QE with larger top_k until at least one NAME contains the token."""
+    """Rebuild the QE with larger top_k until at least one NAME exactly matches the token."""
+    goal = _norm(token)
     for k in ks:
         qe = get_query_engine(collection, embed_model=embedder, top_k=k)
         hits = qe.retrieve(query)
-        names = [(_node_meta(h).get("name") or "").lower() for h in hits]
-        if any(token in set(_tokens(n)) for n in names):
+        names = [(_node_meta(h).get("name") or "") for h in hits]
+        if any(goal == _norm(n) for n in names):
             return hits
     return hits  # last attempt
 
