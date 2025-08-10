@@ -137,6 +137,7 @@ class MonsterFormatter:
         else:
             # Try stitch (non-fatal)
             stitched = maybe_stitch_monster_actions(
+                None,
                 text,
                 meta=meta,
             )
