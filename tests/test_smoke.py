@@ -18,6 +18,24 @@ def test_monster_goblin_top(embedder):
     meta = _node_meta(hits[0])
     assert meta["name"].lower() == "goblin"
 
+
+def test_rerank_exact_name_bubble():
+    class Node:
+        def __init__(self, name):
+            self.metadata = {"name": name}
+            self.text = name
+
+    class Hit:
+        def __init__(self, name, score):
+            self.node = Node(name)
+            self.score = score
+
+    hits = [Hit("goblin boss", 0), Hit("goblin", -100)]
+    results = rerank("goblin", hits)
+    names = [(_node_meta(h).get("name") or "").lower() for h in results]
+    assert names[0] == "goblin"
+    assert names[1] == "goblin boss"
+
 def test_monster_booyahg_whip(embedder):
     hits = retrieve_with_backoff("grim_bestiary", embedder, "booyahg whip", "booyahg")
     hits = rerank("booyahg whip", hits)

@@ -227,7 +227,17 @@ def rerank(query, hits):
 
         return s
 
-    return sorted(hits, key=score, reverse=True)
+    sorted_hits = sorted(hits, key=score, reverse=True)
+
+    if single and qtok:
+        for idx, h in enumerate(sorted_hits):
+            name = (_node_meta(h).get("name") or "")
+            if _norm(name) == qtok:
+                if idx != 0:
+                    sorted_hits.insert(0, sorted_hits.pop(idx))
+                break
+
+    return sorted_hits
 
 def covers_all(r, rare_tokens):
     meta = _node_meta(r)
