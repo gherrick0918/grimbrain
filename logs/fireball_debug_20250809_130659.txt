@@ -1,0 +1,60 @@
+🔍 Top 5 Retrieved Results for query: 'booyahg whip'
+
+
+#1 - Drow Priestess of Lolth | src=MM
+Drow Priestess of Lolth
+
+
+AC: 16
+HP: 71
+Speed: walk: 30
+STR: 10, DEX: 14, CON: 12, INT: 13, WIS: 17, CHA: 18
+------------------------------------------------------------
+Metadata: {'source': 'MM', 'name': 'Drow Priestess of Lolth', 'type': 'monster', 'hp': '71', 'ac': '16', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Drow Priestess of Lolth|MM'}
+
+
+#2 - Skull Lord | src=MPMM
+Skull Lord
+
+
+AC: 18
+HP: 112
+Speed: walk: 30
+STR: 14, DEX: 16, CON: 17, INT: 16, WIS: 15, CHA: 21
+------------------------------------------------------------
+Metadata: {'source': 'MPMM', 'name': 'Skull Lord', 'type': 'monster', 'hp': '112', 'ac': '18', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Skull Lord|MPMM'}
+
+
+#3 - Rot Troll | src=MPMM
+Rot Troll
+
+
+AC: 16
+HP: 138
+Speed: walk: 30
+STR: 18, DEX: 13, CON: 22, INT: 5, WIS: 8, CHA: 4
+------------------------------------------------------------
+Metadata: {'source': 'MPMM', 'name': 'Rot Troll', 'type': 'monster', 'hp': '138', 'ac': '16', 'speed': 'walk: 30', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Rot Troll|MPMM'}
+
+
+#4 - Yeenoghu | src=MPMM
+Yeenoghu
+name: Yeenoghu
+source: MPMM
+page: 270
+lairActions: ["On initiative count 20 (losing initiative ties), Yeenoghu can take one of the following lair actions; he can't take the same lair action two rounds in a row:", {'type': 'list', 'style': 'list-hang-notitle', 'items': [{'type': 'item', 'name': 'Incite the Pack', 'entries': ['Until the next initiative count 20, all gnolls and hyenas within the lair are enraged, causing them to have advantage on melee weapon attack rolls and causing attack rolls to have advantage against them.']}, {'type': 'item', 'name': 'Iron Spike', 'entries': ['Yeenoghu causes an iron spike—5 feet tall and 1 inch in diameter—to burst from the ground at a point he can see within 100 feet of him. Any creature in the space where the spike emerges must make a {@dc 24} Dexterity saving throw. On a failed save, the creature takes 27 ({@damage 6d8}) piercing damage and is {@condition restrained} by being impaled on the spike. A creature can use an action to remove 
+------------------------------------------------------------
+Metadata: {'source': 'MPMM', 'name': 'Yeenoghu', 'type': 'generic', 'doc_type': 'generic', 'priority': 0, 'canonical_id': 'Yeenoghu|MPMM'}
+
+
+#5 - Sacred Statue | src=MPMM
+Sacred Statue
+
+
+AC: 19
+HP: 95
+Speed: walk: 25
+STR: 19, DEX: 8, CON: 19, INT: 14, WIS: 19, CHA: 16
+------------------------------------------------------------
+Metadata: {'source': 'MPMM', 'name': 'Sacred Statue', 'type': 'monster', 'hp': '95', 'ac': '19', 'speed': 'walk: 25', 'doc_type': 'monster', 'priority': 0, 'canonical_id': 'Sacred Statue|MPMM'}
+

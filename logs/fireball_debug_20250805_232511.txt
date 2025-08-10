@@ -1,0 +1,28 @@
+🔍 Top 5 Retrieved Results for query: 'Fireball'
+
+
+#1 - Source: Fireball
+Fireball
+Level 3 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: v, s, m
+Duration: [{'type': 'instant'}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A bright streak flashes from your pointing finger to a point you choose within range and then blossoms with a low roar into an explosion of flame. Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A target takes {@damage 8d6} fire damage on a failed save, or half as much damage on a successful one.
+The fire spreads around corners. It ignites flammable objects in the area that aren't being worn or carried.
+------------------------------------------------------------
+
+#2 - Source: Fireball
+Fireball
+Level 3 V
+Range: {'type': 'point', 'distance': {'type': 'feet', 'amount': 150}}
+Damage: Unknown
+Components: v, s, m
+Duration: [{'type': 'instant'}]
+Casting Time: [{'number': 1, 'unit': 'action'}]
+
+A bright streak flashes from you to a point you choose within range and then blossoms with a low roar into a fiery explosion. Each creature in a 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} centered on that point makes a Dexterity saving throw, taking {@damage 8d6} Fire damage on a failed save or half as much damage on a successful one.
+Flammable objects in the area that aren't being worn or carried start {@hazard burning|XPHB}.
+------------------------------------------------------------

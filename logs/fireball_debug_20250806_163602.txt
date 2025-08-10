@@ -1,0 +1,20 @@
+🔍 Top 5 Retrieved Results for query: 'Goblin'
+
+
+#1 - Source: KKW
+Goblin Gang Member
+AC: Unknown
+HP: Unknown
+Speed: walk: 30
+STR: Unknown, DEX: Unknown, CON: Unknown, INT: Unknown, WIS: Unknown, CHA: Unknown
+------------------------------------------------------------
+
+#2 - Source: VGM
+Booyahg Whip
+name: Booyahg Whip
+source: VGM
+page: 42
+_copy: {'name': 'Goblin', 'source': 'MM', '_mod': {'trait': {'mode': 'appendArr', 'items': {'name': "Khurgorbaeyag's Gift", 'entries': ['Khurgorbaeyag saw fit to gift this goblin with powers that enable it to dominate others. The goblin has {@dice 1d3} other {@creature goblin||goblins} that slavishly obey its orders.']}}}}
+hasToken: True
+hasFluff: True
+------------------------------------------------------------
