@@ -462,7 +462,7 @@ def run_query(
                 if query_type == "monster":
                     # Stitch using the actual text plus node metadata (not the NodeWithScore itself)
                     pref_meta = _node_meta(preferred)
-                    stitched = maybe_stitch_monster_actions(raw_text, meta=pref_meta)
+                    stitched = maybe_stitch_monster_actions(preferred, raw_text, meta=pref_meta)
                     if stitched:
                         raw_text = stitched
             else:
