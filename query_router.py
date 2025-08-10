@@ -59,6 +59,28 @@ AUTO_KEYWORDS = {
     "table": ["roll", "table", "trinket", "loot", "result"],
 }
 
+# Common text-processing helpers
+STOPWORDS = {
+    "the","a","an","of","and","or","to","for","from","with","in","on","at",
+    "by","as","is","are","was","were","be","it","this","that","these","those"
+}
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+def _tokens(s: str):
+    return [t for t in _norm(s).split() if t and t not in STOPWORDS]
+
+def _node_meta(hit):
+    node = getattr(hit, "node", None)
+    return getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {}
+
+SOURCE_BOOSTS = {
+    "MM": 1.0,      # Monster Manual
+    "MPMM": 0.6,    # Monsters of the Multiverse
+    "VGM": 0.4,     # Volo's Guide (for Booyahg variants)
+}
+
 def detect_type_auto(query: str) -> str:
     lowered = query.lower()
     for type_, keywords in AUTO_KEYWORDS.items():
@@ -92,40 +114,6 @@ def get_query_engine(collection_name: str, embed_model=None, top_k: int | None =
 
 def pick_top_k(q: str) -> int:
     return 50 if any(len(t) >= 4 for t in _tokens(q)) else 15
-
-def _node_meta(hit):
-    node = getattr(hit, "node", None)
-    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
-
-SOURCE_BOOSTS = {"MM": 0.5, "MPMM": 0.3, "VGM": 0.3}
-
-def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
-
-def _node_meta(hit):
-    node = getattr(hit, "node", None)
-    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
-
-STOPWORDS = {
-    "the","a","an","of","and","or","to","for","from","with","in","on","at",
-    "by","as","is","are","was","were","be","it","this","that","these","those"
-}
-
-def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
-
-def _tokens(s: str):
-    return [t for t in _norm(s).split() if t and t not in STOPWORDS]
-
-SOURCE_BOOSTS = {
-    "MM": 1.0,      # Monster Manual
-    "MPMM": 0.6,    # Monsters of the Multiverse
-    "VGM": 0.4,     # Volo's Guide (for Booyahg variants)
-}
-
-def _node_meta(hit):
-    node = getattr(hit, "node", None)
-    return (getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {})
 
 def rerank(query, hits):
     """
@@ -224,7 +212,7 @@ def rerank(query, hits):
                     s -= 6.0
 
         # Light source nudges
-        s += {"MM": 0.5, "MPMM": 0.3, "VGM": 0.3}.get(src, 0.0)
+        s += SOURCE_BOOSTS.get(src, 0.0)
 
         # Base vs. variant nudges
         if meta.get("canonical_id") == base_canonical_guess:
