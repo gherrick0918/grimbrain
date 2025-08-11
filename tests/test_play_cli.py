@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -10,10 +11,27 @@ def _write_pc(tmp_path: Path, pcs: list[dict]) -> Path:
 
 
 def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None) -> subprocess.CompletedProcess:
-    args = ["python", "main.py", "--play", "--pc", str(pc_file), "--encounter", encounter]
+    """Run the play CLI in a subprocess and capture its output.
+
+    Using ``sys.executable`` ensures the subprocess uses the same Python
+    interpreter as the tests, which is important on platforms like Windows
+    where ``python`` might not point to the active virtual environment.
+    The path to ``main.py`` is resolved relative to this test file so that the
+    test can be executed from any working directory.
+    """
+
+    main_path = Path(__file__).resolve().parent.parent / "main.py"
+    args = [sys.executable, str(main_path), "--play", "--pc", str(pc_file), "--encounter", encounter]
     if seed is not None:
         args += ["--seed", str(seed)]
-    proc = subprocess.run(args, input=cmds, text=True, capture_output=True, timeout=20)
+    proc = subprocess.run(
+        args,
+        input=cmds,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        cwd=str(main_path.parent),
+    )
     return proc
 
 
