@@ -15,7 +15,7 @@
    ```bash
    python main.py --scene "market brawl" --json-out logs/side.json --md-out logs/side.md
    ```
-   This prints a formatted entry and writes the markdown and sidecar JSON to disk.
+   This prints a formatted entry and writes both markdown and JSON sidecars.
 4. **Python API**
    ```python
    from grimbrain.retrieval.query_router import run_query
@@ -27,11 +27,12 @@
    ```
    The ``run_query`` function always returns a tuple ``(markdown, json, provenance)``.
 
-5. **Combat round**
+5. **Play mode**
    ```bash
-   python main.py --pc tests/pc.json --encounter "goblin" --rounds 1
+   python main.py --play --pc tests/pc.json --encounter "goblin" --seed 1 --autosave
    ```
-   This loads PCs from ``pc.json``, runs a single combat round against a goblin and prints the log.
+   Loads PCs from ``pc.json`` and drops you into an interactive fight. Use
+   shorthand commands like `a` for attack, `c` for cast, `s` for status and `q` to quit.
 
    Example ``pc.json``:
    ```json
@@ -60,3 +61,5 @@ Use `--embeddings` to select embedding mode:
 
 - `--json-out` optionally takes a path (defaults to `logs/last_sidecar.json`)
 - `--md-out` writes the markdown output
+- `--play` enables interactive combat; combine with `--seed` for determinism
+- `--autosave` appends turn summaries to paired markdown/JSON logs
