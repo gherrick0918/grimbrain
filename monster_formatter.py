@@ -160,3 +160,78 @@ class MonsterFormatter:
         if first and not any(h.lower() in first.lower() for h in ["armor class", "hit points", "speed"]):
             return first.strip("# ").strip()
         return "Unknown Creature"
+
+
+def monster_to_json(markdown: str, meta: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Parse the formatted monster markdown into a structured JSON dict."""
+    meta = meta or {}
+
+    lines = [ln.strip() for ln in markdown.splitlines()]
+    header_re = re.compile(r"^###\s*(.+?)(?:\s+—\s+(.+))?$")
+    abil_re = re.compile(
+        r"\*\*STR\*\*\s*(\d+)\s*\*\*DEX\*\*\s*(\d+)\s*\*\*CON\*\*\s*(\d+)\s*"
+        r"\*\*INT\*\*\s*(\d+)\s*\*\*WIS\*\*\s*(\d+)\s*\*\*CHA\*\*\s*(\d+)",
+        re.IGNORECASE,
+    )
+
+    out: Dict[str, Any] = {
+        "name": "",
+        "source": meta.get("source", ""),
+        "ac": "",
+        "hp": "",
+        "speed": "",
+        "str": 0,
+        "dex": 0,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 0,
+        "traits": [],
+        "actions": [],
+        "reactions": [],
+        "provenance": meta.get("provenance", []),
+    }
+
+    section: str | None = None
+    for line in lines:
+        if not line:
+            continue
+        m = header_re.match(line)
+        if m:
+            out["name"] = m.group(1).strip()
+            if m.group(2):
+                out["source"] = m.group(2).strip()
+            continue
+        if line.startswith("**Armor Class**"):
+            out["ac"] = line.split("**Armor Class**:", 1)[1].strip()
+            continue
+        if line.startswith("**Hit Points**"):
+            out["hp"] = line.split("**Hit Points**:", 1)[1].strip()
+            continue
+        if line.startswith("**Speed**"):
+            out["speed"] = line.split("**Speed**:", 1)[1].strip()
+            continue
+        if line.startswith("**STR**"):
+            m2 = abil_re.search(line)
+            if m2:
+                stats = list(map(int, m2.groups()))
+                for k, v in zip(["str", "dex", "con", "int", "wis", "cha"], stats):
+                    out[k] = v
+            continue
+        if line == "**Traits**":
+            section = "traits"
+            continue
+        if line == "**Actions**":
+            section = "actions"
+            continue
+        if line == "**Reactions**":
+            section = "reactions"
+            continue
+        if line.startswith("- **") and section:
+            m3 = re.match(r"- \*\*(.+?)\.\*\*\s*(.+)", line)
+            if m3:
+                getattr_list = out[section]
+                getattr_list.append({"name": m3.group(1).strip(), "text": m3.group(2).strip()})
+            continue
+
+    return out
