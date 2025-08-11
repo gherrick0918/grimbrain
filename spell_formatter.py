@@ -1,4 +1,6 @@
 import re
+import ast
+import json
 from utils import coerce_obj, ordinal
 
 class SpellFormatter:
@@ -157,23 +159,43 @@ def _fmt_components(c):
     if isinstance(c, list): return ", ".join(map(str,c))
     return str(c) if c else "—"
 
+def _maybe_parse_text_dict(val):
+    """Unwrap dictionaries of the form {"text": "[...]"} into Python objects."""
+    if isinstance(val, dict) and set(val.keys()) == {"text"} and isinstance(val["text"], str):
+        txt = val["text"].strip()
+        try:
+            return ast.literal_eval(txt)
+        except Exception:
+            try:
+                return json.loads(txt)
+            except Exception:
+                return txt
+    return val
+
+
 def _fmt_duration(d):
     # usually a list; handle first item
     def one(x):
+        x = _maybe_parse_text_dict(x)
         if isinstance(x, dict):
             t = x.get("type")
-            if t == "instant": return "Instantaneous"
-            if t == "permanent": return "Permanent"
+            if t == "instant":
+                return "Instantaneous"
+            if t == "permanent":
+                return "Permanent"
             if t == "timed":
                 dur = x.get("duration", x)
                 if isinstance(dur, dict):
                     amt = dur.get("amount")
-                    unit = dur.get("type","").replace("_"," ")
+                    unit = dur.get("type", "").replace("_", " ")
                     conc = x.get("concentration")
                     base = f"{amt} {unit}" if amt and unit else unit or "—"
                     return f"Concentration, up to {base}" if conc else base
         return str(x)
-    if isinstance(d, list) and d: return one(d[0])
+
+    d = _maybe_parse_text_dict(d)
+    if isinstance(d, list) and d:
+        return one(d[0])
     return one(d) if d else "—"
 
 def _fmt_time(t):
