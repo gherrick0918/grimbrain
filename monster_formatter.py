@@ -131,20 +131,21 @@ class MonsterFormatter:
         # Actions section (patched)
         lines.append("")
         lines.append("**Actions**")
-        if actions:
-            for k, v in actions.items():
-                lines.append(f"- **{k}.** {v}")
-        else:
-            # Try stitch (non-fatal)
-            stitched = maybe_stitch_monster_actions(
-                None,
-                text,
-                meta=meta,
-            )
+        seen: set[str] = set()
+        for k, v in actions.items():
+            lines.append(f"- **{k}.** {v}")
+            seen.add(k)
+        if not actions:
+            stitched = maybe_stitch_monster_actions(None, text, meta=meta)
             if stitched:
-                lines.append(stitched)
-            else:
-                lines.append("- _See source entry for full actions text._")
+                extra = _named_paras(stitched)
+                for k, v in extra.items():
+                    if k in seen:
+                        continue
+                    lines.append(f"- **{k}.** {v}")
+                    seen.add(k)
+        if len(lines) == 2:  # header only
+            lines.append("- _See source entry for full actions text._")
 
         if reactions:
             lines.append("")

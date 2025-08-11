@@ -20,6 +20,7 @@ from datetime import datetime
 import re
 from formatters import auto_format
 from monster_formatter import monster_to_json
+from spell_formatter import spell_to_json
 from utils import ensure_collection, hit_text
 from llama_index.core.llms.mock import MockLLM
 from llama_index.core import VectorStoreIndex
@@ -684,14 +685,19 @@ def run_query(
         print("🧪 Retrieved text:\n", raw_text[:500])
         print(f"Detected format type for '{query}': {query_type}")
         out = auto_format(raw_text, metadata=pref_meta)
+        json_sidecar = None
         if query_type == "monster":
             try:
-                # mutate in place rather than rebind
                 LAST_MONSTER_JSON.clear()
                 LAST_MONSTER_JSON.update(monster_to_json(out, pref_meta))
+                json_sidecar = LAST_MONSTER_JSON
             except Exception:
                 LAST_MONSTER_JSON.clear()
-        json_sidecar = LAST_MONSTER_JSON if query_type == "monster" and LAST_MONSTER_JSON else None
+        elif query_type == "spell":
+            try:
+                json_sidecar = spell_to_json(out, pref_meta)
+            except Exception:
+                json_sidecar = None
         return out, json_sidecar, pref_meta.get("provenance")
 
     except Exception as e:
