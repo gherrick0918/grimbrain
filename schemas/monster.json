@@ -16,6 +16,7 @@
     "cha",
     "traits",
     "actions",
+    "actions_struct",
     "reactions",
     "provenance"
   ],
@@ -50,6 +51,32 @@
         "properties": {
           "name": {"type": "string"},
           "text": {"type": "string"}
+        }
+      }
+    },
+    "actions_struct": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "attack_bonus",
+          "type",
+          "reach_or_range",
+          "target",
+          "hit_text",
+          "damage_dice",
+          "damage_type"
+        ],
+        "properties": {
+          "name": {"type": "string"},
+          "attack_bonus": {"type": "integer"},
+          "type": {"type": "string"},
+          "reach_or_range": {"type": "string"},
+          "target": {"type": "string"},
+          "hit_text": {"type": "string"},
+          "damage_dice": {"type": "string"},
+          "damage_type": {"type": "string"}
         }
       }
     },

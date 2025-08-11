@@ -8,7 +8,7 @@ from llama_index.core.settings import Settings
 from llama_index.core.llms.mock import MockLLM
 from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
 from query_router import run_query
-from engine.session import start_scene
+from engine.session import Session, start_scene
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -49,6 +49,7 @@ def main():
     parser.add_argument("--json-out", nargs="?", const="logs/last_sidecar.json", help="Write sidecar JSON to path", default=None)
     parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
+    parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
     args = parser.parse_args()
 
@@ -74,8 +75,15 @@ def main():
     print(md)
     write_outputs(md, js, args.json_out, args.md_out)
 
+    if args.scene and args.resume:
+        parser.error("--scene and --resume are mutually exclusive")
+
     if args.scene:
-        start_scene(args.scene)
+        md_path, json_path = start_scene(args.scene)
+        print(f"Started scene '{args.scene}', logs at {json_path}")
+    if args.resume:
+        session = Session.load(args.resume)
+        print(f"Resumed scene '{session.scene}' with {len(session.steps)} steps")
 
 
 if __name__ == "__main__":

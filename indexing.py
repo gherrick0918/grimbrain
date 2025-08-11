@@ -155,11 +155,18 @@ def _scan_json_files(data_dir, hash_cache, updated_hash_cache, log_entries, forc
     return folder_to_changed_files, folder_entries, folder_filehash
 
 def _build_global_lookup(all_entries):
-    return {
-        (e.get("name"), e.get("source")): e
-        for e in all_entries
-        if e.get("name") and e.get("source")
-    }
+    lookup = {}
+    for e in all_entries:
+        key = (e.get("name"), e.get("source"))
+        if not key[0] or not key[1]:
+            continue
+        existing = lookup.get(key)
+        if not existing:
+            lookup[key] = e
+        else:
+            if len(str(e)) > len(str(existing)):
+                lookup[key] = e
+    return lookup
 
 def _entry_to_doc(entry):
     name_value = entry.get("name", "Unknown")
