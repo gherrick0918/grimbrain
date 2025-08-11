@@ -9,7 +9,7 @@ from llama_index.core.llms.mock import MockLLM
 from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
 from query_router import run_query
 from engine.session import Session, start_scene, log_step
-from engine.combat import run_round
+from engine.combat import run_round, run_encounter, parse_monster_spec
 from models import PC, MonsterSidecar
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -56,8 +56,9 @@ def main():
     parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
     parser.add_argument("--seed", type=int, default=None,
                         help="Deterministic seed for dice/combat/session")
-    parser.add_argument("--encounter", type=str, help="Monster name to fight", default=None)
-    parser.add_argument("--rounds", type=int, help="Number of combat rounds", default=0)
+    parser.add_argument("--encounter", type=str, help="Monsters to fight", default=None)
+    parser.add_argument("--rounds", type=int, help="Max combat rounds", default=10)
+    parser.add_argument("--summary-out", type=str, help="Write encounter summary JSON", default=None)
     args = parser.parse_args()
 
     embed_model, msg = choose_embedding(args.embeddings)
@@ -98,7 +99,7 @@ def main():
         # optionally run a round, etc.
         # result = run_round(session.party, session.monsters, seed=args.seed)
 
-    if args.pc and args.encounter and args.rounds > 0:
+    if args.pc and args.encounter:
         raw = json.loads(Path(args.pc).read_text())
         # Accept either a list of PCs or {"party": [...]}
         if isinstance(raw, dict) and "party" in raw:
@@ -116,12 +117,21 @@ def main():
             return obj
         raw = [_normalize_pc(o) for o in raw]
         pcs = [PC(**obj) for obj in raw]
-        _, sidecar, _ = run_query(args.encounter, type="monster", embed_model=embed_model)
-        monster = MonsterSidecar(**sidecar)
-        result = run_round(pcs, [monster], seed=args.seed)
+
+        def _lookup(name: str) -> MonsterSidecar:
+            _, sc, _ = run_query(name, type="monster", embed_model=embed_model)
+            return MonsterSidecar(**sc)
+
+        monsters = parse_monster_spec(args.encounter, _lookup)
+        result = run_encounter(pcs, monsters, seed=args.seed, max_rounds=args.rounds)
         print("\n".join(result["log"]))
+        if args.summary_out:
+            path = Path(args.summary_out)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(result["summary"], indent=2))
+            print(f"Summary written to {path}")
         if md_path and json_path:
-            log_step(md_path, json_path, f"Round 1 vs {args.encounter}", "\n".join(result["log"]))
+            log_step(md_path, json_path, f"Encounter vs {args.encounter}", "\n".join(result["log"]))
 
 
 if __name__ == "__main__":
