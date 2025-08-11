@@ -444,6 +444,14 @@ def run_query(
 
     collection_name = COLLECTION_MAP[query_type]
 
+    # During test runs, ignore any learned alias mappings so results remain
+    # consistent even if a developer has a locally modified aliases.json.
+    # The test harness sets IS_TESTING=1 (see tests/conftest.py) which we use
+    # as a signal to disable alias lookups and learning.
+    if os.getenv("IS_TESTING") == "1":
+        alias_map_enabled = False
+        learn_aliases = False
+
     try:
         query_engine = get_query_engine(collection_name, embed_model)
 
