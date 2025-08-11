@@ -21,10 +21,32 @@
    from query_router import run_query
    md, js, prov = run_query("goblin", type="monster")
    ```
-   `md` is markdown, `js` a sidecar dict, and `prov` a list of provenance strings.
-   For spells:
+   `md` is markdown, `js` a sidecar dict, and `prov` a list of provenance strings. For spells:
    ```python
    md, js, prov = run_query("fireball", type="spell")
+   ```
+   The ``run_query`` function always returns a tuple ``(markdown, json, provenance)``.
+
+5. **Combat round**
+   ```bash
+   python main.py --pc tests/pc.json --encounter "goblin" --rounds 1
+   ```
+   This loads PCs from ``pc.json``, runs a single combat round against a goblin and prints the log.
+
+   Example ``pc.json``:
+   ```json
+   [
+     {"name": "Hero1", "ac": 15, "hp": 20,
+      "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}]},
+     {"name": "Hero2", "ac": 15, "hp": 20,
+      "attacks": [{"name": "Axe", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}]}
+   ]
+   ```
+
+   Sample output:
+   ```
+   Goblin hits Hero for 5
+   Hero misses Goblin
    ```
 
 ### Embeddings flag

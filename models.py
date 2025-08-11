@@ -47,3 +47,21 @@ class SpellSidecar(BaseModel):
     classes: List[str]
     text: str
     provenance: List[str]
+
+
+class Attack(BaseModel):
+    """Simple attack entry for a :class:`PC`."""
+
+    name: str
+    to_hit: int
+    damage_dice: str
+    type: str
+
+
+class PC(BaseModel):
+    """Player character sheet used by the combat engine."""
+
+    name: str
+    ac: int
+    hp: int
+    attacks: List[Attack]

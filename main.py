@@ -8,7 +8,9 @@ from llama_index.core.settings import Settings
 from llama_index.core.llms.mock import MockLLM
 from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
 from query_router import run_query
-from engine.session import Session, start_scene
+from engine.session import Session, start_scene, log_step
+from engine.combat import run_round
+from models import PC, MonsterSidecar
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -51,6 +53,9 @@ def main():
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
+    parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
+    parser.add_argument("--encounter", type=str, help="Monster name to fight", default=None)
+    parser.add_argument("--rounds", type=int, help="Number of combat rounds", default=0)
     args = parser.parse_args()
 
     embed_model, msg = choose_embedding(args.embeddings)
@@ -75,6 +80,8 @@ def main():
     print(md)
     write_outputs(md, js, args.json_out, args.md_out)
 
+    md_path = json_path = None
+
     if args.scene and args.resume:
         parser.error("--scene and --resume are mutually exclusive")
 
@@ -83,7 +90,18 @@ def main():
         print(f"Started scene '{args.scene}', logs at {json_path}")
     if args.resume:
         session = Session.load(args.resume)
+        md_path = Path(args.resume.replace('.json', '.md'))
+        json_path = Path(args.resume)
         print(f"Resumed scene '{session.scene}' with {len(session.steps)} steps")
+
+    if args.pc and args.encounter and args.rounds > 0:
+        pcs = [PC(**obj) for obj in json.loads(Path(args.pc).read_text())]
+        _, sidecar, _ = run_query(args.encounter, type="monster", embed_model=embed_model)
+        monster = MonsterSidecar(**sidecar)
+        result = run_round(pcs, [monster], seed=0)
+        print("\n".join(result["log"]))
+        if md_path and json_path:
+            log_step(md_path, json_path, f"Round 1 vs {args.encounter}", "\n".join(result["log"]))
 
 
 if __name__ == "__main__":
