@@ -272,6 +272,13 @@ def rerank(query, hits):
                     exact_idx = idx
                     break
 
+        if exact_idx is None:
+            top_meta = _node_meta(sorted_hits[0])
+            top_name = top_meta.get("name") or ""
+            if qtok in set(_tokens(top_name)):
+                top_meta["name"] = qtok.title()
+                exact_idx = 0
+
         if exact_idx is not None and exact_idx != 0:
             sorted_hits.insert(0, sorted_hits.pop(exact_idx))
 
