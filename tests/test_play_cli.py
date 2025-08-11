@@ -40,7 +40,7 @@ def test_basic_attack_flow(tmp_path):
         {"name": "Malrick", "ac": 15, "hp": 20, "attacks": [{"name": "Shortsword", "to_hit": 5, "damage_dice": "1d6+3", "type": "melee"}]}
     ]
     pc_file = _write_pc(tmp_path, pcs)
-    script = "status\nattack Malrick Goblin \"Shortsword\"\nstatus\nend\n"
+    script = "s\na Goblin \"Shortsword\"\ns\nend\n"
     res = run_play(script, pc_file, "goblin", seed=1)
     out = res.stdout
     assert "Malrick hits Goblin" in out
@@ -60,7 +60,7 @@ def test_cast_fireball_flow(tmp_path):
         ]}
     ]
     pc_file = _write_pc(tmp_path, pcs)
-    script = "cast Brynn \"Fireball\" all\nend\n"
+    script = "c \"Fireball\" all\nend\n"
     res = run_play(script, pc_file, "goblin x2", seed=2)
     out = res.stdout
     assert out.count("Dex save") == 2
@@ -75,8 +75,20 @@ def test_seed_determinism(tmp_path):
         {"name": "Malrick", "ac": 15, "hp": 20, "attacks": [{"name": "Shortsword", "to_hit": 5, "damage_dice": "1d6+3", "type": "melee"}]}
     ]
     pc_file = _write_pc(tmp_path, pcs)
-    script = "status\nattack Malrick Goblin \"Shortsword\"\nend\n"
+    script = "s\na Goblin \"Shortsword\"\nend\n"
     res1 = run_play(script, pc_file, "goblin", seed=42)
     res2 = run_play(script, pc_file, "goblin", seed=42)
     assert res1.stdout == res2.stdout
+
+
+def test_typo_and_actions(tmp_path):
+    pcs = [
+        {"name": "Malrick", "ac": 15, "hp": 20, "attacks": [{"name": "Shortsword", "to_hit": 5, "damage_dice": "1d6+3", "type": "melee"}]}
+    ]
+    pc_file = _write_pc(tmp_path, pcs)
+    script = "attak Goblin \"Shortsword\"\nactions\nq\n"
+    res = run_play(script, pc_file, "goblin", seed=1)
+    out = res.stdout
+    assert "Malrick hits Goblin" in out
+    assert "Shortsword" in out
 

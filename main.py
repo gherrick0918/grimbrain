@@ -20,6 +20,7 @@ from grimbrain.engine.dice import roll
 from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
 from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
+from grimbrain.engine.encounter import compute_encounter
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -140,16 +141,50 @@ def _load_game(path: str):
     return sess.seed, round_num, turn, combatants
 
 
+def _edit_distance_one(a: str, b: str) -> bool:
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    if len(a) + 1 == len(b):
+        for i in range(len(b)):
+            if a[:i] == b[:i] and a[i:] == b[i + 1 :]:
+                return True
+        return False
+    if len(b) + 1 == len(a):
+        for i in range(len(a)):
+            if a[:i] == b[:i] and a[i + 1 :] == b[i:]:
+                return True
+        return False
+    return False
+
+
+def _normalize_cmd(cmd: str) -> str:
+    aliases = {"a": "attack", "atk": "attack", "c": "cast", "s": "status", "q": "quit"}
+    if cmd in aliases:
+        return aliases[cmd]
+    known = ["attack", "cast", "status", "quit", "end", "save", "load", "actions"]
+    for k in known:
+        if _edit_distance_one(cmd, k):
+            return k
+    return cmd
+
 
 def play_cli(
     pcs: list[PC],
     monsters: list[MonsterSidecar],
     seed: int | None = None,
     max_rounds: int = 20,
+    autosave: bool = False,
+    summary_out: str | None = None,
 ) -> None:
     rng = random.Random(seed)
     if seed is not None:
         print(f"Using seed: {seed}")
+    if autosave:
+        md_path, json_path = start_scene("play", seed=seed)
+    else:
+        md_path = json_path = None
 
     combatants: list[Combatant] = []
     combatants.extend(
@@ -197,23 +232,36 @@ def play_cli(
                 if not cmd:
                     continue
                 parts = shlex.split(cmd)
+                parts[0] = _normalize_cmd(parts[0])
                 if parts[0] == "status":
                     _print_status(round_num, combatants)
                 elif parts[0] == "help":
-                    print("Commands: status, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, quit")
+                    print(
+                        "Commands: status, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
+                    )
                 elif parts[0] == "quit":
                     return
                 elif parts[0] == "save" and len(parts) == 2:
                     _save_game(parts[1], seed, round_num, turn, combatants)
                 elif parts[0] == "load" and len(parts) == 2:
                     seed, round_num, turn, combatants = _load_game(parts[1])
-                elif parts[0] == "attack" and len(parts) >= 4:
-                    name, target_name, atk_name = parts[1], parts[2], parts[3]
-                    adv = len(parts) > 4 and parts[4] == "adv"
-                    dis = len(parts) > 4 and parts[4] == "dis"
-                    if name != actor.name:
-                        print(f"It's {actor.name}'s turn")
+                elif parts[0] == "actions":
+                    target_name = parts[1] if len(parts) > 1 else actor.name
+                    target = next((c for c in combatants if c.name == target_name), None)
+                    if not target:
+                        print("Unknown combatant")
                         continue
+                    names = [a["name"] for a in target.attacks]
+                    print(", ".join(names) if names else "No actions")
+                elif parts[0] == "attack" and len(parts) >= 3:
+                    if parts[1] == actor.name and len(parts) >= 4:
+                        _, target_name, atk_name = parts[1], parts[2], parts[3]
+                        extra = parts[4:]
+                    else:
+                        target_name, atk_name = parts[1], parts[2]
+                        extra = parts[3:]
+                    adv = "adv" in extra
+                    dis = "dis" in extra
                     target = next((c for c in combatants if c.name == target_name and not c.defeated), None)
                     if not target:
                         print("Unknown target")
@@ -239,12 +287,12 @@ def play_cli(
                             print(f"{target.name} is defeated")
                     else:
                         print(f"{actor.name} misses {target.name}")
-                elif parts[0] == "cast" and len(parts) >= 3:
-                    name, spell_name = parts[1], parts[2]
-                    target_spec = parts[3] if len(parts) > 3 else "all"
-                    if name != actor.name:
-                        print(f"It's {actor.name}'s turn")
-                        continue
+                elif parts[0] == "cast" and len(parts) >= 2:
+                    if parts[1] == actor.name and len(parts) >= 3:
+                        _, spell_name, *rest = parts[1:]
+                    else:
+                        spell_name, *rest = parts[1:]
+                    target_spec = rest[0] if rest else "all"
                     attack = next((a for a in actor.attacks if a["name"] == spell_name), None)
                     if not attack:
                         print("Unknown spell")
@@ -292,9 +340,31 @@ def play_cli(
                 else:
                     print(f"{actor.name} misses {target.name}")
         turn = (turn + 1) % len(combatants)
+        hp_line = ", ".join(f"{c.name} {0 if c.defeated else c.hp}" for c in combatants)
+        next_name = combatants[turn].name
+        print(f"HP: {hp_line}")
+        print(f"Next: {next_name}")
+        if autosave and md_path and json_path:
+            log_step(md_path, json_path, f"Round {round_num} {actor.name}", f"HP: {hp_line}\nNext: {next_name}")
         if turn == 0:
             round_num += 1
-    print("Max rounds reached")
+
+    winner = _check_victory(combatants)
+    if winner:
+        xp = compute_encounter(monsters)
+        loot_seed = rng.randint(0, 10_000_000)
+        loot = roll(f"{len(monsters)}d6", seed=loot_seed)["total"]
+        summary = {"winner": winner, "rounds": round_num - 1 if turn == 0 else round_num, "xp": xp["total_xp"], "loot_gp": loot}
+        print(
+            f"{winner.capitalize()} wins after {summary['rounds']} rounds! XP {summary['xp']}, Loot {summary['loot_gp']} gp"
+        )
+        if summary_out:
+            Path(summary_out).write_text(json.dumps(summary, indent=2))
+            print(f"Summary written to {summary_out}")
+        if autosave and md_path and json_path:
+            log_step(md_path, json_path, "Summary", json.dumps(summary))
+    else:
+        print("Max rounds reached")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -312,6 +382,7 @@ def main():
     parser.add_argument("--encounter", type=str, help="Monsters to fight", default=None)
     parser.add_argument("--rounds", type=int, help="Max combat rounds", default=10)
     parser.add_argument("--summary-out", type=str, help="Write encounter summary JSON", default=None)
+    parser.add_argument("--autosave", action="store_true", help="Autosave turn summaries")
     args = parser.parse_args()
 
     if args.play:
@@ -325,7 +396,7 @@ def main():
         raw = _normalize_party(raw)
         pcs = [PC(**o) for o in raw]
         monsters = parse_monster_spec(args.encounter, _lookup_fallback)
-        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds)
+        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds, autosave=args.autosave, summary_out=args.summary_out)
         return
 
     from llama_index.core.settings import Settings
