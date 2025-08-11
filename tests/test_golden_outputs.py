@@ -10,7 +10,7 @@ def test_goblin_golden(embedder):
     md_path = base.with_suffix(".md")
     json_path = base.with_suffix(".json")
     if os.getenv("UPDATE_GOLDENS"):
-        md_path.write_text(md)
-        json_path.write_text(json.dumps(js, indent=2))
-    assert md_path.read_text() == md
-    assert json.loads(json_path.read_text()) == js
+        md_path.write_text(md, encoding="utf-8")
+        json_path.write_text(json.dumps(js, indent=2), encoding="utf-8")
+    assert md_path.read_text(encoding="utf-8") == md
+    assert json.loads(json_path.read_text(encoding="utf-8")) == js
