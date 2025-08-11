@@ -18,7 +18,15 @@ import os
 from pathlib import Path
 from datetime import datetime
 import re
-from formatters import auto_format
+from formatters import (
+    auto_format,
+    item_to_json,
+    rule_to_json,
+    ItemFormatter,
+    RuleFormatter,
+    _append_provenance,
+    _format_with,
+)
 from monster_formatter import monster_to_json
 from spell_formatter import spell_to_json
 from utils import ensure_collection, hit_text
@@ -190,6 +198,15 @@ def _node_meta(hit):
     node = getattr(hit, "node", None)
     return getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {}
 
+def provenance_from_results(results) -> List[str]:
+    prov: List[str] = []
+    for r in results[:3]:
+        meta = _node_meta(r)
+        src = meta.get("source") or "?"
+        nm = meta.get("name") or "?"
+        prov.append(f"{src} · {nm}")
+    return prov
+
 SOURCE_BOOSTS = {
     "MM": 1.0,      # Monster Manual
     "MPMM": 0.6,    # Monsters of the Multiverse
@@ -215,7 +232,11 @@ def get_query_engine(collection_name: str, embed_model=None, top_k: int | None =
         except Exception as e:
             print(f"⚠️ Failed to initialize local embedding: {e}", file=sys.stderr)
     else:
-        print("⚠️ Embedding not configured (Settings/CustomLocalEmbedding unavailable). Proceeding anyway.", file=sys.stderr)
+        if not os.getenv("SUPPRESS_EMBED_WARNING"):
+            print(
+                "⚠️ Embedding not configured (Settings/CustomLocalEmbedding unavailable). Proceeding anyway.",
+                file=sys.stderr,
+            )
 
     client = PersistentClient(path="chroma_store")
     embedder = embed_model or (Settings.embed_model if Settings else None)
@@ -684,21 +705,40 @@ def run_query(
 
         print("🧪 Retrieved text:\n", raw_text[:500])
         print(f"Detected format type for '{query}': {query_type}")
-        out = auto_format(raw_text, metadata=pref_meta)
-        json_sidecar = None
-        if query_type == "monster":
+        prov_list = provenance_from_results(results)
+        pref_meta["provenance"] = prov_list
+        if query_type == "item":
+            out = _format_with(ItemFormatter, raw_text, pref_meta)
+            out = _append_provenance(out, pref_meta)
+            json_sidecar = None
             try:
-                LAST_MONSTER_JSON.clear()
-                LAST_MONSTER_JSON.update(monster_to_json(out, pref_meta))
-                json_sidecar = LAST_MONSTER_JSON
-            except Exception:
-                LAST_MONSTER_JSON.clear()
-        elif query_type == "spell":
-            try:
-                json_sidecar = spell_to_json(out, pref_meta)
+                json_sidecar = item_to_json(out, pref_meta)
             except Exception:
                 json_sidecar = None
-        return out, json_sidecar, pref_meta.get("provenance")
+        elif query_type == "rule":
+            out = _format_with(RuleFormatter, raw_text, pref_meta)
+            out = _append_provenance(out, pref_meta)
+            json_sidecar = None
+            try:
+                json_sidecar = rule_to_json(out, pref_meta)
+            except Exception:
+                json_sidecar = None
+        else:
+            out = auto_format(raw_text, metadata=pref_meta)
+            json_sidecar = None
+            if query_type == "monster":
+                try:
+                    LAST_MONSTER_JSON.clear()
+                    LAST_MONSTER_JSON.update(monster_to_json(out, pref_meta))
+                    json_sidecar = LAST_MONSTER_JSON
+                except Exception:
+                    LAST_MONSTER_JSON.clear()
+            elif query_type == "spell":
+                try:
+                    json_sidecar = spell_to_json(out, pref_meta)
+                except Exception:
+                    json_sidecar = None
+        return out, json_sidecar, prov_list
 
     except Exception as e:
         return f"❌ Failed to query collection '{collection_name}': {e}", None, None

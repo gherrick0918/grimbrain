@@ -1,13 +1,8 @@
-import json
-from pathlib import Path
-
-import jsonschema
-
 from query_router import run_query, LAST_MONSTER_JSON
-
-SCHEMA_PATH = Path(__file__).resolve().parents[1] / "schemas" / "monster.json"
-with open(SCHEMA_PATH) as f:
-    MONSTER_SCHEMA = json.load(f)
+from models import MonsterSidecar
+from validators import validate_monster
+import jsonschema
+import pytest
 
 def _names(items):
     return [i["name"] for i in items]
@@ -29,7 +24,8 @@ def test_goblin_sidecar(embedder):
     assert "Scimitar" in _names(data["actions"])
     assert "Shortbow" in _names(data["actions"])
     assert data["reactions"] == []
-    jsonschema.validate(data, MONSTER_SCHEMA)
+    validate_monster(data)
+    MonsterSidecar(**data)
 
 
 def test_goblin_boss_sidecar(embedder):
@@ -43,12 +39,35 @@ def test_goblin_boss_sidecar(embedder):
     assert "Nimble Escape" in _names(data["traits"])
     assert "Multiattack" in _names(data["actions"])
     assert any(r["name"] == "Redirect Attack" for r in data["reactions"])
-    jsonschema.validate(data, MONSTER_SCHEMA)
+    validate_monster(data)
+    MonsterSidecar(**data)
 
 
 def test_run_query_returns_tuple(embedder):
     md, js, prov = run_query(type="monster", query="goblin", embed_model=embedder)
     assert isinstance(md, str)
     assert isinstance(js, dict)
-    assert isinstance(prov, list)
+    assert isinstance(prov, list) and prov
+
+
+def test_schema_rejects_bad_type():
+    bad = {
+        "name": "Bad",
+        "source": "MM",
+        "ac": "10",
+        "hp": "5",
+        "speed": "30 ft.",
+        "str": "eight",
+        "dex": 10,
+        "con": 10,
+        "int": 10,
+        "wis": 10,
+        "cha": 10,
+        "traits": [],
+        "actions": [],
+        "reactions": [],
+        "provenance": [],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        validate_monster(bad)
 
