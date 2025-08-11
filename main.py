@@ -6,10 +6,7 @@ import random
 import shlex
 from datetime import datetime
 from pathlib import Path
-from llama_index.core.settings import Settings
-from llama_index.core.llms.mock import MockLLM
-from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
-from query_router import run_query, FALLBACK_MONSTERS
+
 from engine.session import Session, start_scene, log_step
 from engine.combat import (
     run_round,
@@ -21,6 +18,7 @@ from engine.combat import (
 from engine.dice import roll
 from engine.checks import attack_roll, damage_roll, saving_throw
 from models import PC, MonsterSidecar
+from fallback_monsters import FALLBACK_MONSTERS
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -321,6 +319,15 @@ def main():
         monsters = parse_monster_spec(args.encounter, _lookup_fallback)
         play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds)
         return
+
+    from llama_index.core.settings import Settings
+    from llama_index.core.llms.mock import MockLLM
+    from indexing import (
+        wipe_chroma_store,
+        load_and_index_grouped_by_folder,
+        kill_other_python_processes,
+    )
+    from query_router import run_query
 
     embed_model, msg = choose_embedding(args.embeddings)
     print(msg)
