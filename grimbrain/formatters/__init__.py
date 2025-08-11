@@ -1,9 +1,9 @@
-from spell_formatter import SpellFormatter
-from monster_formatter import MonsterFormatter
-from generic_formatter import GenericFormatter
-from item_formatter import ItemFormatter, item_to_json
-from rule_formatter import RuleFormatter, rule_to_json
 import re
+from .spell_formatter import SpellFormatter, spell_to_json
+from .monster_formatter import MonsterFormatter, monster_to_json
+from .generic_formatter import GenericFormatter
+from .item_formatter import ItemFormatter, item_to_json
+from .rule_formatter import RuleFormatter, rule_to_json
 
 SCHOOL_MAP = {
     "V": "Evocation",
@@ -13,7 +13,7 @@ SCHOOL_MAP = {
     "E": "Enchantment",
     "I": "Illusion",
     "N": "Necromancy",
-    "T": "Transmutation"
+    "T": "Transmutation",
 }
 
 def format_spell_output(text: str) -> str:
@@ -43,14 +43,11 @@ def format_generic_output(text: str) -> str:
 
 def _format_with(FormatterCls, raw_text, metadata):
     try:
-        # STATeless style: Formatter().format(text, md)
         return FormatterCls().format(raw_text, metadata)
     except TypeError:
         try:
-            # STATEful style: Formatter(text, md).format()
             return FormatterCls(raw_text, metadata).format()
         except TypeError:
-            # Legacy: Formatter(text).format()
             return FormatterCls(raw_text).format()
 
 def _append_provenance(out: str, meta: dict) -> str:
@@ -65,31 +62,22 @@ def _append_provenance(out: str, meta: dict) -> str:
     return out + "\n\n---\n_Sources considered:_ " + " ; ".join(bits)
 
 def auto_format(raw_text: str, metadata: dict | None = None) -> str:
-    """
-    Heuristically format based on content. Keeps existing behavior for spells.
-    Adds MonsterFormatter when a statblock pattern is detected.
-    Falls back to GenericFormatter otherwise.
-    Appends a small provenance block if present in metadata["provenance"].
-    """
+    """Heuristically format based on content."""
     metadata = metadata or {}
     low = raw_text.lower()
-
-    # Spell detection (keep your existing logic as-is if different)
     if ("casting time" in low and "components" in low) or ("spell attack" in low and "components" in low):
         out = _format_with(SpellFormatter, raw_text, metadata)
         return _append_provenance(out, metadata)
-
-    # Monster detection: classic trio + abilities line
-    has_ac   = ("armor class" in low) or bool(re.search(r"\bac\s*:", low))
-    has_hp   = ("hit points" in low) or bool(re.search(r"\bhp\s*:", low))
-    has_spd  = ("speed" in low)
-    has_abil = bool(re.search(r"\bSTR\s+\d+\s*\([^)]+\)\s*DEX\s+\d+\s*\([^)]+\)\s*CON\s+\d+", raw_text, re.I) or
-                       re.search(r"\bSTR\s*:\s*\d+.*CHA\s*:\s*\d+", raw_text, re.I))
+    has_ac = ("armor class" in low) or bool(re.search(r"\bac\s*:", low))
+    has_hp = ("hit points" in low) or bool(re.search(r"\bhp\s*:", low))
+    has_spd = ("speed" in low)
+    has_abil = bool(
+        re.search(r"\bSTR\s+\d+\s*\([^)]+\)\s*DEX\s+\d+\s*\([^)]+\)\s*CON\s+\d+", raw_text, re.I)
+        or re.search(r"\bSTR\s*:\s*\d+.*CHA\s*:\s*\d+", raw_text, re.I)
+    )
     looks_monster = (has_ac and has_hp and has_spd) or has_abil
     if looks_monster:
         out = _format_with(MonsterFormatter, raw_text, metadata)
         return _append_provenance(out, metadata)
-
-    # Fallback: generic formatter
     out = _format_with(GenericFormatter, raw_text.strip(), metadata)
     return _append_provenance(out, metadata)

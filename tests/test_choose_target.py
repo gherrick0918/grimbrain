@@ -1,4 +1,4 @@
-from engine.combat import Combatant, choose_target
+from grimbrain.engine.combat import Combatant, choose_target
 
 
 def make_enemy(name, hp):

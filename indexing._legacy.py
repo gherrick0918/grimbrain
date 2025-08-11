@@ -6,7 +6,7 @@ from llama_index.core import VectorStoreIndex, StorageContext
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.schema import Document
-from utils import infer_root_key
+from grimbrain.retrieval.utils import infer_root_key
 
 def wipe_chroma_store(log_entries, path="chroma_store"):
     client = PersistentClient(path=path)

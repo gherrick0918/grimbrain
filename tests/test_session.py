@@ -1,5 +1,5 @@
 import json
-from engine.session import Session
+from grimbrain.engine.session import Session
 
 
 def test_session_save_load(tmp_path):

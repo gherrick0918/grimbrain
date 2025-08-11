@@ -1,11 +1,11 @@
 # formatters/monster_formatter.py
 import re
 from typing import Dict, Any, Tuple
-from utils import maybe_stitch_monster_actions
+from ..retrieval.utils import maybe_stitch_monster_actions
 
 # --- optional debug logger (no-op if utils._log isn't available) ---
 try:
-    from utils import _log as _utils_log  # type: ignore
+    from ..retrieval.utils import _log as _utils_log  # type: ignore
     def _log(msg: str) -> None:
         try:
             _utils_log(msg)

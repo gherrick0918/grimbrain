@@ -8,18 +8,18 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from engine.session import Session, start_scene, log_step
-from engine.combat import (
+from grimbrain.engine.session import Session, start_scene, log_step
+from grimbrain.engine.combat import (
     run_round,
     run_encounter,
     parse_monster_spec,
     choose_target,
     Combatant,
 )
-from engine.dice import roll
-from engine.checks import attack_roll, damage_roll, saving_throw
-from models import PC, MonsterSidecar
-from fallback_monsters import FALLBACK_MONSTERS
+from grimbrain.engine.dice import roll
+from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
+from grimbrain.models import PC, MonsterSidecar, dump_model
+from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -152,16 +152,8 @@ def play_cli(
         print(f"Using seed: {seed}")
 
     combatants: list[Combatant] = []
-    # Build combatants from PCs (Pydantic v1/v2 compatible)
-    def _dump_model(m):
-        if hasattr(m, "model_dump"):   # Pydantic v2
-            return m.model_dump()
-        if hasattr(m, "dict"):         # Pydantic v1
-            return m.dict()
-        return dict(m) if isinstance(m, dict) else {"value": str(m)}
-
     combatants.extend(
-        [Combatant(p.name, p.ac, p.hp, [_dump_model(a) for a in p.attacks], "party", 0) for p in pcs]
+        [Combatant(p.name, p.ac, p.hp, [dump_model(a) for a in p.attacks], "party", 0) for p in pcs]
     )
     for m in monsters:
         c = Combatant(m.name, int(m.ac.split()[0]), 0, [], "monsters", (m.dex - 10) // 2)
@@ -338,12 +330,12 @@ def main():
 
     from llama_index.core.settings import Settings
     from llama_index.core.llms.mock import MockLLM
-    from indexing import (
+    from grimbrain.retrieval.indexing import (
         wipe_chroma_store,
         load_and_index_grouped_by_folder,
         kill_other_python_processes,
     )
-    from query_router import run_query
+    from grimbrain.retrieval.query_router import run_query
 
     embed_model, msg = choose_embedding(args.embeddings)
     print(msg)

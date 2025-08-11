@@ -1,5 +1,5 @@
-from monster_formatter import MonsterFormatter
-import monster_formatter
+from grimbrain.formatters.monster_formatter import MonsterFormatter
+import grimbrain.formatters.monster_formatter as monster_formatter
 
 
 def test_actions_no_statblock_echo(monkeypatch):

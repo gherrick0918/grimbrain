@@ -1,4 +1,4 @@
-from indexing import _build_global_lookup
+from grimbrain.retrieval.indexing import _build_global_lookup
 
 def test_dedupe_prefers_longer():
     e1 = {"name": "Goblin", "source": "MM", "text": "short"}

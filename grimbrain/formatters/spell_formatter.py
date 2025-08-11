@@ -1,7 +1,7 @@
 import re
 import ast
 import json
-from utils import coerce_obj, ordinal
+from ..retrieval.utils import coerce_obj, ordinal
 
 class SpellFormatter:
     def __init__(self, raw_text:str|None=None, metadata:dict|None=None):
@@ -16,11 +16,11 @@ class SpellFormatter:
             return ""
         try:
             # Prefer your new utility if present (e.g., utils.school_name or utils.school_long_name)
-            from utils import school_name  # type: ignore
+            from ..retrieval.utils import school_name  # type: ignore
             return str(school_name(school)).strip()
         except Exception:
             try:
-                from utils import school_long_name  # type: ignore
+                from ..retrieval.utils import school_long_name  # type: ignore
             except Exception:
                 school_long_name = None
             if callable(school_long_name):

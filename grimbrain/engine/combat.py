@@ -7,7 +7,7 @@ from copy import deepcopy
 
 from .checks import attack_roll, damage_roll, saving_throw
 from .dice import roll
-from models import MonsterSidecar, PC, SpellSidecar
+from ..models import MonsterSidecar, PC, SpellSidecar, dump_model
 from .encounter import compute_encounter
 
 
@@ -44,7 +44,7 @@ def _parse_monster(mon: MonsterSidecar, rng: random.Random) -> Combatant:
 
 
 def _parse_pc(pc: PC) -> Combatant:
-    attacks = [a.dict() for a in pc.attacks]
+    attacks = [dump_model(a) for a in pc.attacks]
     return Combatant(pc.name, pc.ac, pc.hp, attacks, "party", 0)
 
 

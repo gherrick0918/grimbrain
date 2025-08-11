@@ -1,6 +1,6 @@
-from query_router import run_query
-from models import SpellSidecar
-from validators import validate_spell
+from grimbrain.retrieval.query_router import run_query
+from grimbrain.models import SpellSidecar
+from grimbrain.validators import validate_spell
 import jsonschema
 import pytest
 

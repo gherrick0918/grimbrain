@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import Any, Dict, List
 
 class NamedText(BaseModel):
     name: str
@@ -69,3 +69,10 @@ class PC(BaseModel):
     ac: int
     hp: int
     attacks: List[Attack]
+
+
+def dump_model(m: BaseModel) -> Dict[str, Any]:
+    """Return a ``dict`` for a Pydantic model across v1/v2."""
+    if hasattr(m, "model_dump"):
+        return m.model_dump()
+    return m.dict()

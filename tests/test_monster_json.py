@@ -1,6 +1,6 @@
-from query_router import run_query, LAST_MONSTER_JSON
-from models import MonsterSidecar
-from validators import validate_monster
+from grimbrain.retrieval.query_router import run_query, LAST_MONSTER_JSON
+from grimbrain.models import MonsterSidecar
+from grimbrain.validators import validate_monster
 import jsonschema
 import pytest
 

@@ -1,4 +1,4 @@
-from engine.combat import run_encounter, parse_monster_spec
+from grimbrain.engine.combat import run_encounter, parse_monster_spec
 from tests.test_combat_round import make_goblin, make_goblin_boss, make_pc
 
 

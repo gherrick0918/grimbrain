@@ -1,4 +1,4 @@
-from engine.dice import roll
+from grimbrain.engine.dice import roll
 
 
 def test_roll_fixed_seed():

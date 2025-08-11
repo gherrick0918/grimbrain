@@ -1,6 +1,6 @@
-from engine.combat import run_encounter
+from grimbrain.engine.combat import run_encounter
 from tests.test_combat_round import make_goblin
-from models import SpellSidecar, Attack, PC
+from grimbrain.models import SpellSidecar, Attack, PC
 
 fireball = SpellSidecar(
     name="Fireball",

@@ -1,4 +1,4 @@
-from engine.combat import run_encounter
+from grimbrain.engine.combat import run_encounter
 from tests.test_combat_round import make_goblin, make_pc
 
 

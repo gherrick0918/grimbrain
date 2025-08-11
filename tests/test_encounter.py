@@ -1,5 +1,5 @@
-from models import MonsterSidecar
-from engine.encounter import compute_encounter
+from grimbrain.models import MonsterSidecar
+from grimbrain.engine.encounter import compute_encounter
 
 def goblin():
     return MonsterSidecar(
