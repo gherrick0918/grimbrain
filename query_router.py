@@ -101,6 +101,7 @@ FALLBACK_MONSTERS: dict[str, dict] = {
             },
         ],
         "reactions": [],
+        "provenance": [],
     },
     "goblin boss": {
         "name": "Goblin Boss",
@@ -140,6 +141,7 @@ FALLBACK_MONSTERS: dict[str, dict] = {
                 "text": "When a creature the goblin can see targets it with an attack, the goblin chooses another goblin within 5 ft. of it; the two goblins swap places, and the chosen goblin becomes the target instead.",
             }
         ],
+        "provenance": [],
     },
 }
 
