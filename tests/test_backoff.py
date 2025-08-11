@@ -30,7 +30,7 @@ def test_single_token_retry(monkeypatch):
         calls.append(top_k)
         return DummyQE(top_k)
 
-    import query_router
+    import grimbrain.retrieval.query_router as query_router
 
     monkeypatch.setattr(query_router, "get_query_engine", fake_get_query_engine)
     monkeypatch.setattr(query_router, "auto_format", lambda text, metadata=None: text)

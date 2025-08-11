@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from engine.combat import run_round
-from models import PC, ActionStruct, MonsterSidecar
+from grimbrain.engine.combat import run_round
+from grimbrain.models import PC, ActionStruct, MonsterSidecar
 
 
 def make_goblin():

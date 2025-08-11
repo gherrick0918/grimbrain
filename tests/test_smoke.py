@@ -1,6 +1,12 @@
 # tests/test_smoke.py
 import os
-from query_router import get_query_engine, rerank, _node_meta, run_query, _norm
+from grimbrain.retrieval.query_router import (
+    get_query_engine,
+    rerank,
+    _node_meta,
+    run_query,
+    _norm,
+)
 
 def retrieve_with_backoff(collection, embedder, query, token, ks=(25, 50, 100, 200)):
     """Rebuild the QE with larger top_k until at least one NAME exactly matches the token."""

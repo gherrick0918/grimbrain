@@ -1,4 +1,4 @@
-from engine.checks import attack_roll, damage_roll, saving_throw
+from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
 
 
 def test_attack_roll_deterministic():

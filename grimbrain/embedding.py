@@ -1,17 +1,18 @@
 from sentence_transformers import SentenceTransformer
 from pydantic import Field
 from typing import Any
+
 try:
     from llama_index.core.embeddings import BaseEmbedding
-except ImportError:
+except ImportError:  # pragma: no cover - fallback for older versions
     from llama_index.embeddings import BaseEmbedding
 
-class CustomSTEmbedding(BaseEmbedding):
+
+class CustomLocalEmbedding(BaseEmbedding):
     model: Any = Field(..., exclude=True)
 
     def __init__(self, model_name: str):
-        model_instance = SentenceTransformer(model_name)
-        super().__init__(model=model_instance)
+        super().__init__(model=SentenceTransformer(model_name))
 
     def _get_text_embedding(self, text: str) -> list[float]:
         return self.model.encode(text).tolist()
@@ -26,4 +27,4 @@ class CustomSTEmbedding(BaseEmbedding):
         return self.model.encode(texts, show_progress_bar=show_progress).tolist()
 
     def embed_query(self, query: str) -> list[float]:
-        return self._get_query_embedding(query) 
+        return self._get_query_embedding(query)

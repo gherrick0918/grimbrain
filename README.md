@@ -18,7 +18,7 @@
    This prints a formatted entry and writes the markdown and sidecar JSON to disk.
 4. **Python API**
    ```python
-   from query_router import run_query
+   from grimbrain.retrieval.query_router import run_query
    md, js, prov = run_query("goblin", type="monster")
    ```
    `md` is markdown, `js` a sidecar dict, and `prov` a list of provenance strings. For spells:

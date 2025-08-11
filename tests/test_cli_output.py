@@ -1,6 +1,6 @@
 from pathlib import Path
 from main import write_outputs
-from query_router import run_query
+from grimbrain.retrieval.query_router import run_query
 
 def test_write_outputs(tmp_path, embedder):
     md, js, _ = run_query(type="monster", query="goblin", embed_model=embedder)

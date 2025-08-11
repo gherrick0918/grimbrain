@@ -1,5 +1,5 @@
 from typing import List
-from models import MonsterSidecar
+from ..models import MonsterSidecar
 
 XP_BY_NAME = {
     "goblin": 50,

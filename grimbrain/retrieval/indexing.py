@@ -11,7 +11,7 @@ from llama_index.core import VectorStoreIndex, StorageContext
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.schema import Document
-from utils import infer_root_key, resolve_copy, stamp_doc_meta, ensure_collection
+from .utils import infer_root_key, resolve_copy, stamp_doc_meta, ensure_collection
 
 HASH_CACHE_FILE = "hash_cache.json"
 

@@ -1,5 +1,5 @@
-from engine.combat import run_round
-from models import ActionStruct, MonsterSidecar, PC, Attack
+from grimbrain.engine.combat import run_round
+from grimbrain.models import ActionStruct, MonsterSidecar, PC, Attack
 
 
 def make_goblin():

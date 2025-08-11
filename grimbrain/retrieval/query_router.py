@@ -1,6 +1,7 @@
 import sys
-from utils import maybe_stitch_monster_actions
 from typing import Any, Dict, List, Optional
+
+from .utils import maybe_stitch_monster_actions
 
 # LlamaIndex global settings
 try:
@@ -9,7 +10,7 @@ except Exception:
     Settings = None
 
 try:
-    from embedding import CustomLocalEmbedding
+    from ..embedding import CustomLocalEmbedding
 except Exception:
     CustomLocalEmbedding = None
 
@@ -18,7 +19,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 import re
-from formatters import (
+from ..formatters import (
     auto_format,
     item_to_json,
     rule_to_json,
@@ -27,9 +28,9 @@ from formatters import (
     _append_provenance,
     _format_with,
 )
-from monster_formatter import monster_to_json
-from spell_formatter import spell_to_json
-from utils import ensure_collection, hit_text, ordinal
+from ..formatters.monster_formatter import monster_to_json
+from ..formatters.spell_formatter import spell_to_json
+from .utils import ensure_collection, hit_text, ordinal
 from llama_index.core.llms.mock import MockLLM
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -39,7 +40,7 @@ LOCAL_EMBED_MODEL = "all-MiniLM-L6-v2"
 
 # safe logger for this module
 try:
-    from utils import _log as _log  # reuse if present
+    from .utils import _log as _log  # reuse if present
 except Exception:
     def _log(msg: str) -> None:
         try:
@@ -79,7 +80,7 @@ LAST_MONSTER_JSON: dict = {}
 # Minimal hardcoded stat blocks for common low-CR goblins live in
 # ``fallback_monsters`` so that lightweight modules can use them without
 # importing this file and its heavy dependencies.
-from fallback_monsters import FALLBACK_MONSTERS
+from ..fallback_monsters import FALLBACK_MONSTERS
 
 # Minimal fallback spell data for critical test cases
 FALLBACK_SPELLS: dict[str, dict] = {

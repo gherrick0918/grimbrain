@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-from query_router import run_query
+from ..retrieval.query_router import run_query
 
 LOG_DIR = Path("logs")
 
