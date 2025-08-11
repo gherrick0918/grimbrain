@@ -527,7 +527,7 @@ def run_query(
     alias_map: dict | None = None,
     alias_map_enabled: bool = True,
     learn_aliases: bool = False
-) -> str:
+) -> tuple[str, dict | None, list | None]:
     """
     Query wrapper with:
       • Rare-term aware top_k
@@ -536,6 +536,9 @@ def run_query(
       • NEW: source-preference tiebreak
       • NEW: alias normalization (file-backed or provided dict)
       • NEW: optional alias learning
+
+    Returns a tuple of:
+      (markdown, json_sidecar, provenance)
     """
     global LAST_MONSTER_JSON
     # Reset in place so external imports see the update
@@ -546,12 +549,13 @@ def run_query(
         query_type = detect_type_auto(query)
 
     if query_type not in COLLECTION_MAP:
-        return f"❌ Unsupported query type: '{type}'"
+        return f"❌ Unsupported query type: '{type}'", None, None
 
     key = query.strip().lower()
     if query_type == "monster" and alias_map_enabled and key in FALLBACK_MONSTERS:
         LAST_MONSTER_JSON.update(FALLBACK_MONSTERS[key])
-        return _monster_json_to_markdown(LAST_MONSTER_JSON)
+        md = _monster_json_to_markdown(LAST_MONSTER_JSON)
+        return md, LAST_MONSTER_JSON, LAST_MONSTER_JSON.get("provenance")
 
     collection_name = COLLECTION_MAP[query_type]
 
@@ -593,7 +597,7 @@ def run_query(
                     results = query_engine.retrieve(retrieve_query)
 
                 if not results:
-                    return "❌ No relevant entries found."
+                    return "❌ No relevant entries found.", None, None
 
                 results = rerank(effective_query, results)
 
@@ -654,7 +658,7 @@ def run_query(
                     else:
                         results = query_engine.retrieve(retrieve_query)
                     if not results:
-                        return "❌ No relevant entries found."
+                        return "❌ No relevant entries found.", None, None
                     ranked = rerank(effective_query, results)
                     ranked = _apply_source_preference(ranked, prefer_source)
                     pref_meta = _node_meta(ranked[0])
@@ -669,7 +673,7 @@ def run_query(
             else:
                 results = query_engine.retrieve(retrieve_query)
             if not results:
-                return "❌ No relevant entries found."
+                return "❌ No relevant entries found.", None, None
             ranked = rerank(effective_query, results)
             ranked = _apply_source_preference(ranked, prefer_source)
             raw_text = hit_text(ranked[0])
@@ -687,10 +691,16 @@ def run_query(
                 LAST_MONSTER_JSON.update(monster_to_json(out, pref_meta))
             except Exception:
                 LAST_MONSTER_JSON.clear()
-        return out
+        json_sidecar = LAST_MONSTER_JSON if query_type == "monster" and LAST_MONSTER_JSON else None
+        return out, json_sidecar, pref_meta.get("provenance")
 
     except Exception as e:
-        return f"❌ Failed to query collection '{collection_name}': {e}"
+        return f"❌ Failed to query collection '{collection_name}': {e}", None, None
+
+
+def run_query_legacy(*args, **kwargs) -> str:
+    """Backward compatible shim returning only markdown."""
+    return run_query(*args, **kwargs)[0]
 
 # CLI interface
 if __name__ == "__main__":
@@ -700,4 +710,5 @@ if __name__ == "__main__":
     else:
         type_arg = sys.argv[1]
         query_arg = " ".join(sys.argv[2:])
-        print(run_query(query_arg, type_arg))
+        md, *_ = run_query(query_arg, type_arg)
+        print(md)

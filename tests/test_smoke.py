@@ -45,17 +45,17 @@ def test_monster_booyahg_whip(embedder):
     assert meta.get("source") == "VGM"
     
 def test_spell_fireball_format(embedder):
-    out = run_query(type="spell", query="fireball", embed_model=embedder)
-    assert "_3rd-level Evocation_" in out
-    assert "**Damage:** 8d6" in out  # allow 8d6 fire or plain 8d6
+    md, _, _ = run_query(type="spell", query="fireball", embed_model=embedder)
+    assert "_3rd-level Evocation_" in md
+    assert "**Damage:** 8d6" in md  # allow 8d6 fire or plain 8d6
 
 def test_monster_booyahg_formatted_output(embedder):
     # Validate MonsterFormatter path via run_query without changing earlier test
-    out = run_query(type="monster", query="booyahg whip", embed_model=embedder)
-    low = out.lower()
+    md, _, _ = run_query(type="monster", query="booyahg whip", embed_model=embedder)
+    low = md.lower()
     assert "armor class" in low
     assert "actions" in low
 
 def test_spell_fireball_provenance(embedder):
-    out = run_query(type="spell", query="fireball", embed_model=embedder)
-    assert "sources considered" in out.lower()
+    md, _, _ = run_query(type="spell", query="fireball", embed_model=embedder)
+    assert "sources considered" in md.lower()
