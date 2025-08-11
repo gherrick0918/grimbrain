@@ -37,7 +37,7 @@ def test_single_token_retry(monkeypatch):
     monkeypatch.setattr(query_router, "maybe_stitch_monster_actions", lambda *a, **k: None)
     monkeypatch.setattr(query_router, "_write_debug_log", lambda *a, **k: None)
 
-    out = query_router.run_query("goblin", type="monster", embed_model=None, alias_map_enabled=False)
-    assert "goblin" in out.lower()
+    md, _, _ = query_router.run_query("goblin", type="monster", embed_model=None, alias_map_enabled=False)
+    assert "goblin" in md.lower()
     assert 50 in calls and 100 in calls
 

@@ -44,3 +44,11 @@ def test_goblin_boss_sidecar(embedder):
     assert "Multiattack" in _names(data["actions"])
     assert any(r["name"] == "Redirect Attack" for r in data["reactions"])
     jsonschema.validate(data, MONSTER_SCHEMA)
+
+
+def test_run_query_returns_tuple(embedder):
+    md, js, prov = run_query(type="monster", query="goblin", embed_model=embedder)
+    assert isinstance(md, str)
+    assert isinstance(js, dict)
+    assert isinstance(prov, list)
+

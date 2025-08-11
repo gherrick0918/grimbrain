@@ -1,4 +1,6 @@
+import argparse
 import csv
+import json
 from datetime import datetime
 from pathlib import Path
 from llama_index.core.settings import Settings
@@ -55,7 +57,12 @@ log_entries.append({
     "status": modelLlmMsg
 })
 
-force = False
+parser = argparse.ArgumentParser()
+parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
+parser.add_argument("--json-out", type=str, help="Path to write monster sidecar JSON", default=None)
+args = parser.parse_args()
+
+force = args.force
 
 if force:
     kill_other_python_processes()
@@ -70,5 +77,11 @@ with open(LOG_FILE, "w", newline="", encoding="utf-8") as csvfile:
 
 print(f"\nLog saved to: {LOG_FILE}")
 
-response = run_query("goblin boss", type="monster", embed_model=embed_model)
-print(response)
+md, js, _ = run_query("goblin boss", type="monster", embed_model=embed_model)
+print(md)
+if args.json_out and js:
+    out_path = Path(args.json_out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(js, f, indent=2)
+    print(f"Sidecar JSON written to {out_path}")
