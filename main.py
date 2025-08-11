@@ -1,92 +1,82 @@
 import argparse
 import csv
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from llama_index.core.settings import Settings
-from llama_index.llms.ollama import Ollama
-from embedding import CustomSTEmbedding
+from llama_index.core.llms.mock import MockLLM
 from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
-from query import get_query_engine
 from query_router import run_query
 from engine.session import start_scene
-from llama_index.embeddings.ollama import OllamaEmbedding
-from fallback_llm import MinimalFakeLLM
-from llama_index.core.llms.mock import MockLLM
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
 
-alwaysSmall = True
 
-modelLlmMsg = ""
-if alwaysSmall:
-    embed_model = CustomSTEmbedding("sentence-transformers/all-MiniLM-L6-v2")
-    modelLlmMsg = f"Using embedding model: {embed_model.model_name}"
-else:
+def choose_embedding(mode: str):
+    if mode == "none":
+        os.environ["SUPPRESS_EMBED_WARNING"] = "1"
+        return None, "Embeddings disabled"
     try:
-        embed_model = OllamaEmbedding("nomic-embed-text")
-        modelLlmMsg = f"Using embedding model: {embed_model.model_name}"
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+        embed = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        return embed, f"Using embedding model: {embed.model_name}"
     except Exception as e:
-        embed_model = CustomSTEmbedding("sentence-transformers/all-MiniLM-L6-v2")
-        modelLlmMsg = f"Falling back to embedding model: {embed_model.model_name} due to error: {e}"
+        if mode == "bge-small":
+            return None, f"Failed to load BGE small: {e}"
+        return None, f"Embedding model unavailable: {e}"
 
-print(modelLlmMsg)
-log_entries.append({
-    "file": "N/A",
-    "entries": 0,
-    "collection": "embed_model",
-    "status": modelLlmMsg
-})
 
-if alwaysSmall:
+def write_outputs(md: str, js: dict | None, json_out: str | None, md_out: str | None) -> None:
+    if json_out and js:
+        path = Path(json_out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(js, f, indent=2)
+        print(f"Sidecar JSON written to {path}")
+    if md_out:
+        path = Path(md_out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(md)
+        print(f"Markdown written to {path}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
+    parser.add_argument("--json-out", nargs="?", const="logs/last_sidecar.json", help="Write sidecar JSON to path", default=None)
+    parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
+    parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
+    parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
+    args = parser.parse_args()
+
+    embed_model, msg = choose_embedding(args.embeddings)
+    print(msg)
+    log_entries.append({"file": "N/A", "entries": 0, "collection": "embed_model", "status": msg})
+
     Settings.llm = MockLLM()
-    modelllmMsg = "🟡 No real LLM assigned — using MockLLM for retrieval-only mode"
-else:
-    try:
-        Settings.llm = Ollama(model="gemma:2b-instruct", base_url="http://localhost:11434")
-        modelLlmMsg = "🧠 Using local LLM via Ollama (gemma:2b-instruct)"
-    except Exception as e:
-        modelLlmMsg = f"⚠️ Ollama not available, falling back to MockLLM: {e}"
-        Settings.llm = MockLLM()
 
-print(modelLlmMsg)
-log_entries.append({
-    "file": "N/A",
-    "entries": 0,
-    "collection": "LLM",
-    "status": modelLlmMsg
-})
+    if args.force:
+        kill_other_python_processes()
+        wipe_chroma_store(log_entries)
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
-parser.add_argument("--json-out", type=str, help="Path to write monster sidecar JSON", default=None)
-parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
-args = parser.parse_args()
+    load_and_index_grouped_by_folder(Path("data"), embed_model, log_entries, force_wipe=args.force)
 
-force = args.force
+    with open(LOG_FILE, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=["file", "entries", "collection", "status"])
+        writer.writeheader()
+        writer.writerows(log_entries)
+    print(f"\nLog saved to: {LOG_FILE}")
 
-if force:
-    kill_other_python_processes()
-    wipe_chroma_store(log_entries)
+    md, js, _ = run_query("goblin boss", type="monster", embed_model=embed_model)
+    print(md)
+    write_outputs(md, js, args.json_out, args.md_out)
 
-load_and_index_grouped_by_folder(Path("data"), embed_model, log_entries, force_wipe=force)
+    if args.scene:
+        start_scene(args.scene)
 
-with open(LOG_FILE, "w", newline="", encoding="utf-8") as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=["file", "entries", "collection", "status"])
-    writer.writeheader()
-    writer.writerows(log_entries)
 
-print(f"\nLog saved to: {LOG_FILE}")
-
-md, js, _ = run_query("goblin boss", type="monster", embed_model=embed_model)
-print(md)
-if args.json_out and js:
-    out_path = Path(args.json_out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(js, f, indent=2)
-        print(f"Sidecar JSON written to {out_path}")
-
-if args.scene:
-    start_scene(args.scene)
+if __name__ == "__main__":
+    main()

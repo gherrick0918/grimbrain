@@ -1,6 +1,8 @@
 from spell_formatter import SpellFormatter
 from monster_formatter import MonsterFormatter
 from generic_formatter import GenericFormatter
+from item_formatter import ItemFormatter, item_to_json
+from rule_formatter import RuleFormatter, rule_to_json
 import re
 
 SCHOOL_MAP = {
@@ -29,6 +31,12 @@ def debug_output(text: str) -> str:
 
 def format_monster_output(text: str) -> str:
     return MonsterFormatter(text).format()
+
+def format_item_output(text: str) -> str:
+    return ItemFormatter().format(text)
+
+def format_rule_output(text: str) -> str:
+    return RuleFormatter().format(text)
 
 def format_generic_output(text: str) -> str:
     return GenericFormatter(text).format()
