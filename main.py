@@ -4,6 +4,7 @@ import json
 import os
 import random
 import shlex
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from engine.dice import roll
 from engine.checks import attack_roll, damage_roll, saving_throw
 from models import PC, MonsterSidecar
 from fallback_monsters import FALLBACK_MONSTERS
+from typing import Iterator
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -139,13 +141,21 @@ def _load_game(path: str):
     return sess.seed, round_num, turn, combatants
 
 
-def play_cli(pcs: list[PC], monsters: list[MonsterSidecar], seed: int | None = None, max_rounds: int = 20) -> None:
+
+def play_cli(
+    pcs: list[PC],
+    monsters: list[MonsterSidecar],
+    seed: int | None = None,
+    max_rounds: int = 20,
+) -> None:
     rng = random.Random(seed)
     if seed is not None:
         print(f"Using seed: {seed}")
 
     combatants: list[Combatant] = []
-    combatants.extend([Combatant(p.name, p.ac, p.hp, [a.dict() for a in p.attacks], "party", 0) for p in pcs])
+    combatants.extend(
+        [Combatant(p.name, p.ac, p.hp, [a.dict() for a in p.attacks], "party", 0) for p in pcs]
+    )
     for m in monsters:
         c = Combatant(m.name, int(m.ac.split()[0]), 0, [], "monsters", (m.dex - 10) // 2)
         hp_str = m.hp
@@ -166,6 +176,11 @@ def play_cli(pcs: list[PC], monsters: list[MonsterSidecar], seed: int | None = N
         c.init = roll(f"1d20+{getattr(c, 'dex_mod', 0)}", seed=init_seed)["total"]
     combatants.sort(key=lambda c: c.init, reverse=True)
 
+    cmd_iter: Iterator[str] | None = None
+    if not sys.stdin.isatty():
+        cmds = [ln.strip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+        cmd_iter = iter(cmds)
+
     round_num = 1
     turn = 0
     while round_num <= max_rounds:
@@ -182,8 +197,13 @@ def play_cli(pcs: list[PC], monsters: list[MonsterSidecar], seed: int | None = N
         if actor.side == "party":
             while True:
                 try:
-                    cmd = input("> ").strip()
+                    if cmd_iter is not None:
+                        cmd = next(cmd_iter)
+                    else:
+                        cmd = input("> ").strip()
                 except EOFError:
+                    return
+                except StopIteration:
                     return
                 if not cmd:
                     continue
@@ -286,7 +306,6 @@ def play_cli(pcs: list[PC], monsters: list[MonsterSidecar], seed: int | None = N
         if turn == 0:
             round_num += 1
     print("Max rounds reached")
-
 
 def main():
     parser = argparse.ArgumentParser()
