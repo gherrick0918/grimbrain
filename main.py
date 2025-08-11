@@ -20,7 +20,6 @@ from engine.dice import roll
 from engine.checks import attack_roll, damage_roll, saving_throw
 from models import PC, MonsterSidecar
 from fallback_monsters import FALLBACK_MONSTERS
-from typing import Iterator
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -176,12 +175,6 @@ def play_cli(
         c.init = roll(f"1d20+{getattr(c, 'dex_mod', 0)}", seed=init_seed)["total"]
     combatants.sort(key=lambda c: c.init, reverse=True)
 
-    cmd_iter: Iterator[str] | None = None
-    if not sys.stdin.isatty():
-        data = sys.stdin.read()
-        if data:
-            cmd_iter = iter(ln.strip() for ln in data.splitlines() if ln.strip())
-
     round_num = 1
     turn = 0
     while round_num <= max_rounds:
@@ -198,14 +191,9 @@ def play_cli(
         if actor.side == "party":
             while True:
                 try:
-                    if cmd_iter is not None:
-                        cmd = next(cmd_iter)
-                    else:
-                        cmd = input("> ").strip()
+                    cmd = input("> ").strip()
                 except EOFError:
-                    return
-                except StopIteration:
-                    return
+                    cmd = "end"
                 if not cmd:
                     continue
                 parts = shlex.split(cmd)
