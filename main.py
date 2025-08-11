@@ -9,6 +9,7 @@ from embedding import CustomSTEmbedding
 from indexing import wipe_chroma_store, load_and_index_grouped_by_folder, kill_other_python_processes
 from query import get_query_engine
 from query_router import run_query
+from engine.session import start_scene
 from llama_index.embeddings.ollama import OllamaEmbedding
 from fallback_llm import MinimalFakeLLM
 from llama_index.core.llms.mock import MockLLM
@@ -60,6 +61,7 @@ log_entries.append({
 parser = argparse.ArgumentParser()
 parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
 parser.add_argument("--json-out", type=str, help="Path to write monster sidecar JSON", default=None)
+parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
 args = parser.parse_args()
 
 force = args.force
@@ -84,4 +86,7 @@ if args.json_out and js:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(js, f, indent=2)
-    print(f"Sidecar JSON written to {out_path}")
+        print(f"Sidecar JSON written to {out_path}")
+
+if args.scene:
+    start_scene(args.scene)

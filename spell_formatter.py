@@ -188,11 +188,78 @@ def _fmt_time(t):
 
 _DAMAGE_RE = re.compile(r"\{@damage\s+([^}]+)\}", re.IGNORECASE)
 
-def _extract_damage(text:str)->str|None:
-    if not text: return None
+def _extract_damage(text: str) -> str | None:
+    if not text:
+        return None
     m = _DAMAGE_RE.search(text)
-    if not m: return None
+    if not m:
+        return None
     dice = m.group(1).strip()
-    tail = text[m.end(): m.end()+40].lower()
+    tail = text[m.end() : m.end() + 40].lower()
     m2 = re.search(r"\b(\w+)\s+damage", tail)
     return f"{dice} {m2.group(1)}" if m2 else dice
+
+
+def spell_to_json(markdown: str, meta: dict | None = None) -> dict:
+    """Parse formatted spell markdown into a structured dict."""
+    meta = meta or {}
+    lines = [ln.strip() for ln in markdown.splitlines()]
+
+    def grab(label: str) -> str:
+        pat = re.compile(rf"^\*\*{re.escape(label)}:?\*\*\s*(.+)$", re.IGNORECASE)
+        for ln in lines:
+            m = pat.match(ln)
+            if m:
+                return m.group(1).strip()
+        return ""
+
+    name = meta.get("name") or ""
+    if not name and lines:
+        m = re.search(r"\*\*(.+?)\*\*", lines[0])
+        if m:
+            name = m.group(1).strip()
+
+    level = meta.get("level")
+    school = meta.get("school") or ""
+    header = next((ln for ln in lines if ln.startswith("_") and ln.endswith("_")), "")
+    if level is None:
+        m = re.search(r"(\d+)", header)
+        if m:
+            try:
+                level = int(m.group(1))
+            except Exception:
+                level = None
+    if not school:
+        m = re.search(r"-level\s+(.*)", header)
+        if m:
+            school = m.group(1).strip()
+
+    casting_time = grab("Casting Time") or _fmt_time(coerce_obj(meta.get("casting_time")))
+    range_ = grab("Range") or _fmt_range(coerce_obj(meta.get("range")))
+    components = grab("Components") or _fmt_components(coerce_obj(meta.get("components")))
+    duration = grab("Duration") or _fmt_duration(coerce_obj(meta.get("duration")))
+
+    classes = meta.get("classes") or meta.get("class") or []
+    if isinstance(classes, str):
+        classes = [c.strip() for c in classes.split(",") if c.strip()]
+
+    text = meta.get("text") or markdown
+    provenance = meta.get("provenance") or []
+
+    try:
+        level = int(level) if level is not None else None
+    except Exception:
+        level = None
+
+    return {
+        "name": name,
+        "level": level,
+        "school": _fmt_school(str(school)) if school else "",
+        "casting_time": casting_time or "",
+        "range": range_ or "",
+        "components": components or "",
+        "duration": duration or "",
+        "classes": classes,
+        "text": text,
+        "provenance": provenance,
+    }
