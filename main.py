@@ -152,8 +152,16 @@ def play_cli(
         print(f"Using seed: {seed}")
 
     combatants: list[Combatant] = []
+    # Build combatants from PCs (Pydantic v1/v2 compatible)
+    def _dump_model(m):
+        if hasattr(m, "model_dump"):   # Pydantic v2
+            return m.model_dump()
+        if hasattr(m, "dict"):         # Pydantic v1
+            return m.dict()
+        return dict(m) if isinstance(m, dict) else {"value": str(m)}
+
     combatants.extend(
-        [Combatant(p.name, p.ac, p.hp, [a.dict() for a in p.attacks], "party", 0) for p in pcs]
+        [Combatant(p.name, p.ac, p.hp, [_dump_model(a) for a in p.attacks], "party", 0) for p in pcs]
     )
     for m in monsters:
         c = Combatant(m.name, int(m.ac.split()[0]), 0, [], "monsters", (m.dex - 10) // 2)
