@@ -181,6 +181,7 @@ FALLBACK_SPELLS: dict[str, dict] = {
         "range": "150 feet",
         "components": "V, S, M (a tiny ball of bat guano and sulfur)",
         "duration": "Instantaneous",
+        "damage": "8d6 fire",
         "classes": ["Wizard"],
         "text": (
             "A bright streak flashes from your pointing finger to a point you choose within range "
@@ -232,6 +233,9 @@ def _spell_json_to_markdown(data: Dict[str, Any]) -> str:
         "",
         data.get("text", ""),
     ]
+    dmg = data.get("damage")
+    if dmg:
+        lines.insert(4, f"**Damage:** {dmg}")
     prov = data.get("provenance")
     if prov:
         lines.append("")
