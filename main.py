@@ -178,8 +178,9 @@ def play_cli(
 
     cmd_iter: Iterator[str] | None = None
     if not sys.stdin.isatty():
-        cmds = [ln.strip() for ln in sys.stdin.read().splitlines() if ln.strip()]
-        cmd_iter = iter(cmds)
+        data = sys.stdin.read()
+        if data:
+            cmd_iter = iter(ln.strip() for ln in data.splitlines() if ln.strip())
 
     round_num = 1
     turn = 0
