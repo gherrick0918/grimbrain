@@ -196,7 +196,13 @@ def _tokens(s: str):
 
 def _node_meta(hit):
     node = getattr(hit, "node", None)
-    return getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {}
+    meta = getattr(node, "metadata", None) or getattr(node, "extra_info", None) or {}
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
+    return meta
 
 def provenance_from_results(results) -> List[str]:
     prov: List[str] = []
@@ -573,14 +579,6 @@ def run_query(
     if query_type not in COLLECTION_MAP:
         return f"❌ Unsupported query type: '{type}'", None, None
 
-    key = query.strip().lower()
-    if query_type == "monster" and alias_map_enabled and key in FALLBACK_MONSTERS:
-        LAST_MONSTER_JSON.update(FALLBACK_MONSTERS[key])
-        md = _monster_json_to_markdown(LAST_MONSTER_JSON)
-        return md, LAST_MONSTER_JSON, LAST_MONSTER_JSON.get("provenance")
-
-    collection_name = COLLECTION_MAP[query_type]
-
     # During test runs, ignore any learned alias mappings so results remain
     # consistent even if a developer has a locally modified aliases.json.
     # The test harness sets IS_TESTING=1 (see tests/conftest.py) which we use
@@ -588,6 +586,14 @@ def run_query(
     if os.getenv("IS_TESTING") == "1":
         alias_map_enabled = False
         learn_aliases = False
+
+    key = query.strip().lower()
+    if query_type == "monster" and alias_map_enabled and key in FALLBACK_MONSTERS:
+        LAST_MONSTER_JSON.update(FALLBACK_MONSTERS[key])
+        md = _monster_json_to_markdown(LAST_MONSTER_JSON)
+        return md, LAST_MONSTER_JSON, LAST_MONSTER_JSON.get("provenance")
+
+    collection_name = COLLECTION_MAP[query_type]
 
     try:
         query_engine = get_query_engine(collection_name, embed_model)
