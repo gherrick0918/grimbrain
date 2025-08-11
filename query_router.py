@@ -19,6 +19,7 @@ from pathlib import Path
 from datetime import datetime
 import re
 from formatters import auto_format
+from monster_formatter import monster_to_json
 from utils import ensure_collection, hit_text
 from llama_index.core.llms.mock import MockLLM
 from llama_index.core import VectorStoreIndex
@@ -58,6 +59,9 @@ AUTO_KEYWORDS = {
     "class": ["barbarian", "ranger", "class", "sorcerer", "wizard"],
     "table": ["roll", "table", "trinket", "loot", "result"],
 }
+
+# holds the most recent monster JSON sidecar produced by run_query
+LAST_MONSTER_JSON: dict | None = None
 
 # Common text-processing helpers
 STOPWORDS = {
@@ -423,6 +427,8 @@ def run_query(
       • NEW: alias normalization (file-backed or provided dict)
       • NEW: optional alias learning
     """
+    global LAST_MONSTER_JSON
+    LAST_MONSTER_JSON = None
     pref_meta = {}
     query_type = type.lower()
     if query_type == "auto":
@@ -549,7 +555,13 @@ def run_query(
 
         print("🧪 Retrieved text:\n", raw_text[:500])
         print(f"Detected format type for '{query}': {query_type}")
-        return auto_format(raw_text, metadata=pref_meta)
+        out = auto_format(raw_text, metadata=pref_meta)
+        if query_type == "monster":
+            try:
+                LAST_MONSTER_JSON = monster_to_json(out, pref_meta)
+            except Exception:
+                LAST_MONSTER_JSON = None
+        return out
 
     except Exception as e:
         return f"❌ Failed to query collection '{collection_name}': {e}"

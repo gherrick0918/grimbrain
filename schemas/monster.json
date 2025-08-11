@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Monster",
+  "type": "object",
+  "required": [
+    "name",
+    "source",
+    "ac",
+    "hp",
+    "speed",
+    "str",
+    "dex",
+    "con",
+    "int",
+    "wis",
+    "cha",
+    "traits",
+    "actions",
+    "reactions",
+    "provenance"
+  ],
+  "properties": {
+    "name": {"type": "string"},
+    "source": {"type": "string"},
+    "ac": {"type": "string"},
+    "hp": {"type": "string"},
+    "speed": {"type": "string"},
+    "str": {"type": "integer"},
+    "dex": {"type": "integer"},
+    "con": {"type": "integer"},
+    "int": {"type": "integer"},
+    "wis": {"type": "integer"},
+    "cha": {"type": "integer"},
+    "traits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "text"],
+        "properties": {
+          "name": {"type": "string"},
+          "text": {"type": "string"}
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "text"],
+        "properties": {
+          "name": {"type": "string"},
+          "text": {"type": "string"}
+        }
+      }
+    },
+    "reactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "text"],
+        "properties": {
+          "name": {"type": "string"},
+          "text": {"type": "string"}
+        }
+      }
+    },
+    "provenance": {"type": "array"}
+  }
+}
+
