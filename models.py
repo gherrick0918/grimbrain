@@ -53,9 +53,13 @@ class Attack(BaseModel):
     """Simple attack entry for a :class:`PC`."""
 
     name: str
-    to_hit: int
     damage_dice: str
     type: str
+    to_hit: int | None = None
+    save_dc: int | None = None
+    save_ability: str | None = None
+    spell: SpellSidecar | None = None
+    concentration: bool = False
 
 
 class PC(BaseModel):
