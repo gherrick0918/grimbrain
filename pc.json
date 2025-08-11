@@ -1,0 +1,10 @@
+{
+  "party": [
+    {"name":"Malrick","ac":15,"hp":20,"attacks":[
+      {"name":"Shortsword","to_hit":5,"damage_dice":"1d6+3","type":"melee"}
+    ]},
+    {"name":"Brynn","ac":14,"hp":16,"attacks":[
+      {"name":"Shortbow","to_hit":4,"damage_dice":"1d6+2","type":"ranged"}
+    ]}
+  ]
+}

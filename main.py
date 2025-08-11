@@ -54,6 +54,8 @@ def main():
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
     parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Deterministic seed for dice/combat/session")
     parser.add_argument("--encounter", type=str, help="Monster name to fight", default=None)
     parser.add_argument("--rounds", type=int, help="Number of combat rounds", default=0)
     args = parser.parse_args()
@@ -86,19 +88,37 @@ def main():
         parser.error("--scene and --resume are mutually exclusive")
 
     if args.scene:
-        md_path, json_path = start_scene(args.scene)
+        md_path, json_path = start_scene(args.scene, seed=args.seed)
         print(f"Started scene '{args.scene}', logs at {json_path}")
     if args.resume:
         session = Session.load(args.resume)
         md_path = Path(args.resume.replace('.json', '.md'))
         json_path = Path(args.resume)
         print(f"Resumed scene '{session.scene}' with {len(session.steps)} steps")
+        # optionally run a round, etc.
+        # result = run_round(session.party, session.monsters, seed=args.seed)
 
     if args.pc and args.encounter and args.rounds > 0:
-        pcs = [PC(**obj) for obj in json.loads(Path(args.pc).read_text())]
+        raw = json.loads(Path(args.pc).read_text())
+        # Accept either a list of PCs or {"party": [...]}
+        if isinstance(raw, dict) and "party" in raw:
+            raw = raw["party"]
+        if not isinstance(raw, list):
+            raise ValueError("PC file must be a list of PC objects or a dict with 'party' list.")
+        # Normalize common alternate keys inside attacks
+        def _normalize_pc(obj):
+            attacks = obj.get("attacks", [])
+            for atk in attacks:
+                if "damage_dice" not in atk and "damage" in atk:
+                    atk["damage_dice"] = atk.pop("damage")
+                if "to_hit" not in atk and "attack_bonus" in atk:
+                    atk["to_hit"] = atk["attack_bonus"]
+            return obj
+        raw = [_normalize_pc(o) for o in raw]
+        pcs = [PC(**obj) for obj in raw]
         _, sidecar, _ = run_query(args.encounter, type="monster", embed_model=embed_model)
         monster = MonsterSidecar(**sidecar)
-        result = run_round(pcs, [monster], seed=0)
+        result = run_round(pcs, [monster], seed=args.seed)
         print("\n".join(result["log"]))
         if md_path and json_path:
             log_step(md_path, json_path, f"Round 1 vs {args.encounter}", "\n".join(result["log"]))
