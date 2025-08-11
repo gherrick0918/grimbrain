@@ -1,8 +1,18 @@
-from engine.session import start_scene
+import json
+from engine.session import Session
 
 
-def test_start_scene_creates_files(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    md, js = start_scene("market brawl")
-    assert md.exists()
-    assert js.exists()
+def test_session_save_load(tmp_path):
+    path = tmp_path / "sess.json"
+    s = Session.start("market brawl", seed=123)
+    s.log_step("look around", "you see stalls")
+    s.save(path)
+
+    loaded = Session.load(path)
+    loaded.log_step("buy", "apple")
+    loaded.save(path)
+
+    data = json.loads(path.read_text())
+    assert data["seed"] == 123
+    assert data["scene"] == "market brawl"
+    assert len(data["steps"]) == 2

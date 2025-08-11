@@ -24,6 +24,7 @@ def test_goblin_sidecar(embedder):
     assert "Scimitar" in _names(data["actions"])
     assert "Shortbow" in _names(data["actions"])
     assert data["reactions"] == []
+    assert any(a["name"] == "Scimitar" for a in data["actions_struct"])
     validate_monster(data)
     MonsterSidecar(**data)
 
@@ -39,6 +40,14 @@ def test_goblin_boss_sidecar(embedder):
     assert "Nimble Escape" in _names(data["traits"])
     assert "Multiattack" in _names(data["actions"])
     assert any(r["name"] == "Redirect Attack" for r in data["reactions"])
+    scim = next(a for a in data["actions_struct"] if a["name"] == "Scimitar")
+    assert scim["attack_bonus"] == 4
+    assert scim["type"] == "melee"
+    assert scim["damage_dice"] == "1d6 + 2"
+    assert scim["damage_type"] == "slashing"
+    jav = next(a for a in data["actions_struct"] if a["name"] == "Javelin")
+    assert jav["type"] == "ranged"
+    assert jav["damage_type"] == "piercing"
     validate_monster(data)
     MonsterSidecar(**data)
 

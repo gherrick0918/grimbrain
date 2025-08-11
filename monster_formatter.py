@@ -86,6 +86,47 @@ def _named_paras(block: str) -> Dict[str, str]:
             items[name] = desc
     return items
 
+
+ATTACK_RE = re.compile(
+    r"^(?P<type>Melee|Ranged|Melee or Ranged|Ranged or Melee) Weapon Attack:\s+"
+    r"(?P<bonus>[+-]?\d+) to hit,\s+"
+    r"(?P<reach>[^,]+),\s+"
+    r"(?P<target>[^.]+)\.\s*Hit:\s*(?P<hit>.*)$",
+    re.IGNORECASE,
+)
+
+DAMAGE_RE = re.compile(r"\((?P<dice>[^)]+)\)\s*(?P<dtype>[A-Za-z]+) damage", re.IGNORECASE)
+
+
+def _parse_action_struct(name: str, text: str) -> Dict[str, Any] | None:
+    m = ATTACK_RE.match(text)
+    if not m:
+        return None
+    atk_type = m.group("type").lower()
+    if "ranged" in atk_type and "melee" in atk_type:
+        atk_type = "ranged"
+    elif "melee" in atk_type:
+        atk_type = "melee"
+    else:
+        atk_type = "ranged"
+    bonus = int(m.group("bonus"))
+    reach = m.group("reach").strip()
+    target = m.group("target").strip()
+    hit_text = m.group("hit").strip()
+    dmg = DAMAGE_RE.search(hit_text)
+    dmg_dice = dmg.group("dice").strip() if dmg else ""
+    dmg_type = dmg.group("dtype").strip().lower() if dmg else ""
+    return {
+        "name": name,
+        "attack_bonus": bonus,
+        "type": atk_type,
+        "reach_or_range": reach,
+        "target": target,
+        "hit_text": hit_text,
+        "damage_dice": dmg_dice,
+        "damage_type": dmg_type,
+    }
+
 class MonsterFormatter:
     def format(self, text: str, meta: Dict[str, Any] | None = None) -> str:
         meta = meta or {}
@@ -189,6 +230,7 @@ def monster_to_json(markdown: str, meta: Dict[str, Any] | None = None) -> Dict[s
         "cha": 0,
         "traits": [],
         "actions": [],
+        "actions_struct": [],
         "reactions": [],
         "provenance": meta.get("provenance", []),
     }
@@ -232,7 +274,13 @@ def monster_to_json(markdown: str, meta: Dict[str, Any] | None = None) -> Dict[s
             m3 = re.match(r"- \*\*(.+?)\.\*\*\s*(.+)", line)
             if m3:
                 getattr_list = out[section]
-                getattr_list.append({"name": m3.group(1).strip(), "text": m3.group(2).strip()})
+                action_name = m3.group(1).strip()
+                action_text = m3.group(2).strip()
+                getattr_list.append({"name": action_name, "text": action_text})
+                if section == "actions":
+                    parsed = _parse_action_struct(action_name, action_text)
+                    if parsed:
+                        out["actions_struct"].append(parsed)
             continue
 
     return out
