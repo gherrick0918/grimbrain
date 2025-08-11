@@ -61,7 +61,11 @@ AUTO_KEYWORDS = {
 }
 
 # holds the most recent monster JSON sidecar produced by run_query
-LAST_MONSTER_JSON: dict | None = None
+# Use a mutable dict so ``from query_router import LAST_MONSTER_JSON``
+# continues to see updates made inside ``run_query``.  Reassigning the
+# variable would break that import pattern since Python copies the object
+# reference at import time.
+LAST_MONSTER_JSON: dict = {}
 
 # Common text-processing helpers
 STOPWORDS = {
@@ -428,7 +432,8 @@ def run_query(
       • NEW: optional alias learning
     """
     global LAST_MONSTER_JSON
-    LAST_MONSTER_JSON = None
+    # Reset in place so external imports see the update
+    LAST_MONSTER_JSON.clear()
     pref_meta = {}
     query_type = type.lower()
     if query_type == "auto":
@@ -558,9 +563,11 @@ def run_query(
         out = auto_format(raw_text, metadata=pref_meta)
         if query_type == "monster":
             try:
-                LAST_MONSTER_JSON = monster_to_json(out, pref_meta)
+                # mutate in place rather than rebind
+                LAST_MONSTER_JSON.clear()
+                LAST_MONSTER_JSON.update(monster_to_json(out, pref_meta))
             except Exception:
-                LAST_MONSTER_JSON = None
+                LAST_MONSTER_JSON.clear()
         return out
 
     except Exception as e:
