@@ -22,6 +22,7 @@ from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import Campaign, Quest, load_campaign, load_party_file
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter
+from content.packs import load_packs
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -419,6 +420,7 @@ def main():
     parser.add_argument("--rounds", type=int, help="Max combat rounds", default=10)
     parser.add_argument("--summary-out", type=str, help="Write encounter summary JSON", default=None)
     parser.add_argument("--autosave", action="store_true", help="Autosave turn summaries")
+    parser.add_argument("--packs", type=str, default="srd", help="Comma-separated content packs")
     args = parser.parse_args()
 
     if args.play:
@@ -434,7 +436,17 @@ def main():
             pcs = load_party_file(Path(args.pc))
         if not args.encounter:
             raise SystemExit("--encounter required for --play")
-        monsters = parse_monster_spec(args.encounter, _lookup_fallback)
+
+        pack_names = [p.strip() for p in (args.packs or "").split(",") if p.strip()]
+        catalog = load_packs(pack_names)
+
+        def _lookup(name: str) -> MonsterSidecar:
+            data = catalog.get(name.lower())
+            if data:
+                return MonsterSidecar(**data)
+            return _lookup_fallback(name)
+
+        monsters = parse_monster_spec(args.encounter, _lookup)
         play_cli(
             pcs,
             monsters,
@@ -512,7 +524,13 @@ def main():
         raw = [_normalize_pc(o) for o in raw]
         pcs = [PC(**obj) for obj in raw]
 
+        pack_names = [p.strip() for p in (args.packs or "").split(",") if p.strip()]
+        catalog = load_packs(pack_names)
+
         def _lookup(name: str) -> MonsterSidecar:
+            data = catalog.get(name.lower())
+            if data:
+                return MonsterSidecar(**data)
             _, sc, _ = run_query(name, type="monster", embed_model=embed_model)
             return MonsterSidecar(**sc)
 

@@ -11,60 +11,56 @@
    ```bash
    pytest
    ```
-3. **Sample query**
+   Golden files under `tests/golden` lock in expected output.
+3. **Play a fight**
    ```bash
-   python main.py --scene "market brawl" --json-out logs/side.json --md-out logs/side.md
+   python main.py --play --pc pc_wizard.json --encounter "goblin" --packs srd --seed 1
    ```
-   This prints a formatted entry and writes both markdown and JSON sidecars.
-4. **Python API**
-   ```python
-   from grimbrain.retrieval.query_router import run_query
-   md, js, prov = run_query("goblin", type="monster")
-   ```
-   `md` is markdown, `js` a sidecar dict, and `prov` a list of provenance strings. For spells:
-   ```python
-   md, js, prov = run_query("fireball", type="spell")
-   ```
-   The ``run_query`` function always returns a tuple ``(markdown, json, provenance)``.
+   Use `--seed` for deterministic combat. Handy commands in play mode:
+   `status`, `actions [pc]`, `attack <target> "<attack>"`, `cast "<spell>" [all|<target>]`, `end`, `save <path>`.
 
-5. **Play mode**
-   ```bash
-   python main.py --play --pc tests/pc.json --encounter "goblin" --seed 1 --autosave
-   ```
-   Loads PCs from ``pc.json`` and drops you into an interactive fight. Use
-   shorthand commands like `a` for attack, `c` for cast, `s` for status and `q` to quit.
+To continue a campaign:
+```bash
+python main.py --play --pc pc_wizard.json --encounter "goblin" \
+  --campaign campaign.yaml --packs srd,homebrew --seed 1 --autosave
+```
+`campaign.yaml`:
+```yaml
+name: demo
+party_files:
+  - pc_wizard.json
+quests:
+  - id: q1
+    title: Defeat the goblins
+```
 
-   Example ``pc.json``:
-   ```json
-   [
-     {"name": "Hero1", "ac": 15, "hp": 20,
-      "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}]},
-     {"name": "Hero2", "ac": 15, "hp": 20,
-      "attacks": [{"name": "Axe", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}]}
-   ]
-   ```
+`pc_wizard.json`:
+```json
+{
+  "party": [
+    {
+      "name": "Elora",
+      "ac": 12,
+      "hp": 8,
+      "attacks": [
+        {"name": "Fire Bolt", "to_hit": 5, "damage_dice": "1d10", "type": "spell"},
+        {"name": "Quarterstaff", "to_hit": 2, "damage_dice": "1d6", "type": "melee"}
+      ]
+    }
+  ]
+}
+```
 
-   Sample output:
-   ```
-   Goblin hits Hero for 5
-   Hero misses Goblin
-   ```
+## Python API
+```python
+from grimbrain.retrieval.query_router import run_query
+md, js, prov = run_query("goblin", type="monster")
+```
+`md` is markdown, `js` is a sidecar dict, and `prov` lists provenance strings. The
+function always returns a `(markdown, json, provenance)` tuple.
 
-   Play mode also accepts a single character sheet JSON/YAML describing a PC. Missing
-   attack bonuses and spell save DCs are derived from ability scores and proficiency.
-   For longer running games, pass ``--campaign campaign.yaml`` to track quests and notes
-   and to save session logs under ``campaigns/<name>/sessions``.
-
-### Embeddings flag
-
-Use `--embeddings` to select embedding mode:
-- `auto` (default) – use BGE small if available
-- `bge-small` – require the BGE small model
-- `none` – disable embeddings and suppress warnings
-
-### Output flags
-
+## Output flags
 - `--json-out` optionally takes a path (defaults to `logs/last_sidecar.json`)
 - `--md-out` writes the markdown output
-- `--play` enables interactive combat; combine with `--seed` for determinism
+- `--play` enables interactive combat
 - `--autosave` appends turn summaries to paired markdown/JSON logs

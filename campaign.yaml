@@ -1,0 +1,6 @@
+name: demo
+party_files:
+  - pc_wizard.json
+quests:
+  - id: q1
+    title: Defeat the goblins
