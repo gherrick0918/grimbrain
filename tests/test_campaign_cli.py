@@ -55,9 +55,10 @@ def _setup_campaign(tmp_path: Path) -> Path:
 def run_cli(camp_dir: Path, inp: str) -> subprocess.CompletedProcess:
     main_path = Path(__file__).resolve().parent.parent / "main.py"
     args = [sys.executable, str(main_path), "--campaign", str(camp_dir)]
+    # Ensure the input ends with a newline and set the correct working directory
     return subprocess.run(
         args,
-        input=inp,
+        input=inp if inp.endswith('\n') else inp + '\n',
         text=True,
         capture_output=True,
         timeout=20,

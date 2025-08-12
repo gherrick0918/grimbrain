@@ -7,6 +7,7 @@ import shlex
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from grimbrain.engine.session import Session, start_scene, log_step
 from grimbrain.engine.combat import (
@@ -472,11 +473,16 @@ def main():
     parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
-    parser.add_argument("--start", type=str, help="Start scene id", default=None)
+    parser.add_argument(
+        "--start",
+        nargs="?",
+        const="__AUTO__",  # allows bare `--start`
+        help="Start the campaign. Optionally pass a SCENE key; bare --start uses the YAML 'start'.",
+    )
     parser.add_argument("--save", type=str, help="Save session state", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
     parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
-    parser.add_argument("--campaign", type=str, help="Path to campaign YAML", default=None)
+    parser.add_argument("--campaign", type=str, help="Path to campaign folder or YAML. If a folder, we'll look for campaign.yaml (or index.yaml).", default=None)
     parser.add_argument("--seed", type=int, default=None,
                         help="Deterministic seed for dice/combat/session")
     parser.add_argument("--encounter", type=str, help="Monsters to fight", default=None)
@@ -486,16 +492,77 @@ def main():
     parser.add_argument("--packs", type=str, default="srd", help="Comma-separated content packs")
     args = parser.parse_args()
 
+
+
+    # --- PATCH: campaign path resolution ---
+    def _resolve_campaign_path(arg: str) -> Path:
+        """Accept a YAML file or a directory containing one."""
+        p = Path(arg)
+        if p.is_dir():
+            # Preferred filenames
+            for name in ("campaign.yaml", "campaign.yml", "index.yaml", "index.yml"):
+                cand = p / name
+                if cand.exists():
+                    return cand
+            # Fallback: first YAML in the directory
+            for cand in sorted(p.glob("*.y*ml")):
+                return cand
+            raise FileNotFoundError(f"No campaign YAML found in directory: {p}")
+        # If user passed a file, just return it
+        return p
+
     if args.campaign and not args.play:
-        run_campaign_cli(
-            Path(args.campaign),
-            start=args.start,
-            resume=args.resume,
-            save=args.save,
-            seed=args.seed,
-        )
+        import yaml
+        campaign_path = _resolve_campaign_path(args.campaign)
+        with open(campaign_path, "r", encoding="utf-8") as f:
+            campaign_yaml = yaml.safe_load(f)
+        # choose start scene (autostart when --campaign is given and not resuming)
+        if args.resume:
+            start_key = None  # resume path decides the scene
+        else:
+            if args.start is None:
+                start_key = campaign_yaml.get('start')
+            elif args.start == "__AUTO__":
+                start_key = campaign_yaml.get('start')
+            else:
+                start_key = args.start
+        if start_key is not None:
+            run_campaign_cli(
+                campaign_path,
+                start=start_key,
+                resume=args.resume,
+                save=args.save,
+                seed=args.seed,
+            )
         return
 
+        if args.campaign and not args.play:
+            import yaml
+            with open(args.campaign, 'r', encoding='utf-8') as f:
+                campaign = yaml.safe_load(f)
+            # choose start scene (autostart when --campaign is given and not resuming)
+            if args.resume:
+                start_key = None  # resume path decides the scene
+            else:
+                if args.start is None:
+                    # no --start flag at all → if campaign provided, use YAML default
+                    start_key = campaign.get('start')
+                elif args.start == "__AUTO__":
+                    # user typed bare --start → use YAML default
+                    start_key = campaign.get('start')
+                else:
+                    # explicit scene provided
+                    start_key = args.start
+            # ... later, only kick off the campaign flow when we actually have a start
+            if start_key is not None:
+                run_campaign_cli(
+                    Path(args.campaign),
+                    start=start_key,
+                    resume=args.resume,
+                    save=args.save,
+                    seed=args.seed,
+                )
+            return
     if args.play:
         campaign = campaign_engine.load_campaign(args.campaign) if args.campaign else None
         if campaign:
