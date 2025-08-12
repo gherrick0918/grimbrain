@@ -104,7 +104,20 @@ FALLBACK_SPELLS: dict[str, dict] = {
 
 
 def _monster_json_to_markdown(data: Dict[str, Any]) -> str:
-    """Render a simple monster stat block from a JSON dict."""
+    """Render a simple monster stat block from a JSON dict.
+
+    The source JSON we ship with the project mixes line endings depending on
+    the platform that wrote it.  When these raw strings are stitched together
+    the resulting markdown can contain stray ``\r`` characters or trailing
+    whitespace, which in turn causes cross-platform test failures when
+    comparing against golden files.  To keep the output deterministic we strip
+    each text field and normalize newlines before joining the lines.
+    """
+
+    def _clean(text: str) -> str:
+        """Remove any carriage returns and trailing whitespace."""
+        return text.replace("\r\n", "\n").strip()
+
     lines = [f"### {data['name']}" + (f" — {data.get('source')}" if data.get('source') else ""), ""]
     lines.append(f"**Armor Class**: {data['ac']}")
     lines.append(f"**Hit Points**: {data['hp']}")
@@ -117,18 +130,18 @@ def _monster_json_to_markdown(data: Dict[str, Any]) -> str:
         lines.append("")
         lines.append("**Traits**")
         for t in data["traits"]:
-            lines.append(f"- **{t['name']}.** {t['text']}")
+            lines.append(f"- **{t['name']}.** {_clean(t['text'])}")
     lines.append("")
     lines.append("**Actions**")
     if data.get("actions"):
         for a in data["actions"]:
-            lines.append(f"- **{a['name']}.** {a['text']}")
+            lines.append(f"- **{a['name']}.** {_clean(a['text'])}")
     if data.get("reactions"):
         lines.append("")
         lines.append("**Reactions**")
         for r in data["reactions"]:
-            lines.append(f"- **{r['name']}.** {r['text']}")
-    return "\n".join(lines)
+            lines.append(f"- **{r['name']}.** {_clean(r['text'])}")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _spell_json_to_markdown(data: Dict[str, Any]) -> str:
