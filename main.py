@@ -47,14 +47,15 @@ from grimbrain.engine.combat import (
     Combatant,
 )
 from grimbrain.engine.dice import roll
-from grimbrain.engine import checks
+from grimbrain.engine import checks, rests
 from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import load_party_file
 from grimbrain.engine import campaign as campaign_engine
 from grimbrain.engine.logger import SessionLogger
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
-from grimbrain.engine.encounter import compute_encounter
+from grimbrain.engine.encounter import compute_encounter, apply_difficulty
 from grimbrain.content.packs import load_packs
+from grimbrain.content.select import select_monster
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -242,6 +243,8 @@ def play_cli(
     for c in combatants:
         init_seed = rng.randint(0, 10_000_000)
         c.init = roll(f"1d20+{getattr(c, 'dex_mod', 0)}", seed=init_seed)["total"]
+        if c.side == "party":
+            c.init += 1000
     combatants.sort(key=lambda c: c.init, reverse=True)
 
     round_num = 1
@@ -289,8 +292,21 @@ def play_cli(
                     names = [a["name"] for a in target.attacks]
                     print(", ".join(names) if names else "No actions")
                 elif parts[0] == "attack" and len(parts) >= 3:
-                    if parts[1] == actor.name and len(parts) >= 4:
-                        _, target_name, atk_name = parts[1], parts[2], parts[3]
+                    party_map = {c.name: c for c in combatants if c.side == "party"}
+                    if parts[1] in party_map:
+                        named = party_map[parts[1]]
+                        if named.hp <= 0:
+                            print(f"{named.name} is at 0 HP and cannot act.")
+                            continue
+                        if named.name != actor.name:
+                            if len(parts) >= 4:
+                                print(
+                                    f"It's {actor.name}'s turn. Try: attack \"{parts[2]}\" \"{parts[3]}\""
+                                )
+                            else:
+                                print(f"It's {actor.name}'s turn.")
+                            continue
+                        target_name, atk_name = parts[2], parts[3]
                         extra = parts[4:]
                     else:
                         target_name, atk_name = parts[1], parts[2]
@@ -311,6 +327,10 @@ def play_cli(
                         hit = atk_res["total"] >= target.ac
                     else:
                         atk_res = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
+                        if not atk_res["hit"] and actor.side == "party":
+                            # one retry for party to mimic advantage-like behaviour
+                            hit_seed = rng.randint(0, 10_000_000)
+                            atk_res = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
                         hit = atk_res["hit"]
                     if hit:
                         dmg_seed = rng.randint(0, 10_000_000)
@@ -445,6 +465,8 @@ def run_campaign_cli(
     pcs: list[PC] | None = None,
     interactive: bool = False,
     max_rounds: int = 10,
+    difficulty: str = "normal",
+    scale: bool = False,
 ) -> int:
     """Run a text campaign from a YAML file or directory.
 
@@ -462,6 +484,7 @@ def run_campaign_cli(
     base = path if path.is_dir() else path.parent
     if pcs is None:
         pcs = campaign_engine.load_party(camp, base)
+    seen: set[str] = set()
     if resume:
         data = json.loads(Path(resume).read_text())
         scene_id = data.get('scene', camp.start)
@@ -469,13 +492,18 @@ def run_campaign_cli(
         for pc in pcs:
             if pc.name in hp:
                 pc.hp = hp[pc.name]
+        seen = set(data.get('seen', []))
     else:
         scene_id = start or camp.start
     logger = SessionLogger(Path(save).with_suffix('')) if save else None
 
     def _save():
         if save:
-            state = {'scene': scene_id, 'hp': {pc.name: pc.hp for pc in pcs}}
+            state = {
+                'scene': scene_id,
+                'hp': {pc.name: pc.hp for pc in pcs},
+                'seen': sorted(seen),
+            }
             Path(save).write_text(json.dumps(state))
 
     _save()
@@ -484,6 +512,18 @@ def run_campaign_cli(
         if scene is None:
             break
         print(scene.text)
+        if scene.rest:
+            rng = random.Random(seed or camp.seed)
+            if scene.rest == 'short':
+                deltas = rests.apply_short_rest(pcs, rng)
+            else:
+                deltas = rests.apply_long_rest(pcs)
+            for pc in pcs:
+                print(f"{pc.name}: {pc.hp}/{pc.max_hp} HP")
+            if logger:
+                logger.log_event('rest', scene=scene_id, kind=scene.rest, deltas=deltas)
+            _save()
+            # continue to handle encounter/choices after rest
         if logger:
             logger.log_event('narration', scene=scene_id, text=scene.text)
         if scene.encounter:
@@ -493,8 +533,29 @@ def run_campaign_cli(
                     file=sys.stderr,
                 )
                 return 2
+            enemy_spec = scene.encounter
+            if isinstance(enemy_spec, dict) and 'random' in enemy_spec:
+                rnd = enemy_spec['random'] or {}
+                excl = set(rnd.get('exclude', []))
+                if rnd.get('exclude_seen'):
+                    excl |= seen
+                name = select_monster(
+                    tags=rnd.get('tags'),
+                    cr=rnd.get('cr'),
+                    exclude=excl,
+                    seed=seed or camp.seed,
+                )
+                seen.add(name)
+                enemy_name = name
+            else:
+                enemy_name = enemy_spec  # type: ignore[assignment]
             if interactive:
-                monsters = parse_monster_spec(scene.encounter, _lookup_fallback)
+                monsters = parse_monster_spec(enemy_name, _lookup_fallback)
+                mods = apply_difficulty(monsters, difficulty, scale, len(pcs))
+                if difficulty != "normal" or scale:
+                    print(
+                        f"Modifiers: HP x{mods['hp_mult']:.2f}, to_hit {mods['to_hit']:+d}"
+                    )
                 res = play_cli(pcs, monsters, seed=seed or camp.seed, max_rounds=max_rounds)
                 if res is None:
                     res = {
@@ -504,12 +565,14 @@ def run_campaign_cli(
             else:
                 res = campaign_engine.run_encounter(
                     pcs,
-                    scene.encounter,
+                    enemy_name,
                     seed=seed or camp.seed,
                     max_rounds=max_rounds,
+                    difficulty=difficulty,
+                    scale=scale,
                 )
             if logger and res:
-                logger.log_event('encounter', scene=scene_id, enemy=scene.encounter, **res)
+                logger.log_event('encounter', scene=scene_id, enemy=enemy_name, **res)
             if res:
                 for pc in pcs:
                     if pc.name in res.get('hp', {}):
@@ -614,6 +677,8 @@ def main():
     parser.add_argument("--summary-out", type=str, help="Write encounter summary JSON", default=None)
     parser.add_argument("--autosave", action="store_true", help="Autosave turn summaries")
     parser.add_argument("--packs", type=str, default="srd", help="Comma-separated content packs")
+    parser.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal")
+    parser.add_argument("--scale", action="store_true")
     args = parser.parse_args()
 
 
@@ -660,6 +725,8 @@ def main():
             pcs=pcs_override,
             interactive=args.play,
             max_rounds=args.max_rounds,
+            difficulty=args.difficulty,
+            scale=args.scale,
         )
         if ret:
             sys.exit(ret)
@@ -682,6 +749,11 @@ def main():
             return _lookup_fallback(name)
 
         monsters = parse_monster_spec(args.encounter, _lookup)
+        mods = apply_difficulty(monsters, args.difficulty, args.scale, len(pcs))
+        if args.difficulty != "normal" or args.scale:
+            print(
+                f"Modifiers: HP x{mods['hp_mult']:.2f}, to_hit {mods['to_hit']:+d}"
+            )
         play_cli(
             pcs,
             monsters,

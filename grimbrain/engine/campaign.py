@@ -9,6 +9,7 @@ import yaml
 from ..models import PC, MonsterSidecar
 from ..fallback_monsters import FALLBACK_MONSTERS
 from .combat import run_encounter as _run_encounter
+from .encounter import apply_difficulty
 from ..campaign import load_party_file
 
 
@@ -32,9 +33,10 @@ class Check:
 class Scene:
     id: str
     text: str
-    encounter: Optional[str] = None
+    encounter: str | dict | None = None
     on_victory: Optional[str] = None
     on_defeat: Optional[str] = None
+    rest: Optional[str] = None
     check: Optional[Check] = None
     choices: List[Choice] = field(default_factory=list)
 
@@ -73,6 +75,7 @@ def load_campaign(path: str | Path) -> Campaign:
             encounter=sdata.get("encounter"),
             on_victory=sdata.get("on_victory"),
             on_defeat=sdata.get("on_defeat"),
+            rest=sdata.get("rest"),
             check=check,
             choices=choices,
         )
@@ -99,9 +102,12 @@ def run_encounter(
     enemy_name: str,
     seed: int | None = None,
     max_rounds: int = 10,
+    difficulty: str = "normal",
+    scale: bool = False,
 ) -> Dict[str, object]:
     data = FALLBACK_MONSTERS[enemy_name.lower()]
     mon = MonsterSidecar(**data)
+    apply_difficulty([mon], difficulty, scale, len(pcs))
     res = _run_encounter(pcs, [mon], seed=seed, max_rounds=max_rounds)
     outcome = "victory" if res["winner"] == "party" else "defeat"
     hp = {c["name"]: c["hp"] for c in res["state"]["party"]}

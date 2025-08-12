@@ -69,6 +69,15 @@ class PC(BaseModel):
     ac: int
     hp: int
     attacks: List[Attack]
+    max_hp: int | None = None
+    con_mod: int = 0
+
+    def __init__(self, **data):  # type: ignore[override]
+        if data.get("max_hp") is None and "hp" in data:
+            data["max_hp"] = data.get("hp")
+        if data.get("con_mod") is None:
+            data["con_mod"] = 0
+        super().__init__(**data)
 
 
 def dump_model(m: BaseModel) -> Dict[str, Any]:

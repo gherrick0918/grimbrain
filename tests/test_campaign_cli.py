@@ -142,3 +142,23 @@ def test_encounter_requires_pcs(tmp_path):
     proc = run_cli(tmp_path, "", extra=["--max-rounds", "0"])
     assert proc.returncode != 0
     assert "no pcs were loaded" in proc.stderr.lower()
+
+
+def test_rest_scene_save_resume(tmp_path):
+    pc = {"name": "Hero", "ac": 15, "hp": 5, "max_hp": 10, "attacks": []}
+    (tmp_path / "pc.json").write_text(json.dumps(pc))
+    campaign = {
+        "name": "RestDemo",
+        "party_files": ["pc.json"],
+        "start": "rest",
+        "scenes": {
+            "rest": {"text": "resting", "rest": "short", "on_victory": "end", "on_defeat": "end"},
+            "end": {"text": "end"},
+        },
+    }
+    (tmp_path / "campaign.yaml").write_text(yaml.safe_dump(campaign))
+    save_path = tmp_path / "state.json"
+    run_campaign_cli(tmp_path / "campaign.yaml", save=str(save_path), seed=1)
+    state = json.loads(save_path.read_text())
+    assert state["hp"]["Hero"] > 5
+    run_campaign_cli(tmp_path / "campaign.yaml", resume=str(save_path))
