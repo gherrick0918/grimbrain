@@ -386,9 +386,28 @@ def play_cli(
     return None
 
 
-def run_campaign_cli(path: Path, start: str | None = None, resume: str | None = None, save: str | None = None, seed: int | None = None) -> None:
+def run_campaign_cli(
+    path: Path,
+    start: str | None = None,
+    resume: str | None = None,
+    save: str | None = None,
+    seed: int | None = None,
+) -> None:
+    """Run a text campaign from a YAML file or directory.
+
+    ``path`` may point directly to the ``campaign.yaml`` file or to a directory
+    containing it.  ``load_campaign`` accepts either, but loading the party
+    requires the directory so that relative ``party_files`` can be resolved.
+    Previously we passed the YAML file path straight through which resulted in
+    paths like ``campaign.yaml/pc.json`` and crashes when the CLI was invoked
+    with ``--campaign`` pointing to a folder.  Normalising the base directory
+    here fixes those failures and allows both invocation styles.
+    """
+
+    path = Path(path)
     camp = campaign_engine.load_campaign(path)
-    pcs = campaign_engine.load_party(camp, Path(path))
+    base = path if path.is_dir() else path.parent
+    pcs = campaign_engine.load_party(camp, base)
     if resume:
         data = json.loads(Path(resume).read_text())
         scene_id = data.get('scene', camp.start)
@@ -526,7 +545,10 @@ def main():
                 start_key = campaign_yaml.get('start')
             else:
                 start_key = args.start
-        if start_key is not None:
+        # When resuming, ``start_key`` is ``None`` because the save file
+        # determines the next scene.  We still need to launch the campaign
+        # runner in that case.
+        if start_key is not None or args.resume:
             run_campaign_cli(
                 campaign_path,
                 start=start_key,
@@ -535,34 +557,6 @@ def main():
                 seed=args.seed,
             )
         return
-
-        if args.campaign and not args.play:
-            import yaml
-            with open(args.campaign, 'r', encoding='utf-8') as f:
-                campaign = yaml.safe_load(f)
-            # choose start scene (autostart when --campaign is given and not resuming)
-            if args.resume:
-                start_key = None  # resume path decides the scene
-            else:
-                if args.start is None:
-                    # no --start flag at all → if campaign provided, use YAML default
-                    start_key = campaign.get('start')
-                elif args.start == "__AUTO__":
-                    # user typed bare --start → use YAML default
-                    start_key = campaign.get('start')
-                else:
-                    # explicit scene provided
-                    start_key = args.start
-            # ... later, only kick off the campaign flow when we actually have a start
-            if start_key is not None:
-                run_campaign_cli(
-                    Path(args.campaign),
-                    start=start_key,
-                    resume=args.resume,
-                    save=args.save,
-                    seed=args.seed,
-                )
-            return
     if args.play:
         campaign = campaign_engine.load_campaign(args.campaign) if args.campaign else None
         if campaign:
