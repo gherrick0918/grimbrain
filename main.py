@@ -19,7 +19,9 @@ from grimbrain.engine.combat import (
 from grimbrain.engine.dice import roll
 from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
 from grimbrain.models import PC, MonsterSidecar, dump_model
-from grimbrain.campaign import Campaign, Quest, load_campaign, load_party_file
+from grimbrain.campaign import load_party_file
+from grimbrain.engine import campaign as campaign_engine
+from grimbrain.engine.logger import SessionLogger
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter
 from grimbrain.content.packs import load_packs
@@ -179,22 +181,11 @@ def play_cli(
     max_rounds: int = 20,
     autosave: bool = False,
     summary_out: str | None = None,
-    campaign: Campaign | None = None,
-) -> None:
+) -> dict | None:
     rng = random.Random(seed)
     if seed is not None:
         print(f"Using seed: {seed}")
-    if campaign:
-        sess_dir = Path("campaigns") / campaign.name / "sessions"
-        sess_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        md_path = (sess_dir / f"{stamp}.md").resolve()
-        json_path = (sess_dir / f"{stamp}.json").resolve()
-        md_path.write_text(f"# Session {stamp}\n")
-        Session.start("play", seed=seed).save(json_path)
-        campaign.last_session = str(json_path)
-        campaign.save()
-    elif autosave:
+    if autosave:
         md_path, json_path = start_scene("play", seed=seed)
     else:
         md_path = json_path = None
@@ -252,33 +243,11 @@ def play_cli(
                     print(
                         "Commands: status, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
                     )
-                elif parts[0] == "quest" and campaign:
-                    if len(parts) >= 3 and parts[1] == "add":
-                        title = " ".join(parts[2:])
-                        qid = f"q{len(campaign.quests) + 1}"
-                        campaign.quests.append(Quest(id=qid, title=title))
-                        print(f"Added quest {qid}")
-                    elif len(parts) == 3 and parts[1] == "done":
-                        qid = parts[2]
-                        for q in campaign.quests:
-                            if q.id == qid:
-                                q.status = "done"
-                                print(f"Quest {qid} marked done")
-                                break
-                        else:
-                            print("Unknown quest")
-                elif parts[0] == "note" and campaign:
-                    text = " ".join(parts[1:])
-                    campaign.notes.append(text)
-                    print("Note added")
                 elif parts[0] == "quit":
                     return
                 elif parts[0] == "save":
                     if len(parts) == 2:
                         _save_game(parts[1], seed, round_num, turn, combatants)
-                    elif campaign:
-                        campaign.save()
-                        print("Campaign saved")
                 elif parts[0] == "load" and len(parts) == 2:
                     seed, round_num, turn, combatants = _load_game(parts[1])
                 elif parts[0] == "actions":
@@ -391,17 +360,85 @@ def play_cli(
         xp = compute_encounter(monsters)
         loot_seed = rng.randint(0, 10_000_000)
         loot = roll(f"{len(monsters)}d6", seed=loot_seed)["total"]
-        summary = {"winner": winner, "rounds": round_num - 1 if turn == 0 else round_num, "xp": xp["total_xp"], "loot_gp": loot}
+        summary = {
+            'winner': winner,
+            'rounds': round_num - 1 if turn == 0 else round_num,
+            'xp': xp['total_xp'],
+            'loot_gp': loot,
+        }
         print(
-            f"{winner.capitalize()} wins after {summary['rounds']} rounds! XP {summary['xp']}, Loot {summary['loot_gp']} gp"
+            f"{winner.capitalize()} wins after {summary['rounds']} rounds! XP {summary['xp']}, Loot {summary['loot_gp']} gp",
         )
         if summary_out:
             Path(summary_out).write_text(json.dumps(summary, indent=2))
             print(f"Summary written to {summary_out}")
         if autosave and md_path and json_path:
-            log_step(md_path, json_path, "Summary", json.dumps(summary))
+            log_step(md_path, json_path, 'Summary', json.dumps(summary))
+        result = {
+            'result': 'victory' if winner == 'party' else 'defeat',
+            'summary': summary,
+            'hp': {c.name: 0 if c.defeated else c.hp for c in combatants if c.side == 'party'},
+        }
+        return result
     else:
-        print("Max rounds reached")
+        print('Max rounds reached')
+    return None
+
+
+def run_campaign_cli(path: Path, start: str | None = None, resume: str | None = None, save: str | None = None, seed: int | None = None) -> None:
+    camp = campaign_engine.load_campaign(path)
+    pcs = campaign_engine.load_party(camp, Path(path))
+    if resume:
+        data = json.loads(Path(resume).read_text())
+        scene_id = data.get('scene', camp.start)
+        hp = data.get('hp', {})
+        for pc in pcs:
+            if pc.name in hp:
+                pc.hp = hp[pc.name]
+    else:
+        scene_id = start or camp.start
+    logger = SessionLogger(Path(save).with_suffix('')) if save else None
+
+    def _save():
+        if save:
+            state = {'scene': scene_id, 'hp': {pc.name: pc.hp for pc in pcs}}
+            Path(save).write_text(json.dumps(state))
+
+    _save()
+    while scene_id:
+        scene = camp.scenes.get(scene_id)
+        if scene is None:
+            break
+        print(scene.text)
+        if logger:
+            logger.log_event('narration', scene=scene_id, text=scene.text)
+        if scene.encounter:
+            res = campaign_engine.run_encounter(pcs, scene.encounter, seed=seed or camp.seed)
+            if logger:
+                logger.log_event('encounter', scene=scene_id, enemy=scene.encounter, **res)
+            for pc in pcs:
+                if pc.name in res['hp']:
+                    pc.hp = res['hp'][pc.name]
+            scene_id = scene.on_victory if res['result'] == 'victory' else scene.on_defeat
+            _save()
+            continue
+        if not scene.choices:
+            break
+        for idx, ch in enumerate(scene.choices, start=1):
+            print(f"{idx}. {ch.text}")
+        try:
+            ans = input('> ').strip()
+        except EOFError:
+            break
+        try:
+            choice = scene.choices[int(ans) - 1]
+        except Exception:
+            choice = scene.choices[0]
+        if logger:
+            logger.log_event('choice', scene=scene_id, choice=choice.text, next=choice.next)
+        scene_id = choice.next
+        _save()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -412,6 +449,8 @@ def main():
     parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
+    parser.add_argument("--start", type=str, help="Start scene id", default=None)
+    parser.add_argument("--save", type=str, help="Save session state", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
     parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
     parser.add_argument("--campaign", type=str, help="Path to campaign YAML", default=None)
@@ -424,13 +463,22 @@ def main():
     parser.add_argument("--packs", type=str, default="srd", help="Comma-separated content packs")
     args = parser.parse_args()
 
+    if args.campaign and not args.play:
+        run_campaign_cli(
+            Path(args.campaign),
+            start=args.start,
+            resume=args.resume,
+            save=args.save,
+            seed=args.seed,
+        )
+        return
+
     if args.play:
-        campaign = load_campaign(args.campaign) if args.campaign else None
+        campaign = campaign_engine.load_campaign(args.campaign) if args.campaign else None
         if campaign:
             pcs: list[PC] = []
-            base = Path(args.campaign).parent
-            for pf in campaign.party_files:
-                pcs.extend(load_party_file(base / pf))
+            base = Path(args.campaign)
+            pcs.extend(campaign_engine.load_party(campaign, base))
         else:
             if not args.pc:
                 raise SystemExit("--pc required for --play")
@@ -455,7 +503,6 @@ def main():
             max_rounds=args.max_rounds,
             autosave=args.autosave or bool(campaign),
             summary_out=args.summary_out,
-            campaign=campaign,
         )
         return
 
