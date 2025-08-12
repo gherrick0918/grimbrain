@@ -22,7 +22,7 @@ from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import Campaign, Quest, load_campaign, load_party_file
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter
-from content.packs import load_packs
+from grimbrain.content.packs import load_packs
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -359,7 +359,7 @@ def play_cli(
                     print("Unknown command")
         else:
             enemies = [c for c in combatants if c.side != actor.side and not c.defeated]
-            if enemies:
+            if enemies and actor.attacks:
                 attack = actor.attacks[0]
                 target_seed = rng.randint(0, 10_000_000)
                 target = choose_target(actor, enemies, seed=target_seed)
@@ -375,6 +375,7 @@ def play_cli(
                         print(f"{target.name} is defeated")
                 else:
                     print(f"{actor.name} misses {target.name}")
+            # monsters with no attacks or no targets simply skip their turn
         turn = (turn + 1) % len(combatants)
         hp_line = ", ".join(f"{c.name} {0 if c.defeated else c.hp}" for c in combatants)
         next_name = combatants[turn].name
