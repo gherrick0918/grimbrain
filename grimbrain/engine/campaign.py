@@ -94,10 +94,15 @@ def load_party(camp: Campaign, base: Path) -> List[PC]:
     return pcs
 
 
-def run_encounter(pcs: List[PC], enemy_name: str, seed: int | None = None) -> Dict[str, object]:
+def run_encounter(
+    pcs: List[PC],
+    enemy_name: str,
+    seed: int | None = None,
+    max_rounds: int = 10,
+) -> Dict[str, object]:
     data = FALLBACK_MONSTERS[enemy_name.lower()]
     mon = MonsterSidecar(**data)
-    res = _run_encounter(pcs, [mon], seed=seed)
+    res = _run_encounter(pcs, [mon], seed=seed, max_rounds=max_rounds)
     outcome = "victory" if res["winner"] == "party" else "defeat"
     hp = {c["name"]: c["hp"] for c in res["state"]["party"]}
     summary = f"{outcome} in {res['rounds']} rounds"

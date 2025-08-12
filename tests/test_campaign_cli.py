@@ -52,10 +52,11 @@ def _setup_campaign(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def run_cli(camp_dir: Path, inp: str) -> subprocess.CompletedProcess:
+def run_cli(camp_dir: Path, inp: str, extra: list[str] | None = None) -> subprocess.CompletedProcess:
     main_path = Path(__file__).resolve().parent.parent / "main.py"
     args = [sys.executable, str(main_path), "--campaign", str(camp_dir)]
-    # Ensure the input ends with a newline and set the correct working directory
+    if extra:
+        args.extend(extra)
     return subprocess.run(
         args,
         input=inp if inp.endswith('\n') else inp + '\n',
@@ -76,10 +77,10 @@ def test_campaign_load_and_branch(tmp_path, monkeypatch):
     assert "You lose!" in proc.stdout
 
     # encounter branches executed in-process so we can stub RNG
-    def _victory(pcs, enemy, seed=None):
+    def _victory(pcs, enemy, seed=None, **kwargs):
         return {"result": "victory", "summary": "", "hp": {p.name: p.hp for p in pcs}}
 
-    def _defeat(pcs, enemy, seed=None):
+    def _defeat(pcs, enemy, seed=None, **kwargs):
         return {"result": "defeat", "summary": "", "hp": {p.name: p.hp for p in pcs}}
 
     monkeypatch.setattr("grimbrain.engine.campaign.run_encounter", _victory)
@@ -107,3 +108,37 @@ def test_check_scene_branch(tmp_path, monkeypatch, capfd):
     run_campaign_cli(camp_dir, start="bridge")
     out = capfd.readouterr().out
     assert "You lose!" in out
+
+
+def test_campaign_dir_path(tmp_path):
+    camp_dir = _setup_campaign(tmp_path)
+    proc = run_cli(camp_dir, "2\n", extra=["--max-rounds", "0"])
+    assert proc.returncode == 0
+    assert "Start" in proc.stdout or "Demo" in proc.stdout
+
+
+def test_campaign_autostart(tmp_path):
+    camp_dir = _setup_campaign(tmp_path)
+    proc = run_cli(camp_dir, "2\n")
+    assert "Start" in proc.stdout
+
+
+def test_encounter_requires_pcs(tmp_path):
+    campaign = {
+        "name": "Demo",
+        "start": "fight",
+        "scenes": {
+            "fight": {
+                "text": "Fight!",
+                "encounter": "goblin",
+                "on_victory": "win",
+                "on_defeat": "lose",
+            },
+            "win": {"text": "win"},
+            "lose": {"text": "lose"},
+        },
+    }
+    (tmp_path / "campaign.yaml").write_text(yaml.safe_dump(campaign))
+    proc = run_cli(tmp_path, "", extra=["--max-rounds", "0"])
+    assert proc.returncode != 0
+    assert "no pcs were loaded" in proc.stderr.lower()
