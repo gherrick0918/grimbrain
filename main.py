@@ -19,6 +19,7 @@ from grimbrain.engine.combat import (
 from grimbrain.engine.dice import roll
 from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
 from grimbrain.models import PC, MonsterSidecar, dump_model
+from grimbrain.campaign import Campaign, Quest, load_campaign, load_party_file
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter
 
@@ -177,11 +178,22 @@ def play_cli(
     max_rounds: int = 20,
     autosave: bool = False,
     summary_out: str | None = None,
+    campaign: Campaign | None = None,
 ) -> None:
     rng = random.Random(seed)
     if seed is not None:
         print(f"Using seed: {seed}")
-    if autosave:
+    if campaign:
+        sess_dir = Path("campaigns") / campaign.name / "sessions"
+        sess_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        md_path = (sess_dir / f"{stamp}.md").resolve()
+        json_path = (sess_dir / f"{stamp}.json").resolve()
+        md_path.write_text(f"# Session {stamp}\n")
+        Session.start("play", seed=seed).save(json_path)
+        campaign.last_session = str(json_path)
+        campaign.save()
+    elif autosave:
         md_path, json_path = start_scene("play", seed=seed)
     else:
         md_path = json_path = None
@@ -239,10 +251,33 @@ def play_cli(
                     print(
                         "Commands: status, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
                     )
+                elif parts[0] == "quest" and campaign:
+                    if len(parts) >= 3 and parts[1] == "add":
+                        title = " ".join(parts[2:])
+                        qid = f"q{len(campaign.quests) + 1}"
+                        campaign.quests.append(Quest(id=qid, title=title))
+                        print(f"Added quest {qid}")
+                    elif len(parts) == 3 and parts[1] == "done":
+                        qid = parts[2]
+                        for q in campaign.quests:
+                            if q.id == qid:
+                                q.status = "done"
+                                print(f"Quest {qid} marked done")
+                                break
+                        else:
+                            print("Unknown quest")
+                elif parts[0] == "note" and campaign:
+                    text = " ".join(parts[1:])
+                    campaign.notes.append(text)
+                    print("Note added")
                 elif parts[0] == "quit":
                     return
-                elif parts[0] == "save" and len(parts) == 2:
-                    _save_game(parts[1], seed, round_num, turn, combatants)
+                elif parts[0] == "save":
+                    if len(parts) == 2:
+                        _save_game(parts[1], seed, round_num, turn, combatants)
+                    elif campaign:
+                        campaign.save()
+                        print("Campaign saved")
                 elif parts[0] == "load" and len(parts) == 2:
                     seed, round_num, turn, combatants = _load_game(parts[1])
                 elif parts[0] == "actions":
@@ -377,6 +412,7 @@ def main():
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument("--embeddings", choices=["auto", "bge-small", "none"], default="auto")
     parser.add_argument("--pc", type=str, help="Path to PC sheet JSON", default=None)
+    parser.add_argument("--campaign", type=str, help="Path to campaign YAML", default=None)
     parser.add_argument("--seed", type=int, default=None,
                         help="Deterministic seed for dice/combat/session")
     parser.add_argument("--encounter", type=str, help="Monsters to fight", default=None)
@@ -386,17 +422,28 @@ def main():
     args = parser.parse_args()
 
     if args.play:
-        if not args.pc or not args.encounter:
-            raise SystemExit("--pc and --encounter required for --play")
-        raw = json.loads(Path(args.pc).read_text())
-        if isinstance(raw, dict) and "party" in raw:
-            raw = raw["party"]
-        if not isinstance(raw, list):
-            raise ValueError("PC file must be a list or contain 'party'")
-        raw = _normalize_party(raw)
-        pcs = [PC(**o) for o in raw]
+        campaign = load_campaign(args.campaign) if args.campaign else None
+        if campaign:
+            pcs: list[PC] = []
+            base = Path(args.campaign).parent
+            for pf in campaign.party_files:
+                pcs.extend(load_party_file(base / pf))
+        else:
+            if not args.pc:
+                raise SystemExit("--pc required for --play")
+            pcs = load_party_file(Path(args.pc))
+        if not args.encounter:
+            raise SystemExit("--encounter required for --play")
         monsters = parse_monster_spec(args.encounter, _lookup_fallback)
-        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds, autosave=args.autosave, summary_out=args.summary_out)
+        play_cli(
+            pcs,
+            monsters,
+            seed=args.seed,
+            max_rounds=args.max_rounds,
+            autosave=args.autosave or bool(campaign),
+            summary_out=args.summary_out,
+            campaign=campaign,
+        )
         return
 
     from llama_index.core.settings import Settings

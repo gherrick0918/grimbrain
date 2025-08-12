@@ -50,6 +50,11 @@
    Hero misses Goblin
    ```
 
+   Play mode also accepts a single character sheet JSON/YAML describing a PC. Missing
+   attack bonuses and spell save DCs are derived from ability scores and proficiency.
+   For longer running games, pass ``--campaign campaign.yaml`` to track quests and notes
+   and to save session logs under ``campaigns/<name>/sessions``.
+
 ### Embeddings flag
 
 Use `--embeddings` to select embedding mode:
