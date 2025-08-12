@@ -14,14 +14,16 @@
    Golden files under `tests/golden` lock in expected output.
 3. **Play a fight**
    ```bash
-   python main.py --play --pc pc_wizard.json --encounter "goblin" --packs srd --seed 1
+   python -m grimbrain --play --pc pc_wizard.json --encounter "goblin" --packs srd --seed 1
+   # or, after ``pip install -e .``
+   grimbrain --play --pc pc_wizard.json --encounter "goblin" --packs srd --seed 1
    ```
    Use `--seed` for deterministic combat. Handy commands in play mode:
    `status`, `actions [pc]`, `attack <target> "<attack>"`, `cast "<spell>" [all|<target>]`, `end`, `save <path>`.
 
 To continue a campaign:
 ```bash
-python main.py --play --pc pc_wizard.json --encounter "goblin" \
+python -m grimbrain --play --pc pc_wizard.json --encounter "goblin" \
   --campaign campaign.yaml --packs srd,homebrew --seed 1 --autosave
 ```
 `campaign.yaml`:
