@@ -28,3 +28,30 @@ def saving_throw(dc: int, mod: int, seed: int | None, adv: bool = False, disadv:
     """
     result = roll(f"1d20+{mod}", seed=seed, adv=adv, disadv=disadv)
     return {"success": result["total"] >= dc, "detail": result}
+
+
+def roll_check(mod: int, dc: int, advantage: bool = False, seed: int | None = None) -> Dict[str, object]:
+    """Perform an ability or skill check against ``dc``.
+
+    Parameters
+    ----------
+    mod: int
+        Ability or skill modifier to apply to the roll.
+    dc: int
+        Difficulty class to beat.
+    advantage: bool, optional
+        Roll with advantage if True.
+    seed: int | None, optional
+        Seed for deterministic results.
+
+    Returns
+    -------
+    Dict[str, object]
+        Mapping containing the raw roll (without modifier), the total, and
+        whether the check succeeded.
+    """
+
+    result = roll(f"1d20+{mod}", seed=seed, adv=advantage)
+    detail = result["detail"]
+    roll_val = detail.get("chosen", detail.get("rolls", [0])[0])
+    return {"roll": roll_val, "total": result["total"], "success": result["total"] >= dc}

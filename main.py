@@ -17,7 +17,7 @@ from grimbrain.engine.combat import (
     Combatant,
 )
 from grimbrain.engine.dice import roll
-from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
+from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw, roll_check
 from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import load_party_file
 from grimbrain.engine import campaign as campaign_engine
@@ -420,6 +420,24 @@ def run_campaign_cli(path: Path, start: str | None = None, resume: str | None = 
                 if pc.name in res['hp']:
                     pc.hp = res['hp'][pc.name]
             scene_id = scene.on_victory if res['result'] == 'victory' else scene.on_defeat
+            _save()
+            continue
+        if scene.check:
+            res = roll_check(0, scene.check.dc, advantage=scene.check.advantage, seed=seed or camp.seed)
+            if logger:
+                log_data = {
+                    'scene': scene_id,
+                    'dc': scene.check.dc,
+                    'roll': res['roll'],
+                    'total': res['total'],
+                    'success': res['success'],
+                }
+                if scene.check.ability:
+                    log_data['ability'] = scene.check.ability
+                if scene.check.skill:
+                    log_data['skill'] = scene.check.skill
+                logger.log_event('check', **log_data)
+            scene_id = scene.check.on_success if res['success'] else scene.check.on_failure
             _save()
             continue
         if not scene.choices:

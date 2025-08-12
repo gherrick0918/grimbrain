@@ -19,12 +19,23 @@ class Choice:
 
 
 @dataclass
+class Check:
+    ability: Optional[str] = None
+    skill: Optional[str] = None
+    dc: int = 10
+    advantage: bool = False
+    on_success: Optional[str] = None
+    on_failure: Optional[str] = None
+
+
+@dataclass
 class Scene:
     id: str
     text: str
     encounter: Optional[str] = None
     on_victory: Optional[str] = None
     on_defeat: Optional[str] = None
+    check: Optional[Check] = None
     choices: List[Choice] = field(default_factory=list)
 
 
@@ -48,12 +59,14 @@ def load_campaign(path: str | Path) -> Campaign:
     raw_scenes = data.get("scenes", {})
     for sid, sdata in raw_scenes.items():
         choices = [Choice(**c) for c in sdata.get("choices", [])]
+        check = Check(**sdata["check"]) if "check" in sdata else None
         scenes[sid] = Scene(
             id=sid,
             text=sdata.get("text", ""),
             encounter=sdata.get("encounter"),
             on_victory=sdata.get("on_victory"),
             on_defeat=sdata.get("on_defeat"),
+            check=check,
             choices=choices,
         )
     start = data.get("start") or next(iter(scenes))
