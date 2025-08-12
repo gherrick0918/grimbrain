@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+import yaml
 
 
 def _write_pc(tmp_path: Path, pcs: list[dict]) -> Path:
@@ -131,4 +132,59 @@ def test_homebrew_pack(tmp_path):
     res = run_play(script, pc_file, "Tiny Dragon", seed=1, packs=str(tmp_path), cwd=str(tmp_path))
     out = res.stdout
     assert "Tiny Dragon" in out
+
+
+def run_campaign_play(cmds: str, camp_dir: Path, pc_file: Path, extra: list[str]) -> subprocess.CompletedProcess:
+    main_path = Path(__file__).resolve().parent.parent / "main.py"
+    args = [
+        sys.executable,
+        str(main_path),
+        "--campaign",
+        str(camp_dir),
+        "--play",
+        "--pc",
+        str(pc_file),
+    ] + extra
+    proc = subprocess.run(
+        args,
+        input=cmds,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        cwd=str(camp_dir),
+    )
+    return proc
+
+
+def test_play_flag_threads_to_encounter(tmp_path):
+    def _setup_campaign(tmp_path: Path) -> Path:
+        pc = {
+            "name": "Hero",
+            "ac": 15,
+            "hp": 20,
+            "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}],
+        }
+        (tmp_path / "pc.json").write_text(json.dumps(pc))
+        campaign = {
+            "name": "Demo",
+            "start": "fight",
+            "scenes": {
+                "fight": {
+                    "text": "A goblin appears",
+                    "encounter": "goblin",
+                    "on_victory": "win",
+                    "on_defeat": "lose",
+                },
+                "win": {"text": "You win!"},
+                "lose": {"text": "You lose!"},
+            },
+        }
+        (tmp_path / "campaign.yaml").write_text(yaml.safe_dump(campaign))
+        return tmp_path
+
+    camp_dir = _setup_campaign(tmp_path)
+    pc_file = camp_dir / "pc.json"
+    proc = run_campaign_play("end\n", camp_dir, pc_file, ["--start", "fight", "--max-rounds", "1"])
+    assert proc.returncode == 0
+    assert "> " in proc.stdout
 

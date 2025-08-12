@@ -134,7 +134,10 @@ def run_encounter(
     log: List[str] = []
     rounds = 0
 
-    while rounds < max_rounds:
+    party_alive = any(c.side == "party" and not c.defeated for c in combatants)
+    monsters_alive = any(c.side == "monsters" and not c.defeated for c in combatants)
+
+    while rounds < max_rounds and party_alive and monsters_alive:
         rounds += 1
         for actor in combatants:
             if actor.defeated:

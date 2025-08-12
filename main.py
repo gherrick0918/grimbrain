@@ -392,7 +392,10 @@ def run_campaign_cli(
     resume: str | None = None,
     save: str | None = None,
     seed: int | None = None,
-) -> None:
+    pcs: list[PC] | None = None,
+    interactive: bool = False,
+    max_rounds: int = 10,
+) -> int:
     """Run a text campaign from a YAML file or directory.
 
     ``path`` may point directly to the ``campaign.yaml`` file or to a directory
@@ -407,7 +410,8 @@ def run_campaign_cli(
     path = Path(path)
     camp = campaign_engine.load_campaign(path)
     base = path if path.is_dir() else path.parent
-    pcs = campaign_engine.load_party(camp, base)
+    if pcs is None:
+        pcs = campaign_engine.load_party(camp, base)
     if resume:
         data = json.loads(Path(resume).read_text())
         scene_id = data.get('scene', camp.start)
@@ -433,13 +437,40 @@ def run_campaign_cli(
         if logger:
             logger.log_event('narration', scene=scene_id, text=scene.text)
         if scene.encounter:
-            res = campaign_engine.run_encounter(pcs, scene.encounter, seed=seed or camp.seed)
-            if logger:
+            if not pcs:
+                print(
+                    "This scene includes an encounter, but no PCs were loaded. Pass --play --pc <file> or --pc-wizard to create a party.",
+                    file=sys.stderr,
+                )
+                return 2
+            if interactive:
+                def _lookup(name: str) -> MonsterSidecar:
+                    data = FALLBACK_MONSTERS[name.lower()]
+                    return MonsterSidecar(**data)
+
+                monsters = parse_monster_spec(scene.encounter, _lookup)
+                res = play_cli(pcs, monsters, seed=seed or camp.seed, max_rounds=max_rounds)
+                if res is None:
+                    res = {
+                        'result': 'defeat',
+                        'hp': {pc.name: pc.hp for pc in pcs},
+                    }
+            else:
+                res = campaign_engine.run_encounter(
+                    pcs,
+                    scene.encounter,
+                    seed=seed or camp.seed,
+                    max_rounds=max_rounds,
+                )
+            if logger and res:
                 logger.log_event('encounter', scene=scene_id, enemy=scene.encounter, **res)
-            for pc in pcs:
-                if pc.name in res['hp']:
-                    pc.hp = res['hp'][pc.name]
-            scene_id = scene.on_victory if res['result'] == 'victory' else scene.on_defeat
+            if res:
+                for pc in pcs:
+                    if pc.name in res.get('hp', {}):
+                        pc.hp = res['hp'][pc.name]
+                scene_id = scene.on_victory if res.get('result') == 'victory' else scene.on_defeat
+            else:
+                scene_id = scene.on_defeat
             _save()
             continue
         if scene.check:
@@ -482,11 +513,15 @@ def run_campaign_cli(
         scene_id = choice.next
         _save()
 
+    return 0
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--play", action="store_true", help="Interactive play mode")
     parser.add_argument("--max-rounds", type=int, default=20, help="Max rounds for --play")
+    parser.add_argument("--pc-wizard", action="store_true", help="Create a party JSON via prompts")
+    parser.add_argument("--out", type=str, help="Output path for --pc-wizard", default="pc.json")
+    parser.add_argument("--preset", choices=["fighter", "rogue", "wizard"], help="Preset party for --pc-wizard", default=None)
     parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
     parser.add_argument("--json-out", nargs="?", const="logs/last_sidecar.json", help="Write sidecar JSON to path", default=None)
     parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
@@ -513,62 +548,59 @@ def main():
 
 
 
-    # --- PATCH: campaign path resolution ---
     def _resolve_campaign_path(arg: str) -> Path:
         """Accept a YAML file or a directory containing one."""
         p = Path(arg)
         if p.is_dir():
-            # Preferred filenames
             for name in ("campaign.yaml", "campaign.yml", "index.yaml", "index.yml"):
                 cand = p / name
                 if cand.exists():
                     return cand
-            # Fallback: first YAML in the directory
             for cand in sorted(p.glob("*.y*ml")):
                 return cand
             raise FileNotFoundError(f"No campaign YAML found in directory: {p}")
-        # If user passed a file, just return it
         return p
 
-    if args.campaign and not args.play:
+    if args.pc_wizard:
+        from grimbrain import pc_wizard
+
+        pc_wizard.main(out=args.out, preset=args.preset)
+        return
+
+    if args.campaign:
         import yaml
+
         campaign_path = _resolve_campaign_path(args.campaign)
         with open(campaign_path, "r", encoding="utf-8") as f:
             campaign_yaml = yaml.safe_load(f)
-        # choose start scene (autostart when --campaign is given and not resuming)
         if args.resume:
-            start_key = None  # resume path decides the scene
+            start_key = None
         else:
-            if args.start is None:
-                start_key = campaign_yaml.get('start')
-            elif args.start == "__AUTO__":
-                start_key = campaign_yaml.get('start')
+            if args.start is None or args.start == "__AUTO__":
+                start_key = campaign_yaml.get("start")
             else:
                 start_key = args.start
-        # When resuming, ``start_key`` is ``None`` because the save file
-        # determines the next scene.  We still need to launch the campaign
-        # runner in that case.
-        if start_key is not None or args.resume:
-            run_campaign_cli(
-                campaign_path,
-                start=start_key,
-                resume=args.resume,
-                save=args.save,
-                seed=args.seed,
-            )
+        pcs_override = load_party_file(Path(args.pc)) if args.pc else None
+        ret = run_campaign_cli(
+            campaign_path,
+            start=start_key,
+            resume=args.resume,
+            save=args.save,
+            seed=args.seed,
+            pcs=pcs_override,
+            interactive=args.play,
+            max_rounds=args.max_rounds,
+        )
+        if ret:
+            sys.exit(ret)
         return
+
     if args.play:
-        campaign = campaign_engine.load_campaign(args.campaign) if args.campaign else None
-        if campaign:
-            pcs: list[PC] = []
-            base = Path(args.campaign)
-            pcs.extend(campaign_engine.load_party(campaign, base))
-        else:
-            if not args.pc:
-                raise SystemExit("--pc required for --play")
-            pcs = load_party_file(Path(args.pc))
+        if not args.pc:
+            raise SystemExit("--pc required for --play")
         if not args.encounter:
             raise SystemExit("--encounter required for --play")
+        pcs = load_party_file(Path(args.pc))
 
         pack_names = [p.strip() for p in (args.packs or "").split(",") if p.strip()]
         catalog = load_packs(pack_names)
@@ -585,7 +617,7 @@ def main():
             monsters,
             seed=args.seed,
             max_rounds=args.max_rounds,
-            autosave=args.autosave or bool(campaign),
+            autosave=args.autosave,
             summary_out=args.summary_out,
         )
         return
