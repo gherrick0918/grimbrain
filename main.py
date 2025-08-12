@@ -529,6 +529,11 @@ def main():
         )
         return
 
+    if args.resume and not any([args.scene, args.pc, args.encounter, args.campaign, args.play]):
+        session = Session.load(args.resume)
+        print(f"Resumed scene '{session.scene}' with {len(session.steps)} steps")
+        return
+
     from llama_index.core.settings import Settings
     from llama_index.core.llms.mock import MockLLM
     from grimbrain.retrieval.indexing import (
