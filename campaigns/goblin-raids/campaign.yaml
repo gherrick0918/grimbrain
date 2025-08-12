@@ -18,7 +18,7 @@ scenes:
         goto: ambush
 
   ambush:
-    encounter: "goblin boss"            # or: { random: { tags: ["goblinoid"], cr: "1-3" } }
+    encounter: "goblin boss"
     on_victory: loot_camp
     on_defeat: game_over
 
@@ -55,8 +55,8 @@ scenes:
     on_defeat: game_over
 
   lair_alerted:
-    text: The guards raise the alarm!
-    encounter: "goblin boss"
+    text: "The guards raise the alarm!"
+    encounter: "goblin"            # <- different monster (or "goblin archer" if you have it)
     on_victory: credits
     on_defeat: game_over
 
