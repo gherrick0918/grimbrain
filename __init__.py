@@ -1,10 +1,13 @@
 # grimbrain/__init__.py
-__all__ = ["__version__"]
+__all__ = [
+    "__version__",
+    "run_query",
+]
+
 __version__ = "0.1.0"
 
-# Optional convenience re-export; ignore if not available at import time.
+# handy re-exports (optional)
 try:
     from .retrieval.query_router import run_query  # noqa: F401
-    __all__.append("run_query")
 except Exception:
     pass

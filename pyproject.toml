@@ -1,21 +1,18 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "grimbrain"
 version = "0.1.0"
+description = "Local-only RAG engine for solo D&D 5e"
+readme = "README.md"
+requires-python = ">=3.11"
 dependencies = []
 
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+[project.scripts]
+grimbrain = "grimbrain.cli:main"
 
-[tool.black]
-line-length = 88
-
-[tool.ruff]
-line-length = 88
-
-[tool.isort]
-profile = "black"
-line_length = 88
-
-[tool.mypy]
-ignore_missing_imports = true
+[tool.setuptools]
+# Flat layout: only package the grimbrain/ directory (ignore data/, packs/, etc.)
+packages = ["grimbrain"]
