@@ -26,6 +26,7 @@ def _setup_campaign(tmp_path: Path) -> Path:
                 "choices": [
                     {"text": "Fight", "next": "fight"},
                     {"text": "Run", "next": "lose"},
+                    {"text": "Bridge", "next": "bridge"},
                 ],
             },
             "fight": {
@@ -33,6 +34,15 @@ def _setup_campaign(tmp_path: Path) -> Path:
                 "encounter": "goblin",
                 "on_victory": "win",
                 "on_defeat": "lose",
+            },
+            "bridge": {
+                "text": "Bridge",
+                "check": {
+                    "ability": "dexterity",
+                    "dc": 4,
+                    "on_success": "win",
+                    "on_failure": "lose",
+                },
             },
             "win": {"text": "You win!"},
             "lose": {"text": "You lose!"},
@@ -76,3 +86,23 @@ def test_campaign_load_and_branch(tmp_path, monkeypatch):
 
     monkeypatch.setattr("grimbrain.engine.campaign.run_encounter", _defeat)
     run_campaign_cli(camp_dir, start="fight")
+
+
+def test_check_scene_branch(tmp_path, monkeypatch, capfd):
+    camp_dir = _setup_campaign(tmp_path)
+
+    def _success(mod, dc, advantage=False, seed=None):
+        return {"roll": 10, "total": 10, "success": True}
+
+    def _failure(mod, dc, advantage=False, seed=None):
+        return {"roll": 1, "total": 1, "success": False}
+
+    monkeypatch.setattr("grimbrain.engine.checks.roll_check", _success)
+    run_campaign_cli(camp_dir, start="bridge")
+    out = capfd.readouterr().out
+    assert "You win!" in out
+
+    monkeypatch.setattr("grimbrain.engine.checks.roll_check", _failure)
+    run_campaign_cli(camp_dir, start="bridge")
+    out = capfd.readouterr().out
+    assert "You lose!" in out

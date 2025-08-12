@@ -32,5 +32,11 @@ class SessionLogger:
                 mf.write(
                     f"* encounter {data.get('enemy')} -> {data.get('result')} ({data.get('summary')})\n"
                 )
+            elif event_type == "check":
+                tgt = data.get('ability') or data.get('skill') or ''
+                outcome = 'success' if data.get('success') else 'failure'
+                mf.write(
+                    f"* check {tgt} DC {data.get('dc')} -> {outcome} (roll {data.get('roll')} total {data.get('total')})\n"
+                )
             else:
                 mf.write(f"* {event_type}\n")

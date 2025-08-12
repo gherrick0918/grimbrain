@@ -1,4 +1,4 @@
-from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw
+from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw, roll_check
 
 
 def test_attack_roll_deterministic():
@@ -14,3 +14,14 @@ def test_damage_and_saves():
     assert fail["success"] is False
     success = saving_throw(15, 5, seed=16)
     assert success["success"] is True
+
+
+def test_roll_check():
+    res = roll_check(3, 10, seed=1)
+    assert res["roll"] == 5
+    assert res["total"] == 8
+    assert res["success"] is False
+    adv = roll_check(2, 4, advantage=True, seed=2)
+    assert adv["roll"] == 3
+    assert adv["total"] == 5
+    assert adv["success"] is True
