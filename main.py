@@ -1,3 +1,32 @@
+from typing import Any, Dict, List, Optional
+
+# -- snip other imports --
+
+def finalize_result(
+    winner: str,
+    combatants: "List[Combatant]",
+    monsters: Optional[List[Any]] = None,
+    rounds: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Build a stable encounter result payload for the campaign runner.
+    - winner: "party" or "monsters"
+    - combatants: full list; we'll extract party HP
+    - monsters: optional, in case you later compute XP/loot here
+    - rounds: optional, include if you track it
+    """
+    outcome = "victory" if str(winner).lower() == "party" else "defeat"
+    party_hp = {
+        getattr(c, "name", f"pc-{i}"): (0 if getattr(c, "defeated", False) else int(getattr(c, "hp", 0)))
+        for i, c in enumerate(combatants)
+        if getattr(c, "side", "") == "party"
+    }
+    summary = {
+        "winner": winner,
+        "rounds": rounds,
+    }
+    return {"result": outcome, "summary": summary, "hp": party_hp}
+
 import argparse
 import csv
 import json
@@ -221,7 +250,7 @@ def play_cli(
         winner = _check_victory(combatants)
         if winner:
             print(f"{winner.capitalize()} wins!")
-            return
+            break
         actor = combatants[turn]
         if actor.defeated:
             turn = (turn + 1) % len(combatants)
@@ -375,15 +404,36 @@ def play_cli(
             print(f"Summary written to {summary_out}")
         if autosave and md_path and json_path:
             log_step(md_path, json_path, 'Summary', json.dumps(summary))
-        result = {
-            'result': 'victory' if winner == 'party' else 'defeat',
-            'summary': summary,
-            'hp': {c.name: 0 if c.defeated else c.hp for c in combatants if c.side == 'party'},
-        }
-        return result
+        return finalize_result(winner, combatants, monsters=monsters, rounds=round_num - 1 if turn == 0 else round_num)
     else:
         print('Max rounds reached')
-    return None
+        # Use 'monsters' as winner if max rounds reached and no winner
+        return finalize_result('monsters', combatants, monsters=monsters, rounds=round_num - 1 if turn == 0 else round_num)
+
+def finalize_result(
+    winner: str,
+    combatants: "List[Combatant]",
+    monsters: Optional[List[Any]] = None,
+    rounds: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Build a stable encounter result payload for the campaign runner.
+    - winner: "party" or "monsters"
+    - combatants: full list; we'll extract party HP
+    - monsters: optional, in case you later compute XP/loot here
+    - rounds: optional, include if you track it
+    """
+    outcome = "victory" if str(winner).lower() == "party" else "defeat"
+    party_hp = {
+        getattr(c, "name", f"pc-{i}"): (0 if getattr(c, "defeated", False) else int(getattr(c, "hp", 0)))
+        for i, c in enumerate(combatants)
+        if getattr(c, "side", "") == "party"
+    }
+    summary = {
+        "winner": winner,
+        "rounds": rounds,
+    }
+    return {"result": outcome, "summary": summary, "hp": party_hp}
 
 
 def run_campaign_cli(
@@ -444,11 +494,7 @@ def run_campaign_cli(
                 )
                 return 2
             if interactive:
-                def _lookup(name: str) -> MonsterSidecar:
-                    data = FALLBACK_MONSTERS[name.lower()]
-                    return MonsterSidecar(**data)
-
-                monsters = parse_monster_spec(scene.encounter, _lookup)
+                monsters = parse_monster_spec(scene.encounter, _lookup_fallback)
                 res = play_cli(pcs, monsters, seed=seed or camp.seed, max_rounds=max_rounds)
                 if res is None:
                     res = {
@@ -468,7 +514,32 @@ def run_campaign_cli(
                 for pc in pcs:
                     if pc.name in res.get('hp', {}):
                         pc.hp = res['hp'][pc.name]
-                scene_id = scene.on_victory if res.get('result') == 'victory' else scene.on_defeat
+
+                # Normalize outcome
+                outcome = None
+                if isinstance(res, dict):
+                    # common keys we might emit
+                    outcome = (res.get("result")
+                               or res.get("outcome")
+                               or ("victory" if res.get("won") is True else None))
+                if not outcome:
+                    # Fallback: be explicit rather than defaulting to defeat
+                    outcome = "victory" if res else "defeat"
+                outcome = str(outcome).lower()
+
+                # Pick next scene with aliases supported
+                on_victory = getattr(scene, "on_victory", None) or getattr(scene, "on_success", None)
+                on_defeat  = getattr(scene, "on_defeat",  None) or getattr(scene, "on_failure", None)
+
+                if outcome.startswith("vict"):
+                    next_key = on_victory
+                else:
+                    next_key = on_defeat
+
+                if not next_key:
+                    print(f"[campaign] No next scene configured for outcome '{outcome}' in scene '{scene.key}'.", file=sys.stderr)
+                    return 2
+                scene_id = next_key
             else:
                 scene_id = scene.on_defeat
             _save()
@@ -524,7 +595,6 @@ def main():
     parser.add_argument("--preset", choices=["fighter", "rogue", "wizard"], help="Preset party for --pc-wizard", default=None)
     parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
     parser.add_argument("--json-out", nargs="?", const="logs/last_sidecar.json", help="Write sidecar JSON to path", default=None)
-    parser.add_argument("--md-out", type=str, help="Write markdown output to path", default=None)
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument(
