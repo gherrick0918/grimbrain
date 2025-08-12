@@ -1,82 +1,78 @@
 import subprocess
 import sys
 from pathlib import Path
-
-import yaml
 import json
+import yaml
 
-from grimbrain.campaign import load_campaign
+from grimbrain.engine.campaign import load_campaign
+from main import run_campaign_cli
 
 
 def _setup_campaign(tmp_path: Path) -> Path:
-    fighter = {
-        "name": "Roth",
+    pc = {
+        "name": "Hero",
         "ac": 15,
         "hp": 20,
         "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}],
     }
-    wizard = {
-        "name": "Brynn",
-        "class": "Wizard",
-        "level": 3,
-        "abilities": {"str": 8, "dex": 14, "con": 12, "int": 16, "wis": 12, "cha": 10},
-        "ac": 14,
-        "hp": 16,
-        "attacks": [
-            {"name": "Quarterstaff", "proficient": True, "ability": "str", "damage_dice": "1d6+2", "type": "melee"}
-        ],
-    }
-    (tmp_path / "pc_fighter.json").write_text(json.dumps(fighter))
-    (tmp_path / "pc_wizard.json").write_text(json.dumps(wizard))
+    (tmp_path / "pc.json").write_text(json.dumps(pc))
     campaign = {
-        "name": "Greenvale Troubles",
-        "party_files": ["pc_fighter.json", "pc_wizard.json"],
-        "quests": [{"id": "q1", "title": "Bandits on the road", "status": "active"}],
-        "notes": [],
-        "seed": 42,
+        "name": "Demo",
+        "party_files": ["pc.json"],
+        "start": "start",
+        "scenes": {
+            "start": {
+                "text": "Start",
+                "choices": [
+                    {"text": "Fight", "next": "fight"},
+                    {"text": "Run", "next": "lose"},
+                ],
+            },
+            "fight": {
+                "text": "A goblin appears",
+                "encounter": "goblin",
+                "on_victory": "win",
+                "on_defeat": "lose",
+            },
+            "win": {"text": "You win!"},
+            "lose": {"text": "You lose!"},
+        },
     }
-    path = tmp_path / "campaign.yaml"
-    path.write_text(yaml.safe_dump(campaign))
-    return path
+    (tmp_path / "campaign.yaml").write_text(yaml.safe_dump(campaign))
+    return tmp_path
 
 
-def run_play(cmds: str, campaign_file: Path) -> subprocess.CompletedProcess:
+def run_cli(camp_dir: Path, inp: str) -> subprocess.CompletedProcess:
     main_path = Path(__file__).resolve().parent.parent / "main.py"
-    args = [
-        sys.executable,
-        str(main_path),
-        "--play",
-        "--campaign",
-        str(campaign_file),
-        "--encounter",
-        "goblin",
-        "--max-rounds",
-        "1",
-        "--seed",
-        "1",
-    ]
+    args = [sys.executable, str(main_path), "--campaign", str(camp_dir)]
     return subprocess.run(
         args,
-        input=cmds,
+        input=inp,
         text=True,
         capture_output=True,
         timeout=20,
-        cwd=str(campaign_file.parent),
+        cwd=str(camp_dir),
     )
 
 
-def test_campaign_commands_and_logging(tmp_path):
-    camp_path = _setup_campaign(tmp_path)
-    script = (
-        "note \"Scary woods\"\n" "quest add \"Find relic\"\n" "quest done q1\n" "save\n" "end\n"
-    )
-    res = run_play(script, camp_path)
-    assert res.returncode == 0
-    camp = load_campaign(camp_path)
-    assert any(q.id == "q2" and q.title == "Find relic" for q in camp.quests)
-    q1 = next(q for q in camp.quests if q.id == "q1")
-    assert q1.status == "done"
-    assert "Scary woods" in camp.notes
-    sess_dir = tmp_path / "campaigns" / "Greenvale Troubles" / "sessions"
-    assert list(sess_dir.glob("*.json"))
-    assert camp.last_session and Path(camp.last_session).exists()
+def test_campaign_load_and_branch(tmp_path, monkeypatch):
+    camp_dir = _setup_campaign(tmp_path)
+    camp = load_campaign(camp_dir)
+    assert "start" in camp.scenes
+
+    # choice branch
+    proc = run_cli(camp_dir, "2\n")
+    assert "You lose!" in proc.stdout
+
+    # encounter branches executed in-process so we can stub RNG
+    def _victory(pcs, enemy, seed=None):
+        return {"result": "victory", "summary": "", "hp": {p.name: p.hp for p in pcs}}
+
+    def _defeat(pcs, enemy, seed=None):
+        return {"result": "defeat", "summary": "", "hp": {p.name: p.hp for p in pcs}}
+
+    monkeypatch.setattr("grimbrain.engine.campaign.run_encounter", _victory)
+    run_campaign_cli(camp_dir, start="fight")
+
+    monkeypatch.setattr("grimbrain.engine.campaign.run_encounter", _defeat)
+    run_campaign_cli(camp_dir, start="fight")
