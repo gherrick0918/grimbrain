@@ -1,0 +1,13 @@
+{
+  "party": [
+    {
+      "name": "Elora",
+      "ac": 12,
+      "hp": 8,
+      "attacks": [
+        {"name": "Fire Bolt", "to_hit": 5, "damage_dice": "1d10", "type": "spell"},
+        {"name": "Quarterstaff", "to_hit": 2, "damage_dice": "1d6", "type": "melee"}
+      ]
+    }
+  ]
+}

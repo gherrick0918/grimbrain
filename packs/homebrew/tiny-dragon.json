@@ -1,0 +1,22 @@
+{
+  "name": "Tiny Dragon",
+  "source": "HB",
+  "ac": "13",
+  "hp": "3 (1d4+1)",
+  "speed": "10 ft., fly 40 ft.",
+  "str": 6,
+  "dex": 14,
+  "con": 12,
+  "int": 8,
+  "wis": 10,
+  "cha": 12,
+  "traits": [],
+  "actions": [
+    {"name": "Bite", "text": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4+2) piercing damage."}
+  ],
+  "actions_struct": [
+    {"name": "Bite", "attack_bonus": 4, "type": "melee", "reach_or_range": "reach 5 ft.", "target": "one target", "hit_text": "4 (1d4+2) piercing damage.", "damage_dice": "1d4+2", "damage_type": "piercing"}
+  ],
+  "reactions": [],
+  "provenance": ["HB · Tiny Dragon"]
+}

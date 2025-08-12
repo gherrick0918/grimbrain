@@ -10,7 +10,7 @@ def _write_pc(tmp_path: Path, pcs: list[dict]) -> Path:
     return path
 
 
-def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None) -> subprocess.CompletedProcess:
+def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None, packs: str | None = None) -> subprocess.CompletedProcess:
     """Run the play CLI in a subprocess and capture its output.
 
     Using ``sys.executable`` ensures the subprocess uses the same Python
@@ -22,6 +22,8 @@ def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None) 
 
     main_path = Path(__file__).resolve().parent.parent / "main.py"
     args = [sys.executable, str(main_path), "--play", "--pc", str(pc_file), "--encounter", encounter]
+    if packs:
+        args += ["--packs", packs]
     if seed is not None:
         args += ["--seed", str(seed)]
     proc = subprocess.run(
@@ -91,4 +93,15 @@ def test_typo_and_actions(tmp_path):
     out = res.stdout
     assert "Malrick hits Goblin" in out
     assert "Shortsword" in out
+
+
+def test_homebrew_pack(tmp_path):
+    pcs = [
+        {"name": "Malrick", "ac": 15, "hp": 20, "attacks": [{"name": "Shortsword", "to_hit": 5, "damage_dice": "1d6+3", "type": "melee"}]}
+    ]
+    pc_file = _write_pc(tmp_path, pcs)
+    script = "a \"Tiny Dragon\" \"Shortsword\"\nend\n"
+    res = run_play(script, pc_file, "Tiny Dragon", seed=1, packs="homebrew")
+    out = res.stdout
+    assert "Tiny Dragon" in out
 
