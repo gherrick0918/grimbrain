@@ -1,0 +1,67 @@
+title: Goblin Raids
+start: intro
+scenes:
+  intro:
+    text: >
+      Smoke rises from the hills. Villagers beg for help.
+    choices:
+      - label: Track the raiders
+        goto: ambush
+      - label: Help the village
+        goto: village
+
+  village:
+    text: You drive off a skirmish and stabilize the wounded.
+    set_flags: ["helped_village"]
+    choices:
+      - label: Head for the hills
+        goto: ambush
+
+  ambush:
+    encounter: "goblin boss"            # or: { random: { tags: ["goblinoid"], cr: "1-3" } }
+    on_victory: loot_camp
+    on_defeat: game_over
+
+  loot_camp:
+    text: You find a crude map and a sack of coins.
+    loot:
+      coins: { gp: 35 }
+      items:
+        - { name: "Potion of Healing", qty: 1 }
+    choices:
+      - label: Take a short rest
+        goto: short_rest
+      - label: Press on
+        goto: lair
+
+  short_rest:
+    rest: short
+    text: You catch your breath and patch wounds.
+    choices:
+      - label: Follow the map
+        goto: lair
+
+  lair:
+    check:
+      skill: stealth
+      dc: 12
+      on_success: lair_fight
+      on_failure: lair_alerted
+
+  lair_fight:
+    text: You slip into position unseen.
+    encounter: "goblin boss"
+    on_victory: credits
+    on_defeat: game_over
+
+  lair_alerted:
+    text: The guards raise the alarm!
+    encounter: "goblin boss"
+    on_victory: credits
+    on_defeat: game_over
+
+  game_over:
+    text: You fought bravely, but fell.
+
+  credits:
+    text: The raids end. Villagers hail you a hero.
