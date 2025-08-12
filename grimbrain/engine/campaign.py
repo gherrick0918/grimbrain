@@ -58,7 +58,14 @@ def load_campaign(path: str | Path) -> Campaign:
     scenes: Dict[str, Scene] = {}
     raw_scenes = data.get("scenes", {})
     for sid, sdata in raw_scenes.items():
-        choices = [Choice(**c) for c in sdata.get("choices", [])]
+        choices: List[Choice] = []
+        for c in sdata.get("choices", []):
+            c_map = dict(c)
+            if "label" in c_map and "text" not in c_map:
+                c_map["text"] = c_map.pop("label")
+            if "goto" in c_map and "next" not in c_map:
+                c_map["next"] = c_map.pop("goto")
+            choices.append(Choice(**c_map))
         check = Check(**sdata["check"]) if "check" in sdata else None
         scenes[sid] = Scene(
             id=sid,
@@ -71,7 +78,7 @@ def load_campaign(path: str | Path) -> Campaign:
         )
     start = data.get("start") or next(iter(scenes))
     camp = Campaign(
-        name=data.get("name", "Unnamed"),
+        name=data.get("name") or data.get("title", "Unnamed"),
         party_files=data.get("party_files", []),
         scenes=scenes,
         start=start,
