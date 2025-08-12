@@ -22,7 +22,7 @@ from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import Campaign, Quest, load_campaign, load_party_file
 from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter
-from grimbrain.content.packs import load_packs
+from content.packs import load_packs
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
