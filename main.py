@@ -17,7 +17,7 @@ from grimbrain.engine.combat import (
     Combatant,
 )
 from grimbrain.engine.dice import roll
-from grimbrain.engine.checks import attack_roll, damage_roll, saving_throw, roll_check
+from grimbrain.engine import checks
 from grimbrain.models import PC, MonsterSidecar, dump_model
 from grimbrain.campaign import load_party_file
 from grimbrain.engine import campaign as campaign_engine
@@ -280,11 +280,11 @@ def play_cli(
                         atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed, adv=adv, disadv=dis)
                         hit = atk_res["total"] >= target.ac
                     else:
-                        atk_res = attack_roll(attack["to_hit"], target.ac, hit_seed)
+                        atk_res = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
                         hit = atk_res["hit"]
                     if hit:
                         dmg_seed = rng.randint(0, 10_000_000)
-                        dmg = damage_roll(attack["damage_dice"], dmg_seed)
+                        dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
                         target.hp -= dmg["total"]
                         print(f"{actor.name} hits {target.name} for {dmg['total']}")
                         if target.hp <= 0:
@@ -309,12 +309,12 @@ def play_cli(
                         print("No targets")
                         continue
                     dmg_seed = rng.randint(0, 10_000_000)
-                    dmg_total = damage_roll(attack["damage_dice"], dmg_seed)["total"]
+                    dmg_total = checks.damage_roll(attack["damage_dice"], dmg_seed)["total"]
                     ability = attack.get("save_ability", "dex")
                     for tgt in enemies:
                         save_seed = rng.randint(0, 10_000_000)
                         mod = getattr(tgt, f"{ability}_mod", getattr(tgt, "dex_mod", 0))
-                        save = saving_throw(attack.get("save_dc", 0), mod, seed=save_seed)
+                        save = checks.saving_throw(attack.get("save_dc", 0), mod, seed=save_seed)
                         print(f"{tgt.name} Dex save {'succeeds' if save['success'] else 'fails'}")
                         taken = dmg_total if not save["success"] else dmg_total // 2
                         tgt.hp -= taken
@@ -333,10 +333,10 @@ def play_cli(
                 target_seed = rng.randint(0, 10_000_000)
                 target = choose_target(actor, enemies, seed=target_seed)
                 hit_seed = rng.randint(0, 10_000_000)
-                atk = attack_roll(attack["to_hit"], target.ac, hit_seed)
+                atk = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
                 if atk["hit"]:
                     dmg_seed = rng.randint(0, 10_000_000)
-                    dmg = damage_roll(attack["damage_dice"], dmg_seed)
+                    dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
                     target.hp -= dmg["total"]
                     print(f"{actor.name} hits {target.name} for {dmg['total']}")
                     if target.hp <= 0:
@@ -423,7 +423,12 @@ def run_campaign_cli(path: Path, start: str | None = None, resume: str | None = 
             _save()
             continue
         if scene.check:
-            res = roll_check(0, scene.check.dc, advantage=scene.check.advantage, seed=seed or camp.seed)
+            res = checks.roll_check(
+                0,
+                scene.check.dc,
+                advantage=scene.check.advantage,
+                seed=seed or camp.seed,
+            )
             if logger:
                 log_data = {
                     'scene': scene_id,
