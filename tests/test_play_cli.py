@@ -10,7 +10,7 @@ def _write_pc(tmp_path: Path, pcs: list[dict]) -> Path:
     return path
 
 
-def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None, packs: str | None = None) -> subprocess.CompletedProcess:
+def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None, packs: str | None = None, cwd: str | None = None) -> subprocess.CompletedProcess:
     """Run the play CLI in a subprocess and capture its output.
 
     Using ``sys.executable`` ensures the subprocess uses the same Python
@@ -26,13 +26,17 @@ def run_play(cmds: str, pc_file: Path, encounter: str, seed: int | None = None, 
         args += ["--packs", packs]
     if seed is not None:
         args += ["--seed", str(seed)]
+    if cwd is None:
+        cwd_val = str(main_path.parent)
+    else:
+        cwd_val = cwd
     proc = subprocess.run(
         args,
         input=cmds,
         text=True,
         capture_output=True,
         timeout=20,
-        cwd=str(main_path.parent),
+        cwd=cwd_val,
     )
     return proc
 
@@ -100,8 +104,31 @@ def test_homebrew_pack(tmp_path):
         {"name": "Malrick", "ac": 15, "hp": 20, "attacks": [{"name": "Shortsword", "to_hit": 5, "damage_dice": "1d6+3", "type": "melee"}]}
     ]
     pc_file = _write_pc(tmp_path, pcs)
+    # Create a homebrew pack with a Tiny Dragon monster
+    homebrew_dir = tmp_path / "homebrew"
+    homebrew_dir.mkdir(parents=True, exist_ok=True)
+    tiny_dragon = {
+        "name": "Tiny Dragon",
+        "source": "HB",
+        "ac": "15",
+        "hp": "10",
+        "speed": "30 ft.",
+        "str": 10,
+        "dex": 14,
+        "con": 12,
+        "int": 8,
+        "wis": 12,
+        "cha": 14,
+        "traits": [],
+        "actions": [{"name": "Bite", "text": "The dragon bites."}],
+        "actions_struct": [],
+        "reactions": [],
+        "provenance": []
+    }
+    (homebrew_dir / "tiny dragon.json").write_text(json.dumps(tiny_dragon))
     script = "a \"Tiny Dragon\" \"Shortsword\"\nend\n"
-    res = run_play(script, pc_file, "Tiny Dragon", seed=1, packs="homebrew")
+    # Set cwd=tmp_path so the CLI finds the homebrew pack
+    res = run_play(script, pc_file, "Tiny Dragon", seed=1, packs=str(tmp_path), cwd=str(tmp_path))
     out = res.stdout
     assert "Tiny Dragon" in out
 

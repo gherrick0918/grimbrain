@@ -1,4 +1,4 @@
-#!C:\Users\gherr\OneDrive\Documents\Visual Studio Code\grimbrain\venv311\Scripts\python.exe
+#!C:\dev\grimbrain\venv311\Scripts\python.exe
 import argparse
 import sys
 

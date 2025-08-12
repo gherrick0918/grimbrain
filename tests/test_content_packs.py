@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from content.packs import load_packs
+from grimbrain.content.packs import load_packs
 
 
 def test_pack_dedup_prefers_longer_actions(tmp_path):
