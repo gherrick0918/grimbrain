@@ -19,6 +19,8 @@ from .actions import (
     derive_attack_advantage,
     consume_one_shot_flags,
 )
+from .saves import save_dc, roll_save
+from .conditions import Conditions, derive_condition_advantage
 
 __all__ = [
     "mod",
@@ -38,4 +40,8 @@ __all__ = [
     "apply_hide",
     "derive_attack_advantage",
     "consume_one_shot_flags",
+    "save_dc",
+    "roll_save",
+    "Conditions",
+    "derive_condition_advantage",
 ]
