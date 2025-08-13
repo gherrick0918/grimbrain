@@ -185,3 +185,6 @@ logs/*
 
 chroma_store/*
 !chroma_store/.gitkeep
+
+saves/
+!saves/.gitkeep
