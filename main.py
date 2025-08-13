@@ -729,6 +729,7 @@ def main():
     parser.add_argument("--preset", choices=["fighter", "rogue", "wizard"], help="Preset party for --pc-wizard", default=None)
     parser.add_argument("--force", action="store_true", help="Force reindexing of the vector store")
     parser.add_argument("--json-out", nargs="?", const="logs/last_sidecar.json", help="Write sidecar JSON to path", default=None)
+    parser.add_argument("--md-out", nargs="?", const="logs/last_query.md", help="Write Markdown output to path", default=None)
     parser.add_argument("--scene", type=str, help="Start a seed encounter", default=None)
     parser.add_argument("--resume", type=str, help="Resume session from JSON file", default=None)
     parser.add_argument(
