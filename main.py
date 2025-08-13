@@ -162,7 +162,7 @@ def _print_status(
                 if st.hidden:
                     tags += " [Hidden]"
                 if st.help_advantage_token:
-                    tags += " [Help→]"
+                    tags += " [Help]"
         print(f"{c.name}: {hp}, AC {c.ac}{tags}")
 
 
