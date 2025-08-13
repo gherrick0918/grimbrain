@@ -38,6 +38,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from collections import defaultdict
+from dataclasses import asdict, replace
 
 from grimbrain.engine.session import Session, start_scene, log_step
 from grimbrain.engine.combat import (
@@ -65,6 +66,10 @@ from grimbrain.rules import (
     apply_hide,
     derive_attack_advantage,
     consume_one_shot_flags,
+    combine_adv,
+    ConditionFlags,
+    derive_condition_advantage,
+    roll_save,
 )
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -126,6 +131,7 @@ def _serialize_combatant(c: Combatant) -> dict:
         "hp": c.hp,
         "side": c.side,
         "dex_mod": getattr(c, "dex_mod", 0),
+        "str_mod": getattr(c, "str_mod", 0),
         "attacks": c.attacks,
         "defeated": c.defeated,
         "init": getattr(c, "init", 0),
@@ -138,6 +144,7 @@ def _deserialize_combatants(data: list[dict]) -> list[Combatant]:
         c = Combatant(cd["name"], cd["ac"], cd["hp"], cd["attacks"], cd["side"], cd.get("dex_mod", 0))
         c.defeated = cd.get("defeated", False)
         c.init = cd.get("init", 0)
+        c.str_mod = cd.get("str_mod", 0)
         combs.append(c)
     combs.sort(key=lambda c: c.init, reverse=True)
     return combs
@@ -147,6 +154,7 @@ def _print_status(
     round_num: int,
     combatants: list[Combatant],
     action_state: dict[str, ActionState] | None = None,
+    condition_state: dict[str, ConditionFlags] | None = None,
 ) -> None:
     print(f"Round {round_num}")
     order = ", ".join(c.name for c in combatants)
@@ -163,6 +171,17 @@ def _print_status(
                     tags += " [Hidden]"
                 if st.help_advantage_token:
                     tags += " [Help]"
+        if condition_state is not None:
+            cf = condition_state.get(c.name)
+            if cf:
+                if cf.prone:
+                    tags += " [Prone]"
+                if cf.restrained:
+                    tags += " [Restrained]"
+                if cf.frightened:
+                    tags += " [Frightened]"
+                if cf.grappled:
+                    tags += " [Grappled]"
         print(f"{c.name}: {hp}, AC {c.ac}{tags}")
 
 
@@ -176,12 +195,22 @@ def _check_victory(combatants: list[Combatant]) -> str | None:
     return None
 
 
-def _save_game(path: str, seed: int | None, round_num: int, turn: int, combatants: list[Combatant]) -> None:
-    sess = Session(scene="play", seed=seed, steps=[{
+def _save_game(
+    path: str,
+    seed: int | None,
+    round_num: int,
+    turn: int,
+    combatants: list[Combatant],
+    conditions: dict[str, ConditionFlags] | None = None,
+) -> None:
+    step = {
         "round": round_num,
         "turn": turn,
         "combatants": [_serialize_combatant(c) for c in combatants],
-    }])
+    }
+    if conditions:
+        step["conditions"] = {n: asdict(f) for n, f in conditions.items()}
+    sess = Session(scene="play", seed=seed, steps=[step])
     sess.save(path)
     print(f"Saved to {path}")
 
@@ -193,11 +222,14 @@ def _load_game(path: str):
         round_num = data.get("round", 1)
         turn = data.get("turn", 0)
         combatants = _deserialize_combatants(data.get("combatants", []))
+        cond_data = data.get("conditions", {})
+        conditions = {n: ConditionFlags(**v) for n, v in cond_data.items()}
     else:
         round_num = 1
         turn = 0
         combatants = []
-    return sess.seed, round_num, turn, combatants
+        conditions = {}
+    return sess.seed, round_num, turn, combatants, conditions
 
 
 def _edit_distance_one(a: str, b: str) -> bool:
@@ -222,7 +254,19 @@ def _normalize_cmd(cmd: str) -> str:
     aliases = {"a": "attack", "atk": "attack", "c": "cast", "s": "status", "q": "quit"}
     if cmd in aliases:
         return aliases[cmd]
-    known = ["attack", "cast", "status", "quit", "end", "save", "load", "actions"]
+    known = [
+        "attack",
+        "cast",
+        "status",
+        "quit",
+        "end",
+        "save",
+        "load",
+        "actions",
+        "grapple",
+        "shove",
+        "stand",
+    ]
     for k in known:
         if _edit_distance_one(cmd, k):
             return k
@@ -247,10 +291,13 @@ def play_cli(
 
     combatants: list[Combatant] = []
     combatants.extend(
-        [Combatant(p.name, p.ac, p.hp, [dump_model(a) for a in p.attacks], "party", 0) for p in pcs]
+        [Combatant(p.name, p.ac, p.hp, [dump_model(a) for a in p.attacks], "party", getattr(p, "dex_mod", 0)) for p in pcs]
     )
+    for c, p in zip(combatants, pcs):
+        c.str_mod = getattr(p, "str_mod", 0)
     for m in monsters:
         c = Combatant(m.name, int(m.ac.split()[0]), 0, [], "monsters", (m.dex - 10) // 2)
+        c.str_mod = (m.str - 10) // 2
         hp_str = m.hp
         if "(" in hp_str and ")" in hp_str:
             expr = hp_str.split("(")[1].split(")")[0]
@@ -272,6 +319,7 @@ def play_cli(
     combatants.sort(key=lambda c: c.init, reverse=True)
 
     action_state: dict[str, ActionState] = defaultdict(ActionState)
+    condition_state: dict[str, ConditionFlags] = {c.name: ConditionFlags() for c in combatants}
     for c in combatants:
         action_state[c.name]
 
@@ -300,7 +348,7 @@ def play_cli(
                 parts = shlex.split(cmd)
                 parts[0] = _normalize_cmd(parts[0])
                 if parts[0] == "status":
-                    _print_status(round_num, combatants, action_state)
+                    _print_status(round_num, combatants, action_state, condition_state)
                 elif parts[0] == "dodge":
                     apply_dodge(action_state[actor.name])
                     print(
@@ -322,15 +370,28 @@ def play_cli(
                     )
                 elif parts[0] == "help":
                     print(
-                        "Commands: status, dodge, help <ally>, hide, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
+                        "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
                     )
                 elif parts[0] == "quit":
                     return
                 elif parts[0] == "save":
                     if len(parts) == 2:
-                        _save_game(parts[1], seed, round_num, turn, combatants)
+                        _save_game(parts[1], seed, round_num, turn, combatants, condition_state)
+                    elif len(parts) >= 4:
+                        target = next((c for c in combatants if c.name == parts[1]), None)
+                        if not target:
+                            print("Unknown target")
+                            continue
+                        ability = parts[2].lower()
+                        dc = int(parts[3])
+                        mod = getattr(target, f"{ability}_mod", 0)
+                        save_seed = rng.randint(0, 10_000_000)
+                        success, total, face = roll_save(dc, mod, rng=random.Random(save_seed))
+                        print(
+                            f"{target.name} {ability.upper()} save {'succeeds' if success else 'fails'} (total {total}, face {face})"
+                        )
                 elif parts[0] == "load" and len(parts) == 2:
-                    seed, round_num, turn, combatants = _load_game(parts[1])
+                    seed, round_num, turn, combatants, condition_state = _load_game(parts[1])
                 elif parts[0] == "actions":
                     target_name = parts[1] if len(parts) > 1 else actor.name
                     target = next((c for c in combatants if c.name == target_name), None)
@@ -339,6 +400,54 @@ def play_cli(
                         continue
                     names = [a["name"] for a in target.attacks]
                     print(", ".join(names) if names else "No actions")
+                elif parts[0] == "grapple" and len(parts) >= 2:
+                    target = next((c for c in combatants if c.name == parts[1] and not c.defeated), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    att_mod = getattr(actor, "str_mod", 0)
+                    tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
+                    att_seed = rng.randint(0, 10_000_000)
+                    tgt_seed = rng.randint(0, 10_000_000)
+                    att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
+                    tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
+                    if att_roll >= tgt_roll:
+                        condition_state[target.name] = replace(condition_state[target.name], grappled=True)
+                        print(f"{actor.name} grapples {target.name}")
+                    else:
+                        print(f"{actor.name} fails to grapple {target.name}")
+                elif parts[0] == "shove" and len(parts) >= 3:
+                    target = next((c for c in combatants if c.name == parts[1] and not c.defeated), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    intent = parts[2]
+                    att_mod = getattr(actor, "str_mod", 0)
+                    tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
+                    att_seed = rng.randint(0, 10_000_000)
+                    tgt_seed = rng.randint(0, 10_000_000)
+                    att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
+                    tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
+                    if intent == "prone":
+                        if att_roll >= tgt_roll:
+                            condition_state[target.name] = replace(condition_state[target.name], prone=True)
+                            print(f"{actor.name} shoves {target.name} prone")
+                        else:
+                            print(f"{actor.name} fails to shove {target.name}")
+                    elif intent == "push":
+                        if att_roll >= tgt_roll:
+                            print(f"{actor.name} shoves {target.name} back 5 feet")
+                        else:
+                            print(f"{actor.name} fails to shove {target.name}")
+                    else:
+                        print("Specify prone or push")
+                elif parts[0] == "stand":
+                    flags = condition_state[actor.name]
+                    if flags.prone:
+                        condition_state[actor.name] = replace(flags, prone=False)
+                        print(f"{actor.name} stands up")
+                    else:
+                        print(f"{actor.name} is not prone")
                 elif parts[0] == "attack" and len(parts) >= 3:
                     party_map = {c.name: c for c in combatants if c.side == "party"}
                     if parts[1] in party_map:
@@ -370,14 +479,18 @@ def play_cli(
                         print("Unknown attack")
                         continue
                     hit_seed = rng.randint(0, 10_000_000)
+                    action_adv = derive_attack_advantage(
+                        action_state[actor.name], action_state[target.name]
+                    )
+                    cond_adv = derive_condition_advantage(
+                        condition_state[actor.name], condition_state[target.name],
+                        melee=attack.get("type", "melee") != "ranged",
+                    )
+                    adv_mode = combine_adv(action_adv, cond_adv)
                     if manual_adv:
-                        adv_mode = "adv"
+                        adv_mode = combine_adv(adv_mode, "adv")
                     elif manual_dis:
-                        adv_mode = "dis"
-                    else:
-                        adv_mode = derive_attack_advantage(
-                            action_state[actor.name], action_state[target.name]
-                        )
+                        adv_mode = combine_adv(adv_mode, "dis")
                     if os.getenv("GB_TESTING"):
                         print(f"[dbg] adv_mode={adv_mode}")
                     atk_res = roll(
@@ -443,9 +556,14 @@ def play_cli(
                 target_seed = rng.randint(0, 10_000_000)
                 target = choose_target(actor, enemies, seed=target_seed)
                 hit_seed = rng.randint(0, 10_000_000)
-                adv_mode = derive_attack_advantage(
+                action_adv = derive_attack_advantage(
                     action_state[actor.name], action_state[target.name]
                 )
+                cond_adv = derive_condition_advantage(
+                    condition_state[actor.name], condition_state[target.name],
+                    melee=attack.get("type", "melee") != "ranged",
+                )
+                adv_mode = combine_adv(action_adv, cond_adv)
                 if os.getenv("GB_TESTING"):
                     print(f"[dbg] adv_mode={adv_mode}")
                 atk = roll(
