@@ -1,4 +1,17 @@
+
 from __future__ import annotations
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Conditions:
+    prone: bool = False
+    restrained: bool = False
+    frightened: bool = False
+    grappled: bool = False
+
+# Alias for compatibility with code expecting ConditionFlags
+ConditionFlags = Conditions
 
 from dataclasses import dataclass
 
