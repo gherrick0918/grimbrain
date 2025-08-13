@@ -10,6 +10,15 @@ from .core import (
     roll_attack,
     roll_damage,
 )
+from .actions import (
+    ActionState,
+    apply_dodge,
+    clear_dodge,
+    apply_help,
+    apply_hide,
+    derive_attack_advantage,
+    consume_one_shot_flags,
+)
 
 __all__ = [
     "mod",
@@ -22,4 +31,11 @@ __all__ = [
     "initiative_bonus",
     "roll_attack",
     "roll_damage",
+    "ActionState",
+    "apply_dodge",
+    "clear_dodge",
+    "apply_help",
+    "apply_hide",
+    "derive_attack_advantage",
+    "consume_one_shot_flags",
 ]
