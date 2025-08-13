@@ -37,6 +37,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from collections import defaultdict
 
 from grimbrain.engine.session import Session, start_scene, log_step
 from grimbrain.engine.combat import (
@@ -56,6 +57,15 @@ from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter, apply_difficulty
 from grimbrain.content.packs import load_packs
 from grimbrain.content.select import select_monster
+from grimbrain.rules import (
+    ActionState,
+    apply_dodge,
+    clear_dodge,
+    apply_help,
+    apply_hide,
+    derive_attack_advantage,
+    consume_one_shot_flags,
+)
 
 LOG_FILE = f"logs/index_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 log_entries = []
@@ -133,13 +143,27 @@ def _deserialize_combatants(data: list[dict]) -> list[Combatant]:
     return combs
 
 
-def _print_status(round_num: int, combatants: list[Combatant]) -> None:
+def _print_status(
+    round_num: int,
+    combatants: list[Combatant],
+    action_state: dict[str, ActionState] | None = None,
+) -> None:
     print(f"Round {round_num}")
     order = ", ".join(c.name for c in combatants)
     print(f"Initiative: {order}")
     for c in combatants:
         hp = "DEFEATED" if c.defeated else f"{c.hp} HP"
-        print(f"{c.name}: {hp}, AC {c.ac}")
+        tags = ""
+        if action_state is not None:
+            st = action_state.get(c.name)
+            if st:
+                if st.dodge:
+                    tags += " [Dodge]"
+                if st.hidden:
+                    tags += " [Hidden]"
+                if st.help_advantage_token:
+                    tags += " [Help→]"
+        print(f"{c.name}: {hp}, AC {c.ac}{tags}")
 
 
 def _check_victory(combatants: list[Combatant]) -> str | None:
@@ -247,6 +271,10 @@ def play_cli(
             c.init += 1000
     combatants.sort(key=lambda c: c.init, reverse=True)
 
+    action_state: dict[str, ActionState] = defaultdict(ActionState)
+    for c in combatants:
+        action_state[c.name]
+
     round_num = 1
     turn = 0
     while round_num <= max_rounds:
@@ -255,6 +283,7 @@ def play_cli(
             print(f"{winner.capitalize()} wins!")
             break
         actor = combatants[turn]
+        clear_dodge(action_state[actor.name])
         if actor.defeated:
             turn = (turn + 1) % len(combatants)
             if turn == 0:
@@ -271,10 +300,29 @@ def play_cli(
                 parts = shlex.split(cmd)
                 parts[0] = _normalize_cmd(parts[0])
                 if parts[0] == "status":
-                    _print_status(round_num, combatants)
+                    _print_status(round_num, combatants, action_state)
+                elif parts[0] == "dodge":
+                    apply_dodge(action_state[actor.name])
+                    print(
+                        f"{actor.name} takes the Dodge action (attacks against them have disadvantage until their next turn)."
+                    )
+                elif parts[0] == "help" and len(parts) > 1:
+                    ally = next((c for c in combatants if c.name == parts[1]), None)
+                    if not ally:
+                        print("Unknown target")
+                        continue
+                    apply_help(action_state[ally.name])
+                    print(
+                        f"{actor.name} helps {ally.name}, granting advantage on their next attack."
+                    )
+                elif parts[0] == "hide":
+                    apply_hide(action_state[actor.name])
+                    print(
+                        f"{actor.name} hides (advantage on their next attack until revealed)."
+                    )
                 elif parts[0] == "help":
                     print(
-                        "Commands: status, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
+                        "Commands: status, dodge, help <ally>, hide, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
                     )
                 elif parts[0] == "quit":
                     return
@@ -311,8 +359,8 @@ def play_cli(
                     else:
                         target_name, atk_name = parts[1], parts[2]
                         extra = parts[3:]
-                    adv = "adv" in extra
-                    dis = "dis" in extra
+                    manual_adv = "adv" in extra
+                    manual_dis = "dis" in extra
                     target = next((c for c in combatants if c.name == target_name and not c.defeated), None)
                     if not target:
                         print("Unknown target")
@@ -322,16 +370,27 @@ def play_cli(
                         print("Unknown attack")
                         continue
                     hit_seed = rng.randint(0, 10_000_000)
-                    if adv or dis:
-                        atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed, adv=adv, disadv=dis)
-                        hit = atk_res["total"] >= target.ac
+                    if manual_adv:
+                        adv_mode = "adv"
+                    elif manual_dis:
+                        adv_mode = "dis"
                     else:
-                        atk_res = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
-                        if not atk_res["hit"] and actor.side == "party":
-                            # one retry for party to mimic advantage-like behaviour
-                            hit_seed = rng.randint(0, 10_000_000)
-                            atk_res = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
-                        hit = atk_res["hit"]
+                        adv_mode = derive_attack_advantage(
+                            action_state[actor.name], action_state[target.name]
+                        )
+                    if os.getenv("GB_TESTING"):
+                        print(f"[dbg] adv_mode={adv_mode}")
+                    atk_res = roll(
+                        f"1d20+{attack['to_hit']}",
+                        seed=hit_seed,
+                        adv=adv_mode == "adv",
+                        disadv=adv_mode == "dis",
+                    )
+                    hit = atk_res["total"] >= target.ac
+                    if adv_mode == "normal" and not hit and actor.side == "party":
+                        hit_seed = rng.randint(0, 10_000_000)
+                        atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed)
+                        hit = atk_res["total"] >= target.ac
                     if hit:
                         dmg_seed = rng.randint(0, 10_000_000)
                         dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
@@ -342,6 +401,7 @@ def play_cli(
                             print(f"{target.name} is defeated")
                     else:
                         print(f"{actor.name} misses {target.name}")
+                    consume_one_shot_flags(action_state[actor.name])
                 elif parts[0] == "cast" and len(parts) >= 2:
                     if parts[1] == actor.name and len(parts) >= 3:
                         _, spell_name, *rest = parts[1:]
@@ -383,8 +443,18 @@ def play_cli(
                 target_seed = rng.randint(0, 10_000_000)
                 target = choose_target(actor, enemies, seed=target_seed)
                 hit_seed = rng.randint(0, 10_000_000)
-                atk = checks.attack_roll(attack["to_hit"], target.ac, hit_seed)
-                if atk["hit"]:
+                adv_mode = derive_attack_advantage(
+                    action_state[actor.name], action_state[target.name]
+                )
+                if os.getenv("GB_TESTING"):
+                    print(f"[dbg] adv_mode={adv_mode}")
+                atk = roll(
+                    f"1d20+{attack['to_hit']}",
+                    seed=hit_seed,
+                    adv=adv_mode == "adv",
+                    disadv=adv_mode == "dis",
+                )
+                if atk["total"] >= target.ac:
                     dmg_seed = rng.randint(0, 10_000_000)
                     dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
                     target.hp -= dmg["total"]
@@ -394,6 +464,7 @@ def play_cli(
                         print(f"{target.name} is defeated")
                 else:
                     print(f"{actor.name} misses {target.name}")
+                consume_one_shot_flags(action_state[actor.name])
             # monsters with no attacks or no targets simply skip their turn
         turn = (turn + 1) % len(combatants)
         hp_line = ", ".join(f"{c.name} {0 if c.defeated else c.hp}" for c in combatants)
