@@ -14,7 +14,15 @@ from .encounter import compute_encounter
 class Combatant:
     """Internal mutable combatant state."""
 
-    def __init__(self, name: str, ac: int, hp: int, attacks: List[Dict[str, object]], side: str, dex_mod: int = 0):
+    def __init__(
+        self,
+        name: str,
+        ac: int,
+        hp: int,
+        attacks: List[Dict[str, object]],
+        side: str,
+        dex_mod: int = 0,
+    ):
         self.name = name
         self.ac = ac
         self.hp = hp
@@ -22,6 +30,11 @@ class Combatant:
         self.side = side
         self.dex_mod = dex_mod
         self.defeated = False
+        # 5e dying rules
+        self.downed = False
+        self.stable = False
+        self.death_successes = 0
+        self.death_failures = 0
 
     def to_state(self) -> Dict[str, object]:
         return {"name": self.name, "hp": self.hp, "defeated": self.defeated}

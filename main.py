@@ -135,6 +135,10 @@ def _serialize_combatant(c: Combatant) -> dict:
         "attacks": c.attacks,
         "defeated": c.defeated,
         "init": getattr(c, "init", 0),
+        "downed": getattr(c, "downed", False),
+        "stable": getattr(c, "stable", False),
+        "ds_success": getattr(c, "death_successes", 0),
+        "ds_fail": getattr(c, "death_failures", 0),
     }
 
 
@@ -145,9 +149,33 @@ def _deserialize_combatants(data: list[dict]) -> list[Combatant]:
         c.defeated = cd.get("defeated", False)
         c.init = cd.get("init", 0)
         c.str_mod = cd.get("str_mod", 0)
+        c.downed = cd.get("downed", False)
+        c.stable = cd.get("stable", False)
+        c.death_successes = cd.get("ds_success", 0)
+        c.death_failures = cd.get("ds_fail", 0)
         combs.append(c)
     combs.sort(key=lambda c: c.init, reverse=True)
     return combs
+
+
+def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", crit: bool = False) -> None:
+    target.hp -= amount
+    if target.hp > 0:
+        return
+    target.hp = 0
+    if getattr(target, "downed", False) or getattr(target, "stable", False):
+        target.stable = False
+        fails = 2 if crit and attack_type == "melee" else 1
+        target.death_failures += fails
+        print(f"{target.name} suffers {fails} death save failure{'s' if fails > 1 else ''}")
+        if target.death_failures >= 3:
+            target.defeated = True
+            print(f"{target.name} dies")
+    else:
+        target.downed = True
+        target.death_successes = 0
+        target.death_failures = 0
+        print(f"{target.name} is downed")
 
 
 def _print_status(
@@ -182,12 +210,17 @@ def _print_status(
                     tags += " [Frightened]"
                 if cf.grappled:
                     tags += " [Grappled]"
+        if c.hp <= 0 and not c.defeated:
+            if getattr(c, "stable", False):
+                tags += " [Stable]"
+            else:
+                tags += f" [Downed S:{getattr(c, 'death_successes', 0)}/F:{getattr(c, 'death_failures', 0)}]"
         print(f"{c.name}: {hp}, AC {c.ac}{tags}")
 
 
 def _check_victory(combatants: list[Combatant]) -> str | None:
-    party_alive = any(c.side == "party" and not c.defeated for c in combatants)
-    monsters_alive = any(c.side == "monsters" and not c.defeated for c in combatants)
+    party_alive = any(c.side == "party" and c.hp > 0 for c in combatants)
+    monsters_alive = any(c.side == "monsters" and c.hp > 0 for c in combatants)
     if not party_alive:
         return "monsters"
     if not monsters_alive:
@@ -332,6 +365,41 @@ def play_cli(
             break
         actor = combatants[turn]
         clear_dodge(action_state[actor.name])
+        if actor.hp <= 0:
+            if getattr(actor, "stable", False):
+                turn = (turn + 1) % len(combatants)
+                if turn == 0:
+                    round_num += 1
+                continue
+            ds_seed = rng.randint(0, 10_000_000)
+            ds = checks.roll_check(0, 10, seed=ds_seed)
+            print(
+                f"{actor.name} death save {'success' if ds['success'] else 'failure'} ({ds['roll']})"
+            )
+            roll_val = ds["roll"]
+            if roll_val == 20:
+                actor.hp = 1
+                actor.downed = False
+                actor.stable = False
+                actor.death_successes = 0
+                actor.death_failures = 0
+                print(f"{actor.name} regains 1 HP and stands")
+            elif roll_val == 1:
+                actor.death_failures += 2
+            elif ds["success"]:
+                actor.death_successes += 1
+            else:
+                actor.death_failures += 1
+            if actor.death_successes >= 3:
+                actor.stable = True
+                print(f"{actor.name} is stable")
+            elif actor.death_failures >= 3:
+                actor.defeated = True
+                print(f"{actor.name} dies")
+            turn = (turn + 1) % len(combatants)
+            if turn == 0:
+                round_num += 1
+            continue
         if actor.defeated:
             turn = (turn + 1) % len(combatants)
             if turn == 0:
@@ -368,6 +436,34 @@ def play_cli(
                     print(
                         f"{actor.name} hides (advantage on their next attack until revealed)."
                     )
+                elif parts[0] == "stabilize" and len(parts) > 1:
+                    target = next((c for c in combatants if c.name == parts[1] and c.side == actor.side), None)
+                    if not target or target.hp > 0 or target.stable:
+                        print("Cannot stabilize")
+                        continue
+                    med_seed = rng.randint(0, 10_000_000)
+                    check = checks.roll_check(0, 10, seed=med_seed)
+                    print(f"{actor.name} Medicine check {'succeeds' if check['success'] else 'fails'} ({check['roll']})")
+                    if check["success"]:
+                        target.stable = True
+                        target.downed = True
+                        print(f"{target.name} is stable")
+                elif parts[0] == "potion" and len(parts) > 1:
+                    target = next((c for c in combatants if c.name == parts[1] and c.side == actor.side), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    heal_seed = rng.randint(0, 10_000_000)
+                    heal_amt = checks.damage_roll("2d4+2", heal_seed)["total"]
+                    before = target.hp
+                    target.hp += heal_amt
+                    print(f"{actor.name} heals {target.name} for {heal_amt}")
+                    if before <= 0:
+                        target.downed = False
+                        target.stable = False
+                        target.death_successes = 0
+                        target.death_failures = 0
+                        target.defeated = False
                 elif parts[0] == "help":
                     print(
                         "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
@@ -504,14 +600,13 @@ def play_cli(
                         hit_seed = rng.randint(0, 10_000_000)
                         atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed)
                         hit = atk_res["total"] >= target.ac
+                    roll_val = atk_res["detail"].get("chosen", atk_res["detail"].get("rolls", [0])[0])
+                    crit = roll_val == 20
                     if hit:
                         dmg_seed = rng.randint(0, 10_000_000)
                         dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
-                        target.hp -= dmg["total"]
                         print(f"{actor.name} hits {target.name} for {dmg['total']}")
-                        if target.hp <= 0:
-                            target.defeated = True
-                            print(f"{target.name} is defeated")
+                        _apply_damage(target, dmg["total"], attack.get("type", "melee"), crit)
                     else:
                         print(f"{actor.name} misses {target.name}")
                     consume_one_shot_flags(action_state[actor.name])
@@ -540,11 +635,8 @@ def play_cli(
                         save = checks.saving_throw(attack.get("save_dc", 0), mod, seed=save_seed)
                         print(f"{tgt.name} Dex save {'succeeds' if save['success'] else 'fails'}")
                         taken = dmg_total if not save["success"] else dmg_total // 2
-                        tgt.hp -= taken
                         print(f"{actor.name}'s {attack['name']} hits {tgt.name} for {taken}")
-                        if tgt.hp <= 0:
-                            tgt.defeated = True
-                            print(f"{tgt.name} is defeated")
+                        _apply_damage(tgt, taken, attack.get("type", "spell"))
                 elif parts[0] == "end":
                     break
                 else:
@@ -572,14 +664,13 @@ def play_cli(
                     adv=adv_mode == "adv",
                     disadv=adv_mode == "dis",
                 )
+                roll_val = atk["detail"].get("chosen", atk["detail"].get("rolls", [0])[0])
+                crit = roll_val == 20
                 if atk["total"] >= target.ac:
                     dmg_seed = rng.randint(0, 10_000_000)
                     dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
-                    target.hp -= dmg["total"]
                     print(f"{actor.name} hits {target.name} for {dmg['total']}")
-                    if target.hp <= 0:
-                        target.defeated = True
-                        print(f"{target.name} is defeated")
+                    _apply_damage(target, dmg["total"], attack.get("type", "melee"), crit)
                 else:
                     print(f"{actor.name} misses {target.name}")
                 consume_one_shot_flags(action_state[actor.name])
