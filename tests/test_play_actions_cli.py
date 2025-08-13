@@ -65,7 +65,7 @@ def test_help_consumed(tmp_path):
     res = run_play(script, pc_file, "goblin", seed=5)
     out = res.stdout
     assert "Brynn helps Malrick" in out
-    assert out.count("[Help→]") == 1
+    assert out.count("[Help]") == 1
 
 
 def test_hide_consumed(tmp_path):
