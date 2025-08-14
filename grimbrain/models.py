@@ -71,12 +71,21 @@ class PC(BaseModel):
     attacks: List[Attack]
     max_hp: int | None = None
     con_mod: int = 0
+    hit_die_size: int = 8
+    hit_dice_max: int = 1
+    hit_dice: int | None = None
 
     def __init__(self, **data):  # type: ignore[override]
         if data.get("max_hp") is None and "hp" in data:
             data["max_hp"] = data.get("hp")
         if data.get("con_mod") is None:
             data["con_mod"] = 0
+        if data.get("hit_dice_max") is None:
+            data["hit_dice_max"] = data.get("hit_dice", 1)
+        if data.get("hit_dice") is None:
+            data["hit_dice"] = data.get("hit_dice_max", 1)
+        if data.get("hit_die_size") is None:
+            data["hit_die_size"] = 8
         super().__init__(**data)
 
 
