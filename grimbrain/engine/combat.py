@@ -22,7 +22,9 @@ class Combatant:
         attacks: List[Dict[str, object]],
         side: str,
         dex_mod: int = 0,
+        con_mod: int = 0,
         max_hp: int | None = None,
+        spell_slots: Dict[int, int] | None = None,
     ):
         self.name = name
         self.ac = ac
@@ -30,13 +32,16 @@ class Combatant:
         self.attacks = attacks
         self.side = side
         self.dex_mod = dex_mod
+        self.con_mod = con_mod
         self.max_hp = max_hp if max_hp is not None else hp
+        self.spell_slots = spell_slots or {}
         self.defeated = False
         # 5e dying rules
         self.downed = False
         self.stable = False
         self.death_successes = 0
         self.death_failures = 0
+        self.concentrating: str | None = None
 
     def to_state(self) -> Dict[str, object]:
         return {"name": self.name, "hp": self.hp, "defeated": self.defeated}
@@ -52,15 +57,26 @@ def _parse_monster(mon: MonsterSidecar, rng: random.Random) -> Combatant:
     else:
         hp = int(hp_str.split()[0])
     dex_mod = (mon.dex - 10) // 2
+    con_mod = (mon.con - 10) // 2
     attacks: List[Dict[str, object]] = []
     for a in mon.actions_struct:
         attacks.append({"to_hit": a.attack_bonus, "damage_dice": a.damage_dice, "type": a.type})
-    return Combatant(mon.name, ac, hp, attacks, "monsters", dex_mod, max_hp=hp)
+    return Combatant(mon.name, ac, hp, attacks, "monsters", dex_mod, con_mod, max_hp=hp)
 
 
 def _parse_pc(pc: PC) -> Combatant:
     attacks = [dump_model(a) for a in pc.attacks]
-    return Combatant(pc.name, pc.ac, pc.hp, attacks, "party", 0, max_hp=pc.max_hp)
+    return Combatant(
+        pc.name,
+        pc.ac,
+        pc.hp,
+        attacks,
+        "party",
+        0,
+        pc.con_mod,
+        max_hp=pc.max_hp,
+        spell_slots=pc.spell_slots.copy(),
+    )
 
 
 def choose_target(actor: Combatant, enemies: List[Combatant], strategy: str = "lowest_hp", seed: int | None = None) -> Combatant | None:
@@ -143,7 +159,7 @@ def run_encounter(
     for c in combatants:
         init_seed = rng.randint(0, 10_000_000)
         c.init = roll(f"1d20+{c.dex_mod}", seed=init_seed)["total"]
-        c.concentrating: str | None = None
+        c.concentrating = None
     combatants.sort(key=lambda c: c.init, reverse=True)
 
     log: List[str] = []
@@ -161,6 +177,17 @@ def run_encounter(
             if not enemies:
                 break
             attack = actor.attacks[0]
+            level = attack.get("level")
+            if level is None and attack.get("spell"):
+                level = attack["spell"].get("level")
+            if attack.get("type") == "spell" and level:
+                slots = actor.spell_slots.get(level, 0)
+                if slots <= 0:
+                    log.append(
+                        f"{actor.name} has no level {level} slots for {attack['name']}"
+                    )
+                    continue
+                actor.spell_slots[level] = slots - 1
             if attack.get("save_dc"):
                 dmg_seed = rng.randint(0, 10_000_000)
                 dmg_total = damage_roll(attack["damage_dice"], dmg_seed)["total"]
@@ -177,7 +204,20 @@ def run_encounter(
                     if target.hp <= 0:
                         target.defeated = True
                         log.append(f"{target.name} is defeated")
+                    if target.concentrating and taken > 0:
+                        dc = max(10, taken // 2)
+                        con_seed = rng.randint(0, 10_000_000)
+                        con_save = saving_throw(dc, target.con_mod, seed=con_seed)
+                        if not con_save["success"]:
+                            log.append(
+                                f"{target.name} loses concentration on {target.concentrating}"
+                            )
+                            target.concentrating = None
                 if attack.get("concentration"):
+                    if actor.concentrating:
+                        log.append(
+                            f"{actor.name} stops concentrating on {actor.concentrating}"
+                        )
                     actor.concentrating = attack["name"]
             else:
                 enemies_alive = [c for c in enemies if not c.defeated]
@@ -199,8 +239,23 @@ def run_encounter(
                     if target.hp <= 0:
                         target.defeated = True
                         log.append(f"{target.name} is defeated")
+                    if target.concentrating and dmg["total"] > 0:
+                        dc = max(10, dmg["total"] // 2)
+                        con_seed = rng.randint(0, 10_000_000)
+                        con_save = saving_throw(dc, target.con_mod, seed=con_seed)
+                        if not con_save["success"]:
+                            log.append(
+                                f"{target.name} loses concentration on {target.concentrating}"
+                            )
+                            target.concentrating = None
                 else:
                     log.append(f"{actor.name} misses {target.name}")
+                if attack.get("concentration"):
+                    if actor.concentrating:
+                        log.append(
+                            f"{actor.name} stops concentrating on {actor.concentrating}"
+                        )
+                    actor.concentrating = attack["name"]
         party_alive = any(
             c.side == "party" and not c.defeated for c in combatants
         )

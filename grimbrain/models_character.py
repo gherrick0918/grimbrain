@@ -19,6 +19,7 @@ class PCSheetAttack(BaseModel):
     to_hit: int | None = None
     save_dc: int | None = None
     save_ability: str | None = None
+    level: int | None = None
 
 
 class PCSheet(BaseModel):
@@ -46,8 +47,27 @@ class PCSheet(BaseModel):
             save_dc = atk.save_dc
             if save_dc is None and atk.save_ability:
                 save_dc = spell_save_dc(self, atk.save_ability)
-            atks.append(Attack(name=atk.name, damage_dice=atk.damage_dice, type=atk.type, to_hit=to_hit, save_dc=save_dc, save_ability=atk.save_ability))
-        return PC(name=self.name, ac=self.ac, hp=self.hp, attacks=atks)
+            atks.append(
+                Attack(
+                    name=atk.name,
+                    damage_dice=atk.damage_dice,
+                    type=atk.type,
+                    to_hit=to_hit,
+                    save_dc=save_dc,
+                    save_ability=atk.save_ability,
+                    level=atk.level,
+                )
+            )
+        raw_slots = self.resources.get("spell_slots", {})
+        slots: Dict[int, int] = {int(k): int(v) for k, v in raw_slots.items()}
+        return PC(
+            name=self.name,
+            ac=self.ac,
+            hp=self.hp,
+            attacks=atks,
+            con_mod=ability_mod(self.abilities.get("con", 10)),
+            spell_slots=slots,
+        )
 
 
 def ability_mod(score: int) -> int:
@@ -63,6 +83,11 @@ def attack_to_hit(pc: PCSheet, attack: PCSheetAttack) -> int:
     if attack.proficient:
         mod += pc.pb
     return mod
+
+
+def spell_attack_bonus(pc: PCSheet, ability: str = "int") -> int:
+    """Compute the spell attack modifier for ``pc``."""
+    return ability_mod(pc.abilities.get(ability, 10)) + pc.pb
 
 
 def load_pc_sheet(path: str | Path) -> PCSheet:
