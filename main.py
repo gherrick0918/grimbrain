@@ -1023,6 +1023,13 @@ def run_campaign_cli(
 
 def main():
     parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+
+    rest_p = subparsers.add_parser("rest", help="Apply a rest to a PC")
+    rest_p.add_argument("kind", choices=["short", "long"], help="Type of rest")
+    rest_p.add_argument("pc_name", help="PC name")
+    rest_p.add_argument("n", nargs="?", type=int, default=1, help="Hit Dice to spend for short rest")
+
     parser.add_argument("--play", action="store_true", help="Interactive play mode")
     parser.add_argument("--max-rounds", type=int, default=20, help="Max rounds for --play")
     parser.add_argument("--pc-wizard", action="store_true", help="Create a party JSON via prompts")
@@ -1068,6 +1075,43 @@ def main():
                 return cand
             raise FileNotFoundError(f"No campaign YAML found in directory: {p}")
         return p
+
+    if args.command == "rest":
+        if not args.pc:
+            raise SystemExit("--pc required for rest")
+        pcs = load_party_file(Path(args.pc))
+        pc = next((p for p in pcs if p.name == args.pc_name), None)
+        if pc is None:
+            raise SystemExit(f"PC '{args.pc_name}' not found")
+        rng = random.Random(args.seed)
+        if args.kind == "short":
+            deltas = rests.apply_short_rest([pc], rng, {pc.name: args.n})
+            info = deltas[pc.name]
+            print(
+                f"{pc.name} spends {info['spent']} Hit Dice {info['rolls']} and heals {info['healed']} HP"
+            )
+        else:
+            deltas = rests.apply_long_rest([pc])
+            info = deltas[pc.name]
+            print(
+                f"{pc.name} heals {info['healed']} HP and regains {info['hd_regained']} Hit Dice"
+            )
+        path = Path(args.pc)
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            data = None
+        if isinstance(data, list):
+            path.write_text(
+                json.dumps([dump_model(p) for p in pcs], indent=2)
+            )
+        elif isinstance(data, dict) and "party" in data:
+            path.write_text(
+                json.dumps({"party": [dump_model(p) for p in pcs]}, indent=2)
+            )
+        else:
+            path.write_text(json.dumps(dump_model(pc), indent=2))
+        return
 
     if args.pc_wizard:
         from grimbrain import pc_wizard
