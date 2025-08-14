@@ -10,6 +10,12 @@ from pathlib import Path
 import os
 import runpy
 import sys
+import re  # <-- Added
+
+# Added regex patterns
+REST_RE = re.compile(r'^rest\s+(short|long)\s+([A-Za-z][\w\s\'"-]+)(?:\s+(\d+))?$', re.I)
+CAST_RE = re.compile(r'^cast\s+"([^"]+)"(?:\s+"([^"]+)")?(?:\s+--level\s+(\d+))?$', re.I)
+REACTION_RE = re.compile(r'^reaction\s+"([^"]+)"\s+([A-Za-z][\w\s\'"-]+)$', re.I)
 
 
 def main(argv: list[str] | None = None) -> int:

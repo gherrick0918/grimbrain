@@ -1,0 +1,14 @@
+2
+1
+status
+cast "Magic Missile" "Goblin Boss" --level 1
+end
+cast "Guiding Bolt" "Goblin Boss" --level 1
+attack "Goblin Boss" "Shortsword"
+end
+cast "Thunderwave" --level 1
+end
+end
+end
+cast "Cure Wounds" "Brynn" --level 1
+status

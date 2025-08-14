@@ -1,6 +1,6 @@
-2
-status
+2            # Help the village (still out of combat)
+status       # should show HD d? X/Y; Slots if present
 rest short Malrick 2
-status
+status       # HP up; HD decreased; log shows: Short rest (2 dice): d?=R+CON(...) → +N HP; HD a/b remain
 rest long Malrick
-status
+status       # HP = max; HD partially refilled; Slots refilled to totals if any
