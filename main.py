@@ -210,7 +210,7 @@ def heal_target(target: Combatant, amount: int) -> str:
         target.defeated = False
         cleared = True
     note = "; death saves cleared" if cleared else ""
-    return f"{target.name} heals {amount} (HP {before} → {target.hp}){note}"
+    return f"{target.name} heals {amount} (HP {before} -> {target.hp}){note}"
 
 
 def _print_status(
