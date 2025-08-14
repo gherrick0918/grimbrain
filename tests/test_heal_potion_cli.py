@@ -84,5 +84,5 @@ def test_potion_routes_to_heal_helper(tmp_path):
     out = _run(script, pc_file, seed=13).stdout
     assert "Potion of Healing on Mal: rolled 2d4+2 =" in out
     assert "Mal heals" in out
-    assert "HP 0 →" in out
+    assert "HP 0 ->" in out
     assert "death saves cleared" in out
