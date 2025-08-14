@@ -252,7 +252,14 @@ def _print_status(
                 tags += " [Stable]"
             else:
                 tags += f" [Downed S:{getattr(c, 'death_successes', 0)}/F:{getattr(c, 'death_failures', 0)}]"
-        print(f"{c.name}: {hp}, AC {c.ac}{tags}")
+        line = f"{c.name}: {hp}, AC {c.ac}{tags}"
+        if getattr(c, "hit_die", None):
+            line += f"; HD {c.hit_die} {getattr(c, 'hit_dice_remaining', 0)}/{getattr(c, 'hit_dice_total', 0)}"
+        slots_tot = getattr(c, "spell_slots_total", {})
+        if slots_tot:
+            parts = [f"L{lvl} {c.spell_slots.get(lvl,0)}/{tot}" for lvl, tot in sorted(slots_tot.items())]
+            line += f"; Slots: {' '.join(parts)}"
+        print(line)
 
 
 def _check_victory(combatants: list[Combatant]) -> str | None:
@@ -1087,14 +1094,23 @@ def main():
         if args.kind == "short":
             deltas = rests.apply_short_rest([pc], rng, {pc.name: args.n})
             info = deltas[pc.name]
+            rolls = ", ".join(
+                f"{pc.hit_die}={r}+CON({pc.con_mod})" for r in info["rolls"]
+            )
             print(
-                f"{pc.name} spends {info['spent']} Hit Dice {info['rolls']} and heals {info['healed']} HP"
+                f"Short rest ({info['spent']} dice): {rolls} → +{info['healed']} HP; "
+                f"HD {pc.hit_dice_remaining}/{pc.hit_dice_total} remain"
             )
         else:
             deltas = rests.apply_long_rest([pc])
             info = deltas[pc.name]
+            slots = " ".join(
+                f"L{lvl} {pc.spell_slots.get(lvl,0)}/{tot}"
+                for lvl, tot in sorted(pc.spell_slots_total.items())
+            )
             print(
-                f"{pc.name} heals {info['healed']} HP and regains {info['hd_regained']} Hit Dice"
+                f"Long rest: +{info['healed']} HP; HD {pc.hit_dice_remaining}/{pc.hit_dice_total}; "
+                f"Slots: {slots}".rstrip()
             )
         path = Path(args.pc)
         try:
