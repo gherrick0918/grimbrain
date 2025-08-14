@@ -139,13 +139,22 @@ def _serialize_combatant(c: Combatant) -> dict:
         "stable": getattr(c, "stable", False),
         "ds_success": getattr(c, "death_successes", 0),
         "ds_fail": getattr(c, "death_failures", 0),
+        "max_hp": getattr(c, "max_hp", c.hp),
     }
 
 
 def _deserialize_combatants(data: list[dict]) -> list[Combatant]:
     combs: list[Combatant] = []
     for cd in data:
-        c = Combatant(cd["name"], cd["ac"], cd["hp"], cd["attacks"], cd["side"], cd.get("dex_mod", 0))
+        c = Combatant(
+            cd["name"],
+            cd["ac"],
+            cd["hp"],
+            cd["attacks"],
+            cd["side"],
+            cd.get("dex_mod", 0),
+            max_hp=cd.get("max_hp", cd["hp"]),
+        )
         c.defeated = cd.get("defeated", False)
         c.init = cd.get("init", 0)
         c.str_mod = cd.get("str_mod", 0)
@@ -159,6 +168,8 @@ def _deserialize_combatants(data: list[dict]) -> list[Combatant]:
 
 
 def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", crit: bool = False) -> None:
+    if getattr(target, "defeated", False):
+        return
     target.hp -= amount
     if target.hp > 0:
         return
@@ -178,6 +189,24 @@ def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", cr
         print(f"{target.name} is downed")
 
 
+def heal_target(target: Combatant, amount: int) -> None:
+    if getattr(target, "defeated", False):
+        print(f"{target.name} is dead.")
+        return
+    before = target.hp
+    target.hp = min(target.hp + amount, getattr(target, "max_hp", target.hp + amount))
+    cleared = False
+    if before <= 0:
+        target.downed = False
+        target.stable = False
+        target.death_successes = 0
+        target.death_failures = 0
+        target.defeated = False
+        cleared = True
+    note = "; death saves cleared" if cleared else ""
+    print(f"{target.name} heals {amount} (HP {before} → {target.hp}){note}")
+
+
 def _print_status(
     round_num: int,
     combatants: list[Combatant],
@@ -188,7 +217,7 @@ def _print_status(
     order = ", ".join(c.name for c in combatants)
     print(f"Initiative: {order}")
     for c in combatants:
-        hp = "DEFEATED" if c.defeated else f"{c.hp} HP"
+        hp = f"{c.hp} HP"
         tags = ""
         if action_state is not None:
             st = action_state.get(c.name)
@@ -210,7 +239,9 @@ def _print_status(
                     tags += " [Frightened]"
                 if cf.grappled:
                     tags += " [Grappled]"
-        if c.hp <= 0 and not c.defeated:
+        if c.defeated:
+            tags += " [Dead]"
+        elif c.hp <= 0:
             if getattr(c, "stable", False):
                 tags += " [Stable]"
             else:
@@ -365,6 +396,11 @@ def play_cli(
             break
         actor = combatants[turn]
         clear_dodge(action_state[actor.name])
+        if actor.defeated:
+            turn = (turn + 1) % len(combatants)
+            if turn == 0:
+                round_num += 1
+            continue
         if actor.hp <= 0:
             if getattr(actor, "stable", False):
                 turn = (turn + 1) % len(combatants)
@@ -396,11 +432,6 @@ def play_cli(
             elif actor.death_failures >= 3:
                 actor.defeated = True
                 print(f"{actor.name} dies")
-            turn = (turn + 1) % len(combatants)
-            if turn == 0:
-                round_num += 1
-            continue
-        if actor.defeated:
             turn = (turn + 1) % len(combatants)
             if turn == 0:
                 round_num += 1
@@ -437,8 +468,14 @@ def play_cli(
                         f"{actor.name} hides (advantage on their next attack until revealed)."
                     )
                 elif parts[0] == "stabilize" and len(parts) > 1:
-                    target = next((c for c in combatants if c.name == parts[1] and c.side == actor.side), None)
-                    if not target or target.hp > 0 or target.stable:
+                    target = next((c for c in combatants if c.name == parts[1]), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    if target.defeated:
+                        print(f"{target.name} is dead.")
+                        continue
+                    if target.hp > 0 or target.stable:
                         print("Cannot stabilize")
                         continue
                     med_seed = rng.randint(0, 10_000_000)
@@ -455,18 +492,21 @@ def play_cli(
                         continue
                     heal_seed = rng.randint(0, 10_000_000)
                     heal_amt = checks.damage_roll("2d4+2", heal_seed)["total"]
-                    before = target.hp
-                    target.hp += heal_amt
-                    print(f"{actor.name} heals {target.name} for {heal_amt}")
-                    if before <= 0:
-                        target.downed = False
-                        target.stable = False
-                        target.death_successes = 0
-                        target.death_failures = 0
-                        target.defeated = False
+                    heal_target(target, heal_amt)
+                elif parts[0] == "heal" and len(parts) > 2:
+                    target = next((c for c in combatants if c.name == parts[1]), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    try:
+                        amt = int(parts[2])
+                    except ValueError:
+                        print("Invalid amount")
+                        continue
+                    heal_target(target, amt)
                 elif parts[0] == "help":
                     print(
-                        "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], quit"
+                        "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], heal <target> <amount>, quit"
                     )
                 elif parts[0] == "quit":
                     return
@@ -676,14 +716,18 @@ def play_cli(
                 consume_one_shot_flags(action_state[actor.name])
             # monsters with no attacks or no targets simply skip their turn
         turn = (turn + 1) % len(combatants)
+        if turn == 0:
+            round_num += 1
+        while combatants[turn].defeated:
+            turn = (turn + 1) % len(combatants)
+            if turn == 0:
+                round_num += 1
         hp_line = ", ".join(f"{c.name} {0 if c.defeated else c.hp}" for c in combatants)
         next_name = combatants[turn].name
         print(f"HP: {hp_line}")
         print(f"Next: {next_name}")
         if autosave and md_path and json_path:
             log_step(md_path, json_path, f"Round {round_num} {actor.name}", f"HP: {hp_line}\nNext: {next_name}")
-        if turn == 0:
-            round_num += 1
 
     winner = _check_victory(combatants)
     if winner:

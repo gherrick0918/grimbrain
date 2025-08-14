@@ -22,6 +22,7 @@ class Combatant:
         attacks: List[Dict[str, object]],
         side: str,
         dex_mod: int = 0,
+        max_hp: int | None = None,
     ):
         self.name = name
         self.ac = ac
@@ -29,6 +30,7 @@ class Combatant:
         self.attacks = attacks
         self.side = side
         self.dex_mod = dex_mod
+        self.max_hp = max_hp if max_hp is not None else hp
         self.defeated = False
         # 5e dying rules
         self.downed = False
@@ -53,12 +55,12 @@ def _parse_monster(mon: MonsterSidecar, rng: random.Random) -> Combatant:
     attacks: List[Dict[str, object]] = []
     for a in mon.actions_struct:
         attacks.append({"to_hit": a.attack_bonus, "damage_dice": a.damage_dice, "type": a.type})
-    return Combatant(mon.name, ac, hp, attacks, "monsters", dex_mod)
+    return Combatant(mon.name, ac, hp, attacks, "monsters", dex_mod, max_hp=hp)
 
 
 def _parse_pc(pc: PC) -> Combatant:
     attacks = [dump_model(a) for a in pc.attacks]
-    return Combatant(pc.name, pc.ac, pc.hp, attacks, "party", 0)
+    return Combatant(pc.name, pc.ac, pc.hp, attacks, "party", 0, max_hp=pc.max_hp)
 
 
 def choose_target(actor: Combatant, enemies: List[Combatant], strategy: str = "lowest_hp", seed: int | None = None) -> Combatant | None:
