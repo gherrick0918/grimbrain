@@ -355,7 +355,18 @@ def play_cli(
 
     combatants: list[Combatant] = []
     combatants.extend(
-        [Combatant(p.name, p.ac, p.hp, [dump_model(a) for a in p.attacks], "party", getattr(p, "dex_mod", 0)) for p in pcs]
+        [
+            Combatant(
+                p.name,
+                p.ac,
+                p.hp,
+                [dump_model(a) for a in p.attacks],
+                "party",
+                getattr(p, "dex_mod", 0),
+                max_hp=p.max_hp,
+            )
+            for p in pcs
+        ]
     )
     for c, p in zip(combatants, pcs):
         c.str_mod = getattr(p, "str_mod", 0)
