@@ -196,10 +196,9 @@ def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", cr
         print(f"{target.name} is downed")
 
 
-def heal_target(target: Combatant, amount: int) -> None:
+def heal_target(target: Combatant, amount: int) -> str:
     if getattr(target, "defeated", False):
-        print(f"{target.name} is dead.")
-        return
+        return f"{target.name} is dead."
     before = target.hp
     target.hp = min(target.hp + amount, getattr(target, "max_hp", target.hp + amount))
     cleared = False
@@ -211,7 +210,7 @@ def heal_target(target: Combatant, amount: int) -> None:
         target.defeated = False
         cleared = True
     note = "; death saves cleared" if cleared else ""
-    print(f"{target.name} heals {amount} (HP {before} → {target.hp}){note}")
+    return f"{target.name} heals {amount} (HP {before} → {target.hp}){note}"
 
 
 def _print_status(
@@ -410,7 +409,7 @@ def play_cli(
     while round_num <= max_rounds:
         winner = _check_victory(combatants)
         if winner:
-            print(f"{winner.capitalize()} wins!")
+            print(f"{winner.capitalize()} win!")
             break
         actor = combatants[turn]
         clear_dodge(action_state[actor.name])
@@ -457,12 +456,15 @@ def play_cli(
         if actor.side == "party":
             while True:
                 try:
-                    cmd = input("> ").strip()
+                    cmd = input("> ")
                 except EOFError:
                     cmd = "end"
+                cmd = cmd.strip()
                 if not cmd:
                     continue
-                parts = shlex.split(cmd)
+                parts = shlex.split(cmd, comments=True)
+                if not parts:
+                    continue
                 parts[0] = _normalize_cmd(parts[0])
                 if parts[0] == "status":
                     _print_status(round_num, combatants, action_state, condition_state)
@@ -491,10 +493,10 @@ def play_cli(
                         print("Unknown target")
                         continue
                     if target.defeated:
-                        print(f"{target.name} is dead.")
+                        print(f"You can't stabilize {target.name}. {target.name} is dead.")
                         continue
                     if target.hp > 0 or target.stable:
-                        print("Cannot stabilize")
+                        print(f"You can't stabilize {target.name} (not at 0 HP).")
                         continue
                     med_seed = rng.randint(0, 10_000_000)
                     check = checks.roll_check(0, 10, seed=med_seed)
@@ -512,9 +514,29 @@ def play_cli(
                     if not target:
                         print("Unknown target")
                         continue
+                    if getattr(target, "defeated", False):
+                        print(f"{target.name} is dead.")
+                        continue
                     heal_seed = rng.randint(0, 10_000_000)
-                    heal_amt = checks.damage_roll("2d4+2", heal_seed)["total"]
-                    heal_target(target, heal_amt)
+                    roll_res = checks.damage_roll("2d4+2", heal_seed)
+                    msg = heal_target(target, roll_res["total"])
+                    print(f"Potion of Healing on {target.name}: rolled 2d4+2 = {roll_res['total']} -> {msg}")
+                elif parts[0] == "use" and len(parts) >= 4 and parts[2] == "on":
+                    item = parts[1]
+                    target = next((c for c in combatants if c.name == parts[3] and c.side == actor.side), None)
+                    if not target:
+                        print("Unknown target")
+                        continue
+                    if item.lower() == "potion of healing":
+                        if getattr(target, "defeated", False):
+                            print(f"{target.name} is dead.")
+                            continue
+                        heal_seed = rng.randint(0, 10_000_000)
+                        roll_res = checks.damage_roll("2d4+2", heal_seed)
+                        msg = heal_target(target, roll_res["total"])
+                        print(f"Potion of Healing on {target.name}: rolled 2d4+2 = {roll_res['total']} -> {msg}")
+                    else:
+                        print("Unknown item")
                 elif parts[0] == "heal" and len(parts) > 2:
                     target = next((c for c in combatants if c.name == parts[1]), None)
                     if not target:
@@ -525,7 +547,8 @@ def play_cli(
                     except ValueError:
                         print("Invalid amount")
                         continue
-                    heal_target(target, amt)
+                    msg = heal_target(target, amt)
+                    print(msg)
                 elif parts[0] == "help":
                     print(
                         "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], heal <target> <amount>, quit"
@@ -763,7 +786,7 @@ def play_cli(
             'loot_gp': loot,
         }
         print(
-            f"{winner.capitalize()} wins after {summary['rounds']} rounds! XP {summary['xp']}, Loot {summary['loot_gp']} gp",
+            f"{winner.capitalize()} win after {summary['rounds']} rounds! XP {summary['xp']}, Loot {summary['loot_gp']} gp",
         )
         if summary_out:
             Path(summary_out).write_text(json.dumps(summary, indent=2))
@@ -981,9 +1004,12 @@ def run_campaign_cli(
         for idx, ch in enumerate(scene.choices, start=1):
             print(f"{idx}. {ch.text}")
         try:
-            ans = input('> ').strip()
+            ans = input('> ')
         except EOFError:
             break
+        ans = ans.split('#', 1)[0].strip()
+        if not ans:
+            continue
         try:
             choice = scene.choices[int(ans) - 1]
         except Exception:

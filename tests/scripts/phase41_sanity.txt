@@ -1,16 +1,18 @@
-# Drop Brynn to 0 and get a failure
+# Phase 4.1 sanity (seeded)
 status
-attack Goblin "Brynn" "Scimitar"  # or any attack that will land; repeat if needed
+attack "Goblin Boss" Brynn Scimitar
+end
+attack "Goblin Boss" Brynn Scimitar
+end
+attack "Goblin Boss" Brynn Scimitar   # repeat until Brynn is downed
 status
-# Heal from 0, verify clear
-heal Brynn 5
+heal Brynn 5                           # if HP was 0, should say "death saves cleared"
 status
-# Drop to 0 again and finish them to Dead
-attack Goblin "Brynn" "Scimitar"
-attack Goblin "Brynn" "Scimitar"  # force failures (adjust as needed)
+# Kill Brynn to test corpse lock
+attack "Goblin Boss" Brynn Scimitar
+attack "Goblin Boss" Brynn Scimitar
 status
-# Try illegal actions on corpse
-stabilize Brynn
-heal Brynn 3
-use "Potion of Healing" on Brynn
+stabilize Brynn                        # expect: "Brynn is dead."
+heal Brynn 3                           # expect: "Brynn is dead."
+use "Potion of Healing" on Brynn       # expect: "Brynn is dead."
 status
