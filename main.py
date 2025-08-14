@@ -175,10 +175,17 @@ def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", cr
         return
     target.hp = 0
     if getattr(target, "downed", False) or getattr(target, "stable", False):
+        was_stable = getattr(target, "stable", False)
         target.stable = False
         fails = 2 if crit and attack_type == "melee" else 1
         target.death_failures += fails
-        print(f"{target.name} suffers {fails} death save failure{'s' if fails > 1 else ''}")
+        if was_stable:
+            print(f"{target.name} suffers {fails} failure{'s' if fails > 1 else ''}")
+        else:
+            print(f"{target.name} suffers {fails} death save failure{'s' if fails > 1 else ''}")
+        # Emit the updated downed status so callers can observe the new failure
+        # count without needing to request a full status update.
+        print(f"[Downed S:{getattr(target, 'death_successes', 0)}/F:{target.death_failures}]")
         if target.death_failures >= 3:
             target.defeated = True
             print(f"{target.name} dies")
@@ -493,8 +500,12 @@ def play_cli(
                     check = checks.roll_check(0, 10, seed=med_seed)
                     print(f"{actor.name} Medicine check {'succeeds' if check['success'] else 'fails'} ({check['roll']})")
                     if check["success"]:
+                        print(f"[Downed S:{target.death_successes}/F:{target.death_failures}]")
                         target.stable = True
                         target.downed = True
+                        # Stabilizing clears any accumulated death save counts.
+                        target.death_successes = 0
+                        target.death_failures = 0
                         print(f"{target.name} is stable")
                 elif parts[0] == "potion" and len(parts) > 1:
                     target = next((c for c in combatants if c.name == parts[1] and c.side == actor.side), None)
