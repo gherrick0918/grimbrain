@@ -1,0 +1,16 @@
+# Drop Brynn to 0 and get a failure
+status
+attack Goblin "Brynn" "Scimitar"  # or any attack that will land; repeat if needed
+status
+# Heal from 0, verify clear
+heal Brynn 5
+status
+# Drop to 0 again and finish them to Dead
+attack Goblin "Brynn" "Scimitar"
+attack Goblin "Brynn" "Scimitar"  # force failures (adjust as needed)
+status
+# Try illegal actions on corpse
+stabilize Brynn
+heal Brynn 3
+use "Potion of Healing" on Brynn
+status
