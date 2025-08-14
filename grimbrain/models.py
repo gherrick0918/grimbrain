@@ -59,6 +59,7 @@ class Attack(BaseModel):
     save_dc: int | None = None
     save_ability: str | None = None
     spell: SpellSidecar | None = None
+    level: int | None = None
     concentration: bool = False
 
 
@@ -74,6 +75,7 @@ class PC(BaseModel):
     hit_die_size: int = 8
     hit_dice_max: int = 1
     hit_dice: int | None = None
+    spell_slots: Dict[int, int] = Field(default_factory=dict)
 
     def __init__(self, **data):  # type: ignore[override]
         if data.get("max_hp") is None and "hp" in data:
