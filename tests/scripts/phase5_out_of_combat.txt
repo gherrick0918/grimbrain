@@ -1,0 +1,6 @@
+2
+status
+rest short Malrick 2
+status
+rest long Malrick
+status

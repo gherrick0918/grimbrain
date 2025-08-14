@@ -1,3 +1,5 @@
+2
+1
 status
 attack "Goblin Boss" Brynn Scimitar
 end

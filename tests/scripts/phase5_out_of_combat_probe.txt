@@ -1,0 +1,10 @@
+2
+status
+# try likely rest syntaxes (one should succeed; others will say Unknown command)
+rest short Malrick 2
+short rest Malrick 2
+rest Malrick short 2
+rest long Malrick
+long rest Malrick
+rest Malrick long
+status
