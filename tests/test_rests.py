@@ -13,9 +13,9 @@ def test_multi_die_spend_and_heal():
         max_hp=15,
         con_mod=1,
         attacks=[],
-        hit_die_size=8,
-        hit_dice_max=5,
-        hit_dice=5,
+        hit_die="d8",
+        hit_dice_total=5,
+        hit_dice_remaining=5,
     )
     rng = random.Random(1)
     res = rests.apply_short_rest([pc], rng, {"Hero": 2})
@@ -24,7 +24,7 @@ def test_multi_die_spend_and_heal():
     assert len(info["rolls"]) == 2
     expected = sum(max(0, r + pc.con_mod) for r in info["rolls"])
     assert info["healed"] == expected
-    assert pc.hit_dice == 3
+    assert pc.hit_dice_remaining == 3
 
 
 def test_over_spend_clamped():
@@ -35,16 +35,16 @@ def test_over_spend_clamped():
         max_hp=15,
         con_mod=0,
         attacks=[],
-        hit_die_size=8,
-        hit_dice_max=1,
-        hit_dice=1,
+        hit_die="d8",
+        hit_dice_total=1,
+        hit_dice_remaining=1,
     )
     rng = random.Random(2)
     res = rests.apply_short_rest([pc], rng, {"Hero": 3})
     info = res["Hero"]
     assert info["spent"] == 1
     assert len(info["rolls"]) == 1
-    assert pc.hit_dice == 0
+    assert pc.hit_dice_remaining == 0
 
 
 def test_long_rest_recovers_hit_dice():
@@ -55,30 +55,47 @@ def test_long_rest_recovers_hit_dice():
         max_hp=10,
         con_mod=0,
         attacks=[],
-        hit_die_size=8,
-        hit_dice_max=5,
-        hit_dice=1,
+        hit_die="d8",
+        hit_dice_total=5,
+        hit_dice_remaining=1,
     )
     res = rests.apply_long_rest([pc])
     info = res["Hero"]
     assert info["healed"] == 8
     assert info["hd_regained"] == 2
-    assert pc.hit_dice == 3
+    assert pc.hit_dice_remaining == 3
     assert pc.hp == pc.max_hp
 
 
 def test_reject_dead_or_in_combat():
     rng = random.Random(3)
-    dead = PC(name="Dead", ac=10, hp=0, max_hp=10, attacks=[], hit_dice_max=2, hit_dice=2)
+    dead = PC(name="Dead", ac=10, hp=0, max_hp=10, attacks=[], hit_dice_total=2, hit_dice_remaining=2)
     with pytest.raises(ValueError):
         rests.apply_short_rest([dead], rng)
     with pytest.raises(ValueError):
         rests.apply_long_rest([dead])
 
-    fighter = PC(name="Fighter", ac=10, hp=5, max_hp=10, attacks=[], hit_dice_max=2, hit_dice=2)
+    fighter = PC(name="Fighter", ac=10, hp=5, max_hp=10, attacks=[], hit_dice_total=2, hit_dice_remaining=2)
     object.__setattr__(fighter, "in_combat", True)
     with pytest.raises(ValueError):
         rests.apply_short_rest([fighter], rng)
     with pytest.raises(ValueError):
         rests.apply_long_rest([fighter])
+
+
+def test_healing_capped_at_max_hp():
+    pc = PC(
+        name="Hero",
+        ac=10,
+        hp=14,
+        max_hp=15,
+        con_mod=2,
+        attacks=[],
+        hit_die="d8",
+        hit_dice_total=2,
+        hit_dice_remaining=2,
+    )
+    rng = random.Random(4)
+    res = rests.apply_short_rest([pc], rng, {"Hero": 2})
+    assert pc.hp == pc.max_hp
 

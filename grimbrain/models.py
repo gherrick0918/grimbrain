@@ -72,22 +72,44 @@ class PC(BaseModel):
     attacks: List[Attack]
     max_hp: int | None = None
     con_mod: int = 0
-    hit_die_size: int = 8
-    hit_dice_max: int = 1
-    hit_dice: int | None = None
+    # Hit Dice tracking for rests
+    hit_die: str = "d8"
+    hit_dice_total: int = 1
+    hit_dice_remaining: int | None = None
+    # Spell slots by level (remaining) and their totals
     spell_slots: Dict[int, int] = Field(default_factory=dict)
+    spell_slots_total: Dict[int, int] = Field(default_factory=dict)
+    # Basic spellcasting stats for on-the-fly DC/attack calculations
+    prof_bonus: int = 2
+    spell_mod: int = 0
 
     def __init__(self, **data):  # type: ignore[override]
         if data.get("max_hp") is None and "hp" in data:
             data["max_hp"] = data.get("hp")
         if data.get("con_mod") is None:
             data["con_mod"] = 0
-        if data.get("hit_dice_max") is None:
-            data["hit_dice_max"] = data.get("hit_dice", 1)
-        if data.get("hit_dice") is None:
-            data["hit_dice"] = data.get("hit_dice_max", 1)
-        if data.get("hit_die_size") is None:
-            data["hit_die_size"] = 8
+        # Back-compat: allow old field names
+        if "hit_die_size" in data and "hit_die" not in data:
+            data["hit_die"] = f"d{data.pop('hit_die_size')}"
+        if "hit_dice_max" in data and "hit_dice_total" not in data:
+            data["hit_dice_total"] = data.pop("hit_dice_max")
+        if "hit_dice" in data and "hit_dice_remaining" not in data:
+            data["hit_dice_remaining"] = data.pop("hit_dice")
+
+        if data.get("hit_dice_total") is None:
+            data["hit_dice_total"] = data.get("hit_dice_remaining", 1)
+        if data.get("hit_dice_remaining") is None:
+            data["hit_dice_remaining"] = data.get("hit_dice_total", 1)
+        if data.get("hit_die") is None:
+            data["hit_die"] = "d8"
+
+        # Spell slots: if only one of total/remaining provided, mirror it
+        slots = data.get("spell_slots")
+        slots_total = data.get("spell_slots_total")
+        if slots_total is None and slots is not None:
+            data["spell_slots_total"] = slots.copy()
+        elif slots is None and slots_total is not None:
+            data["spell_slots"] = slots_total.copy()
         super().__init__(**data)
 
 
