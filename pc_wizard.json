@@ -3,11 +3,29 @@
     {
       "name": "Elora",
       "ac": 12,
-      "hp": 8,
+      "hp": 12,
       "attacks": [
-        {"name": "Fire Bolt", "to_hit": 5, "damage_dice": "1d10", "type": "spell"},
-        {"name": "Quarterstaff", "to_hit": 2, "damage_dice": "1d6", "type": "melee"}
-      ]
+        {
+          "name": "Fire Bolt",
+          "damage_dice": "1d10",
+          "type": "ranged",
+          "to_hit": 5,
+          "save_dc": null,
+          "save_ability": null,
+          "spell": null,
+          "level": null,
+          "concentration": false
+        }
+      ],
+      "max_hp": 12,
+      "con_mod": 0,
+      "hit_die": "d8",
+      "hit_dice_total": 1,
+      "hit_dice_remaining": 1,
+      "spell_slots": {},
+      "spell_slots_total": {},
+      "prof_bonus": 2,
+      "spell_mod": 0
     }
   ]
 }

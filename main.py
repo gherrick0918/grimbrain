@@ -149,6 +149,7 @@ def play_cli(
     max_rounds: int = 20,
     autosave: bool = False,
     summary_out: str | None = None,
+    script=None,  # <-- add this parameter
 ) -> dict | None:
     rng = random.Random(seed)
     if seed is not None:
@@ -158,6 +159,23 @@ def play_cli(
     else:
         md_path = json_path = None
 
+    # --- PATCH START: make_input helper ---
+    def make_input(script_file):
+        if script_file is None:
+            return lambda prompt: input(prompt)
+        def _read(prompt):
+            raw = script_file.readline()
+            if raw == "":           # EOF -> default to ending the turn
+                return "end"
+            s = raw.strip()
+            print(f"> {s}")         # echo so we can see what ran
+            return s
+        return _read
+
+    input_fn = make_input(script)
+    # --- PATCH END ---
+
+    script_stream = script  # this will be a file handle or None
     input_lines: list[str] | None = None
     input_iter = iter([])
     if not sys.stdin.isatty():
@@ -261,10 +279,22 @@ def play_cli(
                 round_num += 1
             continue
         if actor.side == "party":
-            # Local helper to execute a spell by name and target spec ("all" or a single target name)
+            # --- Command input logic ---
+            # player prompt: read from --script if provided, else from stdin
+            if script is not None:
+                raw = script.readline()
+                if raw == "":                 # EOF -> default to ending the turn
+                    cmd = "end"
+                else:
+                    cmd = raw.strip()
+                    print(f"> {cmd}")
+            else:
+                cmd = input_fn("> ").strip()
+            # --- You can now process `cmd` as needed below ---
+            # Execute a spell by name and target spec ("all" or a single target name)
             def _do_cast(spell_name: str, target_spec: str = "all") -> None:
-                attack = next((a for a in actor.attacks if a["name"] == spell_name), None)
-                if not attack:
+                atk = next((a for a in actor.attacks if a["name"] == spell_name), None)
+                if not atk:
                     print("Unknown spell")
                     return
                 enemies = [c for c in combatants if c.side != actor.side and not c.defeated]
@@ -273,316 +303,124 @@ def play_cli(
                 if not enemies:
                     print("No targets")
                     return
+
+                # roll damage up front (same total applied per target; matches your current pattern)
                 dmg_seed = rng.randint(0, 10_000_000)
-                dmg_total = checks.damage_roll(attack["damage_dice"], dmg_seed)["total"]
-                if dmg_total % 2:
-                    dmg_total -= 1
-                ability = attack.get("save_ability", "dex")
-                for tgt in enemies:
-                    save_seed = rng.randint(0, 10_000_000)
-                    mod = getattr(tgt, f"{ability}_mod", getattr(tgt, "dex_mod", 0))
-                    save = checks.saving_throw(attack.get("save_dc", 0), mod, seed=save_seed)
-                    # Human-friendly ability name (Dex/Con/etc.)
-                    print(
-                        f"{tgt.name} {ability.capitalize()} save {'succeeds' if save['success'] else 'fails'}"
-                    )
-                    taken = dmg_total if not save["success"] else dmg_total // 2
-                    print(f"{actor.name}'s {attack['name']} hits {tgt.name} for {taken}")
-                    _apply_damage(tgt, taken, attack.get("type", "spell"))
+                dmg_total = checks.damage_roll(atk.get("damage_dice", "0"), dmg_seed)["total"]
 
-            while True:
-                try:
-                    if input_lines:
-                        cmd = next(input_iter)
-                        print(f"> {cmd}")  # Echo the command for clarity
+                # decide model: save-based vs attack-roll
+                save_ability = atk.get("save_ability")        # e.g., "con", "dex"
+                save_dc = atk.get("save_dc")                  # may be None for attack-roll spells (e.g., Fire Bolt)
+                use_save = bool(save_ability or save_dc)
+
+                if use_save:
+                    # compute DC if not provided on the action
+                    if save_dc is None:
+                        casting_ability = (atk.get("casting_ability")
+                                           or getattr(actor, "spell_ability", "int"))
+                        dc = 8 + getattr(actor, "proficiency", 0) + getattr(actor, f"{casting_ability}_mod", 0)
                     else:
-                        cmd = input("> ")
-                except (EOFError, StopIteration):
-                    cmd = "end"
-                cmd = cmd.strip()
-                if not cmd:
-                    continue
+                        dc = int(save_dc)
 
-                # --- DEV SHELL HANDLER ---
-                if cmd.lower() == "dev shell":
-                    print("Developer shell: out-of-combat commands enabled.")
-                    continue
-                # --- END DEV SHELL HANDLER ---
+                    ability = (save_ability or "dex").lower()
+                    for tgt in enemies:
+                        save_seed = rng.randint(0, 10_000_000)
+                        t_mod = getattr(tgt, f"{ability}_mod", 0)
+                        save = checks.saving_throw(dc, t_mod, seed=save_seed)
+                        print(f"{tgt.name} {ability.upper()} save {'succeeds' if save['success'] else 'fails'}")
+                        taken = dmg_total if not save["success"] else dmg_total // 2
+                        print(f"{actor.name}'s {atk['name']} hits {tgt.name} for {taken}")
+                        _apply_damage(tgt, taken, atk.get("type", "spell"))
+                    return
 
-                # --- Regex command handling ---
-                m = REST_RE.match(cmd)
-                if m:
-                    kind, name, n = m.groups()
-                    # Prevent resting during combat
-                    print("Cannot rest during combat.")
-                    continue
+                # attack-roll path (e.g., Fire Bolt)
+                casting_ability = (atk.get("attack_ability")
+                                   or atk.get("casting_ability")
+                                   or getattr(actor, "spell_ability", "int"))
+                attack_bonus = atk.get("attack_bonus")
+                if attack_bonus is None:
+                    attack_bonus = getattr(actor, "proficiency", 0) + getattr(actor, f"{casting_ability}_mod", 0)
 
+                for tgt in enemies:
+                    ac = getattr(tgt, "ac", 10)
+                    tohit_seed = rng.randint(0, 10_000_000)
+                    try:
+                        # Signature with AC positional
+                        ar = checks.attack_roll(attack_bonus, ac, seed=tohit_seed)
+                        # Prefer nested detail.total; fall back to top-level keys
+                        total = (ar.get("detail", {}) or {}).get("total")
+                        if total is None:
+                            total = ar.get("total")
+                        if total is None:
+                            total = ar.get("roll")
+                        hit = ar.get("hit", (total is not None and total >= ac))
+                    except TypeError:
+                        # Older signature without AC
+                        ar = checks.attack_roll(attack_bonus, seed=tohit_seed)
+                        total = ar.get("detail", {}).get("total", ar.get("total"))
+                        if total is None:
+                            total = ar.get("roll")
+                        hit = (total is not None and total >= ac)
+
+                    # Final fallback to avoid printing 0 if structure is unusual
+                    if total is None:
+                        total = attack_bonus  # conservative display
+
+                    print(f"{actor.name} casts {atk['name']} at {tgt.name}: {total} vs AC {ac} → {'hits' if hit else 'misses'}")
+                    if hit:
+                        print(f"{actor.name}'s {atk['name']} hits {tgt.name} for {dmg_total}")
+                        _apply_damage(tgt, dmg_total, atk.get("type", "spell"))
+
+            # --- NEW: player command dispatch ---
+            parts = shlex.split(cmd) if cmd else []
+            if not parts:
+                pass  # no-op
+            elif parts[0].lower() in ("end", "e"):
+                # do nothing here; the loop advances the turn at the bottom
+                pass
+            elif parts[0].lower() in ("status", "hp"):
+                _print_status(round_num, combatants, action_state, condition_state)
+            elif parts[0].lower() in ("actions", "list"):
+                for a in actor.attacks or []:
+                    print(a.get("name", ""))
+            else:
+                # regex forms first (quoted spell names etc.)
                 m = CAST_RE.match(cmd)
                 if m:
                     spell, target, lvl = m.groups()
-                    # level is parsed for future scaling; current flows ignore it
                     _do_cast(spell, target or "all")
-                    continue
-
-                m = REACTION_RE.match(cmd)
-                if m:
-                    spell, who = m.groups()
-                    try:
-                        print(f'Would react with "{spell}" for "{who}"')
-                    except Exception as e:
-                        print(str(e))
-                    continue
-                # --- End regex command handling ---
-
-                parts = shlex.split(cmd, comments=True)
-                if not parts:
-                    continue
-                parts[0] = _normalize_cmd(parts[0])
-                if parts[0] == "status":
-                    _print_status(round_num, combatants, action_state, condition_state)
-                elif parts[0] == "dodge":
-                    apply_dodge(action_state[actor.name])
-                    print(
-                        f"{actor.name} takes the Dodge action (attacks against them have disadvantage until their next turn)."
-                    )
-                elif parts[0] == "help" and len(parts) > 1:
-                    ally = next((c for c in combatants if c.name == parts[1]), None)
-                    if not ally:
-                        print("Unknown target")
-                        continue
-                    apply_help(action_state[ally.name])
-                    print(
-                        f"{actor.name} helps {ally.name}, granting advantage on their next attack."
-                    )
-                elif parts[0] == "hide":
-                    apply_hide(action_state[actor.name])
-                    print(
-                        f"{actor.name} hides (advantage on their next attack until revealed)."
-                    )
-                elif parts[0] == "stabilize" and len(parts) > 1:
-                    target = next((c for c in combatants if c.name == parts[1]), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    if target.defeated:
-                        print(f"You can't stabilize {target.name}. {target.name} is dead.")
-                        continue
-                    if target.hp > 0 or target.stable:
-                        print(f"You can't stabilize {target.name} (not at 0 HP).")
-                        continue
-                    med_seed = rng.randint(0, 10_000_000)
-                    check = checks.roll_check(0, 10, seed=med_seed)
-                    print(f"{actor.name} Medicine check {'succeeds' if check['success'] else 'fails'} ({check['roll']})")
-                    if check["success"]:
-                        print(f"[Downed S:{target.death_successes}/F:{target.death_failures}]")
-                        target.stable = True
-                        target.downed = True
-                        # Stabilizing clears any accumulated death save counts.
-                        target.death_successes = 0
-                        target.death_failures = 0
-                        print(f"{target.name} is stable")
-                elif parts[0] == "potion" and len(parts) > 1:
-                    target = next((c for c in combatants if c.name == parts[1] and c.side == actor.side), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    if getattr(target, "defeated", False):
-                        print(f"{target.name} is dead.")
-                        continue
-                    heal_seed = rng.randint(0, 10_000_000)
-                    roll_res = checks.damage_roll("2d4+2", heal_seed)
-                    msg = heal_target(target, roll_res["total"])
-                    print(f"Potion of Healing on {target.name}: rolled 2d4+2 = {roll_res['total']} -> {msg}")
-                elif parts[0] == "use" and len(parts) >= 4 and parts[2] == "on":
-                    item = parts[1]
-                    target = next((c for c in combatants if c.name == parts[3] and c.side == actor.side), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    if item.lower() == "potion of healing":
-                        if getattr(target, "defeated", False):
-                            print(f"{target.name} is dead.")
-                            continue
-                        heal_seed = rng.randint(0, 10_000_000)
-                        roll_res = checks.damage_roll("2d4+2", heal_seed)
-                        msg = heal_target(target, roll_res["total"])
-                        print(f"Potion of Healing on {target.name}: rolled 2d4+2 = {roll_res['total']} -> {msg}")
+                else:
+                    m = REST_RE.match(cmd)
+                    if m:
+                        # In-combat guard only; happy-path rests are out-of-combat
+                        print("Cannot rest during combat.")
                     else:
-                        print("Unknown item")
-                elif parts[0] == "heal" and len(parts) > 2:
-                    target = next((c for c in combatants if c.name == parts[1]), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    try:
-                        amt = int(parts[2])
-                    except ValueError:
-                        print("Invalid amount")
-                        continue
-                    msg = heal_target(target, amt)
-                    print(msg)
-                elif parts[0] == "help":
-                    print(
-                        "Commands: status, dodge, help <ally>, hide, grapple <target>, shove <target> prone|push, save <target> <ability> <dc>, stand, attack <pc> <target> \"<attack>\" [adv|dis], cast <pc> \"<spell>\" [all|<target>], end, save <path>, load <path>, actions [pc], heal <target> <amount>, quit"
-                    )
-                elif parts[0] == "quit":
-                    return
-                elif parts[0] == "end":
-                    break
-                elif parts[0] == "save":
-                    if len(parts) == 2:
-                        _save_game(parts[1], seed, round_num, turn, combatants, condition_state)
-                    elif len(parts) >= 4:
-                        target = next((c for c in combatants if c.name == parts[1]), None)
-                        if not target:
-                            print("Unknown target")
-                            continue
-                        ability = parts[2].lower()
-                        dc = int(parts[3])
-                        mod = getattr(target, f"{ability}_mod", 0)
-                        save_seed = rng.randint(0, 10_000_000)
-                        success, total, face = roll_save(dc, mod, rng=random.Random(save_seed))
-                        print(
-                            f"{target.name} {ability.upper()} save {'succeeds' if success else 'fails'} (total {total}, face {face})"
-                        )
-                elif parts[0] == "load" and len(parts) == 2:
-                    seed, round_num, turn, combatants, condition_state = _load_game(parts[1])
-                elif parts[0] == "actions":
-                    target_name = parts[1] if len(parts) > 1 else actor.name
-                    target = next((c for c in combatants if c.name == target_name), None)
-                    if not target:
-                        print("Unknown combatant")
-                        continue
-                    names = [a["name"] for a in target.attacks]
-                    print(", ".join(names) if names else "No actions")
-                elif parts[0] == "grapple" and len(parts) >= 2:
-                    target = next((c for c in combatants if c.name == parts[1] and not c.defeated), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    att_mod = getattr(actor, "str_mod", 0)
-                    tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
-                    tgt_seed = rng.randint(0, 10_000_000)
-                    att_seed = rng.randint(0, 10_000_000)
-                    att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
-                    tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
-                    if os.getenv("GB_TESTING"):
-                        print(f"[dbg] shove att={att_roll} tgt={tgt_roll}")
-                    if att_roll >= tgt_roll:
-                        condition_state[target.name] = replace(condition_state[target.name], grappled=True)
-                        print(f"{actor.name} grapples {target.name}")
-                    else:
-                        print(f"{actor.name} fails to grapple {target.name}")
-                elif parts[0] == "shove" and len(parts) >= 3:
-                    target = next((c for c in combatants if c.name == parts[1] and not c.defeated), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    intent = parts[2]
-                    att_mod = getattr(actor, "str_mod", 0)
-                    tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
-                    tgt_seed = rng.randint(0, 10_000_000)
-                    att_seed = rng.randint(0, 10_000_000)
-                    att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
-                    tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
-                    if intent == "prone":
-                        if att_roll >= tgt_roll:
-                            condition_state[target.name] = replace(condition_state[target.name], prone=True)
-                            print(f"{actor.name} shoves {target.name} prone")
+                        m = REACTION_RE.match(cmd)
+                        if m:
+                            spell_name, who = m.groups()
+                            print("Reactions not implemented yet.")  # or call your react() if available
                         else:
-                            print(f"{actor.name} fails to shove {target.name}")
-                    elif intent == "push":
-                        if att_roll >= tgt_roll:
-                            print(f"{actor.name} shoves {target.name} back 5 feet")
-                        else:
-                            print(f"{actor.name} fails to shove {target.name}")
-                    else:
-                        print("Specify prone or push")
-                elif parts[0] == "stand":
-                    flags = condition_state[actor.name]
-                    if flags.prone:
-                        condition_state[actor.name] = replace(flags, prone=False)
-                        print(f"{actor.name} stands up")
-                    else:
-                        print(f"{actor.name} is not prone")
-                elif parts[0] == "attack" and len(parts) >= 3:
-                    party_map = {c.name: c for c in combatants if c.side == "party"}
-                    if parts[1] in party_map:
-                        named = party_map[parts[1]]
-                        if named.hp <= 0:
-                            print(f"{named.name} is at 0 HP and cannot act.")
-                            continue
-                        if named.name != actor.name:
-                            if len(parts) >= 4:
-                                print(
-                                    f"It's {actor.name}'s turn. Try: attack \"{parts[2]}\" \"{parts[3]}\""
-                                )
+                            # simple space-separated forms (fallback)
+                            if parts[0].lower() == "cast" and len(parts) >= 2:
+                                # cast "<Spell>" [<Target>]
+                                spell_name = parts[1]
+                                target_spec = parts[2] if len(parts) >= 3 else "all"
+                                _do_cast(spell_name, target_spec)
+                            elif parts[0].lower() == "heal" and len(parts) >= 3:
+                                # heal <Target> <Amount>
+                                who = parts[1]
+                                try:
+                                    amt = int(parts[2])
+                                except ValueError:
+                                    print("Usage: heal <target> <amount>")
+                                else:
+                                    tgt = next((c for c in combatants if c.name == who), None)
+                                    if not tgt:
+                                        print("Unknown target")
+                                    else:
+                                        heal_target(tgt, amt)
                             else:
-                                print(f"It's {actor.name}'s turn.")
-                            continue
-                        target_name, atk_name = parts[2], parts[3]
-                        extra = parts[4:]
-                    else:
-                        target_name, atk_name = parts[1], parts[2]
-                        extra = parts[3:]
-                    manual_adv = "adv" in extra
-                    manual_dis = "dis" in extra
-                    target = next((c for c in combatants if c.name == target_name and not c.defeated), None)
-                    if not target:
-                        print("Unknown target")
-                        continue
-                    attack = next((a for a in actor.attacks if a["name"] == atk_name), None)
-                    if not attack:
-                        print("Unknown attack")
-                        continue
-                    hit_seed = rng.randint(0, 10_000_000)
-                    action_adv = derive_attack_advantage(
-                        action_state[actor.name], action_state[target.name]
-                    )
-                    cond_adv = derive_condition_advantage(
-                        condition_state[actor.name], condition_state[target.name],
-                        melee=attack.get("type", "melee") != "ranged",
-                    )
-                    if target.hp <= 0:
-                        cond_adv = combine_adv(
-                            cond_adv,
-                            "adv" if attack.get("type", "melee") != "ranged" else "dis",
-                        )
-                    adv_mode = combine_adv(action_adv, cond_adv)
-                    if manual_adv:
-                        adv_mode = combine_adv(adv_mode, "adv")
-                    elif manual_dis:
-                        adv_mode = combine_adv(adv_mode, "dis")
-                    if os.getenv("GB_TESTING"):
-                        print(f"[dbg] adv_mode={adv_mode}")
-                    atk_res = roll(
-                        f"1d20+{attack['to_hit']}",
-                        seed=hit_seed,
-                        adv=adv_mode == "adv",
-                        disadv=adv_mode == "dis",
-                    )
-                    hit = atk_res["total"] >= target.ac
-                    if adv_mode == "normal" and not hit and actor.side == "party":
-                        hit_seed = rng.randint(0, 10_000_000)
-                        atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed)
-                        hit = atk_res["total"] >= target.ac
-                    roll_val = atk_res["detail"].get("chosen", atk_res["detail"].get("rolls", [0])[0])
-                    crit = roll_val == 20
-                    if hit:
-                        dmg_seed = rng.randint(0, 10_000_000)
-                        dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
-                        print(f"{actor.name} hits {target.name} for {dmg['total']}")
-                        _apply_damage(target, dmg["total"], attack.get("type", "melee"), crit)
-                    else:
-                        print(f"{actor.name} misses {target.name}")
-                    consume_one_shot_flags(action_state[actor.name])
-                elif parts[0] == "cast" and len(parts) >= 2:
-                    if parts[1] == actor.name and len(parts) >= 3:
-                        _, spell_name, *rest = parts[1:]
-                    else:
-                        spell_name, *rest = parts[1:]
-                    target_spec = rest[0] if rest else "all"
-                    _do_cast(spell_name, target_spec)
+                                print("Unknown command")
         else:
             enemies = [
                 c
@@ -766,6 +604,8 @@ if __name__ == "__main__":
     parser.add_argument("--pc-wizard", action="store_true", help="Create party JSON interactively or from preset")
     parser.add_argument("--preset", help="Preset name for pc-wizard", default=None)
     parser.add_argument("--out", help="Output path for pc-wizard", default=None)
+    parser.add_argument("--script", type=argparse.FileType("r"),
+                        help="Path to a text file of commands to feed into the in-combat CLI")
 
     args = parser.parse_args()
 
@@ -834,7 +674,14 @@ if __name__ == "__main__":
         if not monsters:
             print(f"ERROR: No valid monsters loaded from encounter spec: {encounter_spec}")
             sys.exit(1)
-        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds, autosave=args.autosave)
+        play_cli(
+            pcs,
+            monsters,
+            seed=args.seed,
+            max_rounds=args.max_rounds,
+            autosave=args.autosave,
+            script=args.script,  # <-- pass the script argument
+        )
     elif args.campaign:
         run_campaign_cli(
             args.campaign,
