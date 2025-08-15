@@ -157,6 +157,12 @@ def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", cr
     if target.hp > 0:
         return
     target.hp = 0
+    # Always set downed when reduced to 0 HP
+    if not target.downed:
+        target.downed = True
+        target.death_successes = 0
+        target.death_failures = 0
+        print(f"{target.name} is downed")
     if target.downed or target.stable:
         was_stable = target.stable
         target.stable = False
@@ -170,11 +176,6 @@ def _apply_damage(target: Combatant, amount: int, attack_type: str = "melee", cr
         if target.death_failures >= 3:
             target.defeated = True
             print(f"{target.name} dies")
-    else:
-        target.downed = True
-        target.death_successes = 0
-        target.death_failures = 0
-        print(f"{target.name} is downed")
 
 
 def heal_target(target: Combatant, amount: int) -> str:
@@ -403,36 +404,39 @@ def play_cli(pcs_raw: List[dict],
         if actor is not last_actor:
             action_state[actor.name].dodge = False
             last_actor = actor
-        if actor.defeated or (actor.hp <= 0 and actor.stable):
+        # Only skip if defeated; process death saves for any hp <= 0 and not defeated
+        if actor.defeated:
             turn_index += 1
             if turn_index % len(combatants) == 0:
                 round_num += 1
             continue
 
+        # Process death save for any actor with hp <= 0 and not defeated
         if actor.hp <= 0:
-            face = _d(20, rng)
-            if face == 20:
-                actor.hp = 1
-                actor.downed = False
-                actor.death_successes = 0
-                actor.death_failures = 0
-                print(f"{actor.name} death save 20 -> revived with 1 HP")
-            elif face == 1:
-                actor.death_failures += 2
-                print(f"{actor.name} suffers 2 death save failures")
-            elif face >= 10:
-                actor.death_successes += 1
-                if actor.death_successes >= 3:
-                    actor.stable = True
-                    print(f"{actor.name} is stable")
+            if not actor.stable:
+                face = _d(20, rng)
+                if face == 20:
+                    actor.hp = 1
+                    actor.downed = False
+                    actor.death_successes = 0
+                    actor.death_failures = 0
+                    print(f"{actor.name} death save 20 -> revived with 1 HP")
+                elif face == 1:
+                    actor.death_failures += 2
+                    print(f"{actor.name} suffers 2 death save failures")
+                elif face >= 10:
+                    actor.death_successes += 1
+                    if actor.death_successes >= 3:
+                        actor.stable = True
+                        print(f"{actor.name} is stable")
+                    else:
+                        print(f"{actor.name} succeeds a death save")
                 else:
-                    print(f"{actor.name} succeeds a death save")
-            else:
-                actor.death_failures += 1
-                print(f"{actor.name} suffers 1 death save failure")
-                if actor.death_failures >= 3:
-                    actor.defeated = True
-                    print(f"{actor.name} dies")
+                    actor.death_failures += 1
+                    print(f"{actor.name} suffers 1 death save failure")
+                    if actor.death_failures >= 3:
+                        actor.defeated = True
+                        print(f"{actor.name} dies")
             # Do not auto-advance the turn here; allow the player to issue
             # a command (e.g. "end" or an attempted action) so tests can
             # observe the proper error messages for downed actors.
