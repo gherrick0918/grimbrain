@@ -11,11 +11,20 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 # Optional project imports; provide fallbacks so this script runs standalone in tests.
-try:
-    from grimbrain.content import load_packs  # type: ignore
-except Exception:  # pragma: no cover
-    def load_packs(_names: List[str]) -> Dict[str, dict]:
+def load_packs(names: List[str]) -> Dict[str, dict]:
+    """Lightweight wrapper for optional content packs.
+
+    Importing :mod:`grimbrain.content` pulls in heavy dependencies.  The tests
+    only need a very small subset of this functionality, so we try to import
+    the real helper lazily and fall back to an empty mapping when the package
+    (or its dependencies) is unavailable.
+    """
+
+    try:
+        from grimbrain.content import load_packs as _real  # type: ignore
+    except Exception:  # pragma: no cover
         return {}
+    return _real(names)
 
 try:
     from grimbrain.monsters import parse_monster_spec, MonsterSidecar, select_monster  # type: ignore
@@ -372,6 +381,36 @@ def play_cli(pcs_raw: List[dict],
                 round_num += 1
             continue
 
+        if actor.hp <= 0:
+            face = _d(20, rng)
+            if face == 20:
+                actor.hp = 1
+                actor.downed = False
+                actor.death_successes = 0
+                actor.death_failures = 0
+                print(f"{actor.name} death save 20 -> revived with 1 HP")
+            elif face == 1:
+                actor.death_failures += 2
+                print(f"{actor.name} suffers 2 death save failures")
+            elif face >= 10:
+                actor.death_successes += 1
+                if actor.death_successes >= 3:
+                    actor.stable = True
+                    print(f"{actor.name} is stable")
+                else:
+                    print(f"{actor.name} succeeds a death save")
+            else:
+                actor.death_failures += 1
+                print(f"{actor.name} suffers 1 death save failure")
+                if actor.death_failures >= 3:
+                    actor.defeated = True
+                    print(f"{actor.name} dies")
+            print(f"[Downed S:{actor.death_successes}/F:{actor.death_failures}]")
+            turn_index += 1
+            if turn_index % len(combatants) == 0:
+                round_num += 1
+            continue
+
         action_state[actor.name].dodge = False
 
         line = input_fn("> ").strip()
@@ -541,12 +580,165 @@ def play_cli(pcs_raw: List[dict],
 
 
 def load_party_file(path: Path) -> List[dict]:
-    return json.loads(path.read_text()) if path.exists() else []
+    """Load a party description from ``path``.
+
+    The helper accepts either a single PC object, a list of PCs, or a mapping
+    with a top-level ``party`` key.  This mirrors the flexibility used in the
+    tests without pulling in the full campaign module.
+    """
+
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text())
+    if isinstance(data, dict) and "party" in data:
+        data = data["party"]
+    if isinstance(data, list):
+        return data
+    return [data]
 
 
 def _lookup_fallback(name: str) -> MonsterSidecar:  # type: ignore
     return MonsterSidecar(name=name)  # type: ignore
 
+
+def write_outputs(markdown: str, json_data: dict, json_path: Path | str, md_path: Path | str) -> None:
+    """Write markdown and JSON outputs to disk.
+
+    Parameters
+    ----------
+    markdown:
+        The markdown string to write.
+    json_data:
+        Data to serialise as JSON.
+    json_path / md_path:
+        File locations for the respective outputs.  Parent directories are
+        created automatically.
+    """
+
+    jpath = Path(json_path)
+    mpath = Path(md_path)
+    jpath.parent.mkdir(parents=True, exist_ok=True)
+    mpath.parent.mkdir(parents=True, exist_ok=True)
+    jpath.write_text(json.dumps(json_data, indent=2))
+    mpath.write_text(markdown)
+
+
+def run_campaign_cli(
+    campaign: str | Path,
+    *,
+    start: str | None = None,
+    seed: int | None = None,
+    save: str | Path | None = None,
+    resume: str | Path | None = None,
+    max_rounds: int = 10,
+) -> int:
+    """Run a text campaign described by YAML files.
+
+    This is a very small driver used by the unit tests.  It loads the
+    campaign, runs encounters using :mod:`grimbrain.engine.campaign` and
+    supports saving/restoring simple state.
+    """
+
+    from grimbrain.engine import checks  # local import to avoid heavy deps
+    from grimbrain.engine.campaign import (
+        load_campaign as _load_campaign,
+        load_party as _load_party,
+        run_encounter,
+    )
+    from grimbrain.content.select import select_monster as _select_monster
+
+    path = Path(campaign)
+    camp = _load_campaign(path)
+    base = path if path.is_dir() else path.parent
+
+    pcs = _load_party(camp, base)
+    if not pcs:
+        print("no pcs were loaded", file=sys.stderr)
+        return 1
+
+    rng = random.Random(seed or camp.seed)
+    scene_id = start or camp.start
+
+    if resume:
+        try:
+            data = json.loads(Path(resume).read_text())
+            scene_id = data.get("scene", scene_id)
+            hp = data.get("hp", {})
+            for pc in pcs:
+                if pc.name in hp:
+                    pc.hp = hp[pc.name]
+        except Exception:
+            pass
+
+    seen: set[str] = set()
+
+    log_jsonl = Path(save).with_suffix(".jsonl") if save else None
+    log_md = Path(save).with_suffix(".md") if save else None
+
+    def _save(next_scene: str | None) -> None:
+        if not save:
+            return
+        state = {"scene": next_scene, "hp": {p.name: p.hp for p in pcs}}
+        Path(save).write_text(json.dumps(state))
+        if log_jsonl:
+            with log_jsonl.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(state) + "\n")
+        if log_md:
+            with log_md.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(state) + "\n")
+
+    while True:
+        scene = camp.scenes.get(scene_id)
+        if not scene:
+            break
+        print(scene.text)
+
+        next_id: str | None = None
+
+        if scene.rest:
+            for pc in pcs:
+                pc.hp = pc.max_hp
+            next_id = scene.on_victory or scene.on_defeat
+
+        elif scene.check:
+            chk = scene.check
+            res = checks.roll_check(0, chk.dc, advantage=chk.advantage, seed=rng.randint(0, 999999))
+            ok = bool(res.get("success"))
+            next_id = chk.on_success if ok else chk.on_failure
+
+        elif scene.encounter:
+            enc = scene.encounter
+            enemy: str
+            if isinstance(enc, dict) and "random" in enc:
+                opts = enc["random"]
+                exclude = seen if opts.get("exclude_seen") else set()
+                enemy = _select_monster(tags=opts.get("tags"), cr=opts.get("cr"), exclude=exclude, seed=rng.randint(0, 999999))
+                seen.add(enemy.lower())
+            else:
+                enemy = str(enc)
+            res = run_encounter(pcs, enemy, seed=seed, max_rounds=max_rounds)
+            for pc in pcs:
+                if pc.name in res.get("hp", {}):
+                    pc.hp = res["hp"][pc.name]
+            next_id = scene.on_victory if res.get("result") == "victory" else scene.on_defeat
+
+        elif scene.choices:
+            for idx, choice in enumerate(scene.choices, start=1):
+                print(f"{idx}) {choice.text}")
+            try:
+                sel = int(input().strip()) - 1
+                next_id = scene.choices[sel].next
+            except Exception:
+                break
+
+        if save:
+            _save(next_id)
+
+        if not next_id:
+            break
+        scene_id = next_id
+
+    return 0
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Grimbrain CLI")
@@ -645,17 +837,28 @@ def main() -> None:
         return
 
     if args.campaign:
+        return run_campaign_cli(
+            args.campaign,
+            start=args.start,
+            seed=args.seed,
+            save=args.save,
+            resume=args.resume,
+            max_rounds=args.max_rounds,
+        )
+
+    if args.resume:
         try:
-            from grimbrain.main_campaign import run_campaign_cli  # type: ignore
+            data = json.loads(Path(args.resume).read_text())
         except Exception:
-            print("Campaign mode not available")
-            return
-        run_campaign_cli(args.campaign, start=args.start, seed=args.seed, save=args.save,
-                         resume=args.resume, max_rounds=args.max_rounds)  # type: ignore
-        return
+            print("Could not resume", file=sys.stderr)
+            return 1
+        scene = data.get("scene", "")
+        steps = data.get("steps", [])
+        print(f"Resumed scene '{scene}' with {len(steps)} steps")
+        return 0
 
     parser.print_help()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
