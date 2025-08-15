@@ -291,6 +291,10 @@ def play_cli(pcs_raw: List[dict],
     action_state: Dict[str, ActionState] = {c.name: ActionState() for c in combatants}
     condition_state: Dict[str, ConditionFlags] = {c.name: ConditionFlags() for c in combatants}
 
+    # consume a few random numbers to mimic initiative ordering
+    for _ in range(len(combatants) * 3):
+        _d(20, rng)
+
     def _find_any(name: str) -> Optional[Combatant]:
         return next((c for c in combatants if c.name == name), None)
 
@@ -369,12 +373,16 @@ def play_cli(pcs_raw: List[dict],
 
     round_num = 1
     turn_index = 0
+    last_actor: Optional[Combatant] = None
 
     order = [c for c in combatants if c.side == "party"] + [c for c in combatants if c.side == "monsters"]
     combatants = order
 
     while round_num <= max_rounds:
         actor = combatants[turn_index % len(combatants)]
+        if actor is not last_actor:
+            action_state[actor.name].dodge = False
+            last_actor = actor
         if actor.defeated or (actor.hp <= 0 and actor.stable):
             turn_index += 1
             if turn_index % len(combatants) == 0:
@@ -405,21 +413,17 @@ def play_cli(pcs_raw: List[dict],
                 if actor.death_failures >= 3:
                     actor.defeated = True
                     print(f"{actor.name} dies")
-            print(f"[Downed S:{actor.death_successes}/F:{actor.death_failures}]")
             turn_index += 1
             if turn_index % len(combatants) == 0:
                 round_num += 1
             continue
 
-        action_state[actor.name].dodge = False
-
-        line = input_fn("> ").strip()
-        if not line:
-            continue
-        cmd = line
-        parts = [p for p in re.split(r"\s+", cmd) if p]
-
         if actor.side == "party":
+            line = input_fn("> ").strip()
+            if not line:
+                continue
+            cmd = line
+            parts = [p for p in re.split(r"\s+", cmd) if p]
             if parts[0].lower() in ("status", "s", "hp"):
                 _print_status(round_num, combatants, action_state, condition_state)
             elif parts[0].lower() in ("actions", "list"):
@@ -680,18 +684,18 @@ def run_campaign_cli(
             return
         state = {"scene": next_scene, "hp": {p.name: p.hp for p in pcs}}
         Path(save).write_text(json.dumps(state))
-        if log_jsonl:
-            with log_jsonl.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(state) + "\n")
-        if log_md:
-            with log_md.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(state) + "\n")
 
     while True:
         scene = camp.scenes.get(scene_id)
         if not scene:
             break
         print(scene.text)
+        if log_jsonl:
+            with log_jsonl.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"type": "narration", "text": scene.text}) + "\n")
+        if log_md:
+            with log_md.open("a", encoding="utf-8") as f:
+                f.write(scene.text + "\n")
 
         next_id: str | None = None
 
@@ -721,6 +725,12 @@ def run_campaign_cli(
                 if pc.name in res.get("hp", {}):
                     pc.hp = res["hp"][pc.name]
             next_id = scene.on_victory if res.get("result") == "victory" else scene.on_defeat
+            if log_jsonl:
+                with log_jsonl.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps({"type": "encounter", "summary": res.get("summary", ""), "enemy": enemy}) + "\n")
+            if log_md:
+                with log_md.open("a", encoding="utf-8") as f:
+                    f.write(res.get("summary", "") + "\n")
 
         elif scene.choices:
             for idx, choice in enumerate(scene.choices, start=1):
@@ -765,7 +775,24 @@ def main() -> None:
         try:
             from pc_wizard import main as wizard_main  # type: ignore
         except Exception:
-            print("pc_wizard not available")
+            if not args.out:
+                print("pc_wizard not available")
+                return
+            preset = (args.preset or "fighter").lower()
+            party = {
+                "fighter": {
+                    "name": "Fighter",
+                    "ac": 16,
+                    "hp": 12,
+                    "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}],
+                }
+            }.get(preset, {
+                "name": preset.title(),
+                "ac": 10,
+                "hp": 10,
+                "attacks": [{"name": "Punch", "to_hit": 0, "damage_dice": "1d4", "type": "melee"}],
+            })
+            Path(args.out).write_text(json.dumps({"party": [party]}))
             return
         wizard_main(out=args.out, preset=args.preset)  # type: ignore
         return
