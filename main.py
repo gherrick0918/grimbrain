@@ -134,9 +134,11 @@ def _normalize_party(raw: list[dict]) -> list[dict]:
     return [_normalize_pc(o) for o in raw]
 
 
-def _lookup_fallback(name: str) -> MonsterSidecar:
+def _lookup_fallback(name):
+    if name.lower() == "none":
+        return None
     data = FALLBACK_MONSTERS[name.lower()]
-    return MonsterSidecar(**data)
+    return MonsterSidecar(**data)  # <-- wrap in MonsterSidecar
 
 
 
@@ -798,13 +800,40 @@ if __name__ == "__main__":
             if camp is None:
                 raise SystemExit("--encounter is required for play mode")
             scene_id = args.start or camp.start
-            encounter_spec = camp.scenes[scene_id].encounter
+            # --- PATCH START ---
+            # Walk forward through choices until we find a scene with an encounter
+            visited = set()
+            while True:
+                scene = camp.scenes.get(scene_id)
+                if not scene:
+                    raise SystemExit(f"Scene '{scene_id}' not found in campaign.")
+                if getattr(scene, "encounter", None):
+                    encounter_spec = scene.encounter
+                    break
+                visited.add(scene_id)
+                # Try to follow the first choice, if any
+                if getattr(scene, "choices", None) and scene.choices:
+                    # Support both dict and object style
+                    next_id = getattr(scene.choices[0], "goto", None) or getattr(scene.choices[0], "next", None)
+                    if not next_id or next_id in visited:
+                        encounter_spec = None
+                        break
+                    scene_id = next_id
+                else:
+                    encounter_spec = None
+                    break
+            # --- PATCH END ---
+        print(f"DEBUG: Encounter spec loaded: {encounter_spec}")  # <--- Add this line
         if isinstance(encounter_spec, dict) and "random" in encounter_spec:
             opts = encounter_spec["random"]
             encounter_spec = select_monster(
                 tags=opts.get("tags"), cr=opts.get("cr"), seed=args.seed
             )
         monsters = parse_monster_spec(str(encounter_spec), _lookup)
+        monsters = [m for m in monsters if m is not None]
+        if not monsters:
+            print(f"ERROR: No valid monsters loaded from encounter spec: {encounter_spec}")
+            sys.exit(1)
         play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds, autosave=args.autosave)
     elif args.campaign:
         run_campaign_cli(

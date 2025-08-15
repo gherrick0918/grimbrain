@@ -1,0 +1,14 @@
+2
+1
+status
+end
+end
+end
+heal Brynn 5
+status
+end
+end
+stabilize Brynn
+heal Brynn 3
+use "Potion of Healing" on Brynn
+status
