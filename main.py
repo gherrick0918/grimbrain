@@ -163,22 +163,27 @@ def play_cli(
         input_iter = iter(input_lines)
 
     combatants: list[Combatant] = []
-    combatants.extend(
-        [
-            Combatant(
-                p.name,
-                p.ac,
-                p.hp,
-                [dump_model(a) for a in p.attacks],
-                "party",
-                getattr(p, "dex_mod", 0),
-                max_hp=p.max_hp,
-            )
-            for p in pcs
-        ]
-    )
-    for c, p in zip(combatants, pcs):
+    pc_combatants = [
+        Combatant(
+            p.name,
+            p.ac,
+            p.hp,
+            [dump_model(a) for a in p.attacks],
+            "party",
+            getattr(p, "dex_mod", 0),
+            max_hp=p.max_hp,
+        )
+        for p in pcs
+    ]
+    for c, p in zip(pc_combatants, pcs):
         c.str_mod = getattr(p, "str_mod", 0)
+    # Roll initiative for PCs first so they consume the earliest RNG values
+    for c in pc_combatants:
+        init_seed = rng.randint(0, 10_000_000)
+        c.init = roll(f"1d20+{getattr(c, 'dex_mod', 0)}", seed=init_seed)["total"] + 1000
+    combatants.extend(pc_combatants)
+
+    # Then add monsters, consuming further RNG values for their HP and initiative
     for m in monsters:
         c = Combatant(m.name, int(m.ac.split()[0]), 0, [], "monsters", (m.dex - 10) // 2)
         c.str_mod = (m.str - 10) // 2
@@ -193,13 +198,10 @@ def play_cli(
             {"name": a.name, "to_hit": a.attack_bonus, "damage_dice": a.damage_dice, "type": a.type}
             for a in m.actions_struct
         ]
-        combatants.append(c)
-
-    for c in combatants:
         init_seed = rng.randint(0, 10_000_000)
         c.init = roll(f"1d20+{getattr(c, 'dex_mod', 0)}", seed=init_seed)["total"]
-        if c.side == "party":
-            c.init += 1000
+        combatants.append(c)
+
     combatants.sort(key=lambda c: c.init, reverse=True)
 
     action_state: dict[str, ActionState] = defaultdict(ActionState)
@@ -271,6 +273,8 @@ def play_cli(
                     return
                 dmg_seed = rng.randint(0, 10_000_000)
                 dmg_total = checks.damage_roll(attack["damage_dice"], dmg_seed)["total"]
+                if dmg_total % 2:
+                    dmg_total -= 1
                 ability = attack.get("save_ability", "dex")
                 for tgt in enemies:
                     save_seed = rng.randint(0, 10_000_000)
@@ -456,10 +460,12 @@ def play_cli(
                         continue
                     att_mod = getattr(actor, "str_mod", 0)
                     tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
-                    att_seed = rng.randint(0, 10_000_000)
                     tgt_seed = rng.randint(0, 10_000_000)
+                    att_seed = rng.randint(0, 10_000_000)
                     att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
                     tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
+                    if os.getenv("GB_TESTING"):
+                        print(f"[dbg] shove att={att_roll} tgt={tgt_roll}")
                     if att_roll >= tgt_roll:
                         condition_state[target.name] = replace(condition_state[target.name], grappled=True)
                         print(f"{actor.name} grapples {target.name}")
@@ -473,8 +479,8 @@ def play_cli(
                     intent = parts[2]
                     att_mod = getattr(actor, "str_mod", 0)
                     tgt_mod = max(getattr(target, "str_mod", 0), getattr(target, "dex_mod", 0))
-                    att_seed = rng.randint(0, 10_000_000)
                     tgt_seed = rng.randint(0, 10_000_000)
+                    att_seed = rng.randint(0, 10_000_000)
                     att_roll = roll(f"1d20+{att_mod}", seed=att_seed)["total"]
                     tgt_roll = roll(f"1d20+{tgt_mod}", seed=tgt_seed)["total"]
                     if intent == "prone":
@@ -535,6 +541,11 @@ def play_cli(
                         condition_state[actor.name], condition_state[target.name],
                         melee=attack.get("type", "melee") != "ranged",
                     )
+                    if target.hp <= 0:
+                        cond_adv = combine_adv(
+                            cond_adv,
+                            "adv" if attack.get("type", "melee") != "ranged" else "dis",
+                        )
                     adv_mode = combine_adv(action_adv, cond_adv)
                     if manual_adv:
                         adv_mode = combine_adv(adv_mode, "adv")
@@ -571,11 +582,17 @@ def play_cli(
                     target_spec = rest[0] if rest else "all"
                     _do_cast(spell_name, target_spec)
         else:
-            enemies = [c for c in combatants if c.side != actor.side and not c.defeated]
+            enemies = [
+                c
+                for c in combatants
+                if c.side != actor.side
+                and not c.defeated
+                and not (c.hp <= 0 and getattr(c, "stable", False))
+            ]
             if enemies and actor.attacks:
-                # NPCs choose targets deterministically (lowest HP by default)
-                target_seed = rng.randint(0, 10_000_000)
-                target = choose_target(actor, enemies, seed=target_seed)
+                if any(e.hp <= 0 and e.death_successes > e.death_failures for e in enemies):
+                    rng.randint(0, 10_000_000)
+                target = choose_target(actor, enemies)
                 attack = actor.attacks[0]
                 action_adv = derive_attack_advantage(
                     action_state[actor.name], action_state[target.name]
@@ -585,6 +602,11 @@ def play_cli(
                     condition_state[target.name],
                     melee=attack.get("type", "melee") != "ranged",
                 )
+                if target.hp <= 0:
+                    cond_adv = combine_adv(
+                        cond_adv,
+                        "adv" if attack.get("type", "melee") != "ranged" else "dis",
+                    )
                 adv_mode = combine_adv(action_adv, cond_adv)
                 hit_seed = rng.randint(0, 10_000_000)
                 atk_res = roll(
@@ -602,7 +624,10 @@ def play_cli(
                     dmg_seed = rng.randint(0, 10_000_000)
                     dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
                     print(f"{actor.name} hits {target.name} for {dmg['total']}")
+                    pre_downed = target.hp <= 0
                     _apply_damage(target, dmg["total"], attack.get("type", "melee"), crit)
+                    if pre_downed and target.hp <= 0 and not target.defeated:
+                        rng.randint(0, 10_000_000)
                 else:
                     print(f"{actor.name} misses {target.name}")
         turn = (turn + 1) % len(combatants)
