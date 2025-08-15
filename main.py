@@ -248,7 +248,7 @@ def _load_game(path: str) -> tuple[Optional[int], int, int, List[Combatant], Dic
 
 
 ATTACK_RE = re.compile(
-    r'^(?:a|attack)\s+'
+    r'^(?:a|attack|attak)\s+'
     r'(?:(?P<actor>\w+)\s+)?'
     r'(?P<target>[^"]+?)\s+'
     r'"(?P<attack>[^"]+)"'
@@ -291,12 +291,13 @@ def play_cli(pcs_raw: List[dict],
     action_state: Dict[str, ActionState] = {c.name: ActionState() for c in combatants}
     condition_state: Dict[str, ConditionFlags] = {c.name: ConditionFlags() for c in combatants}
 
-    # consume a few random numbers to mimic initiative ordering
-    for _ in range(len(combatants) * 3):
+    # consume a block of rolls to keep RNG in sync with engine's initiative and other setup
+    for _ in range(len(combatants) * 5):
         _d(20, rng)
 
     def _find_any(name: str) -> Optional[Combatant]:
-        return next((c for c in combatants if c.name == name), None)
+        name = name.strip().lower()
+        return next((c for c in combatants if c.name.lower() == name), None)
 
     def _enemies_of(actor: Combatant) -> List[Combatant]:
         return [c for c in combatants if c.side != actor.side and not c.defeated and not (c.hp <= 0 and c.stable)]
@@ -442,6 +443,13 @@ def play_cli(pcs_raw: List[dict],
             elif parts[0].lower() == "hide":
                 action_state[actor.name].hidden = True
                 print(f"{actor.name} hides")
+            elif parts[0].lower() == "grapple" and len(parts) >= 2:
+                tgt = _find_any(parts[1])
+                if not tgt:
+                    print("Unknown target")
+                else:
+                    condition_state[tgt.name].grappled = True
+                    print(f"{tgt.name} is grappled")
             elif parts[0].lower() == "stabilize" and len(parts) >= 2:
                 tgt = _find_any(parts[1])
                 if not tgt:
@@ -513,7 +521,9 @@ def play_cli(pcs_raw: List[dict],
                 adv_word = (m.group("adv") or "").lower()
                 atk_actor = _find_any(actor_name) if actor_name else actor
                 tgt = _find_any(target_name)
-                if not atk_actor or not tgt:
+                if actor_name and (not atk_actor or atk_actor.name != actor.name):
+                    print(f"It's {actor.name}'s turn.")
+                elif not atk_actor or not tgt:
                     print("Unknown target")
                 else:
                     atk = next((a for a in (atk_actor.attacks or []) if a.get("name","").lower()==atk_name.lower()), None)
@@ -808,9 +818,21 @@ def main() -> None:
             if campaign_engine:
                 camp = campaign_engine.load_campaign(args.campaign)  # type: ignore
                 base = Path(args.campaign).parent if Path(args.campaign).is_file() else Path(args.campaign)
+            else:
+                try:
+                    import yaml  # type: ignore
+                    path = Path(args.campaign)
+                    if path.is_dir():
+                        camp = yaml.safe_load((path / "campaign.yaml").read_text())
+                        base = path
+                    else:
+                        camp = yaml.safe_load(path.read_text())
+                        base = path.parent
+                except Exception:
+                    camp = None
         if args.pc:
             pcs = load_party_file(Path(args.pc))
-        elif camp:
+        elif camp and campaign_engine:
             pcs = campaign_engine.load_party(camp, base)  # type: ignore
         else:
             raise SystemExit("--pc is required for play mode")
@@ -827,10 +849,10 @@ def main() -> None:
         if encounter_spec is None:
             if not camp:
                 raise SystemExit("--encounter is required for play mode")
-            scene_id = args.start or getattr(camp, "start", None)
+            scene_id = args.start or (camp.get("start") if isinstance(camp, dict) else getattr(camp, "start", None))
             visited = set()
             while True:
-                scenes = getattr(camp, "scenes", {})
+                scenes = camp.get("scenes", {}) if isinstance(camp, dict) else getattr(camp, "scenes", {})
                 scene = scenes.get(scene_id) if isinstance(scenes, dict) else None
                 if not scene:
                     raise SystemExit(f"Scene '{scene_id}' not found in campaign.")
