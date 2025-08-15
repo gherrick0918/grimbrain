@@ -276,8 +276,10 @@ def play_cli(
                     save_seed = rng.randint(0, 10_000_000)
                     mod = getattr(tgt, f"{ability}_mod", getattr(tgt, "dex_mod", 0))
                     save = checks.saving_throw(attack.get("save_dc", 0), mod, seed=save_seed)
-                    # Capitalize ability in log (DEX/CON/etc.)
-                    print(f"{tgt.name} {ability.upper()} save {'succeeds' if save['success'] else 'fails'}")
+                    # Human-friendly ability name (Dex/Con/etc.)
+                    print(
+                        f"{tgt.name} {ability.capitalize()} save {'succeeds' if save['success'] else 'fails'}"
+                    )
                     taken = dmg_total if not save["success"] else dmg_total // 2
                     print(f"{actor.name}'s {attack['name']} hits {tgt.name} for {taken}")
                     _apply_damage(tgt, taken, attack.get("type", "spell"))
@@ -571,10 +573,28 @@ def play_cli(
         else:
             enemies = [c for c in combatants if c.side != actor.side and not c.defeated]
             if enemies and actor.attacks:
-                target = rng.choice(enemies)
+                # NPCs choose targets deterministically (lowest HP by default)
+                target_seed = rng.randint(0, 10_000_000)
+                target = choose_target(actor, enemies, seed=target_seed)
                 attack = actor.attacks[0]
+                action_adv = derive_attack_advantage(
+                    action_state[actor.name], action_state[target.name]
+                )
+                cond_adv = derive_condition_advantage(
+                    condition_state[actor.name],
+                    condition_state[target.name],
+                    melee=attack.get("type", "melee") != "ranged",
+                )
+                adv_mode = combine_adv(action_adv, cond_adv)
                 hit_seed = rng.randint(0, 10_000_000)
-                atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed)
+                atk_res = roll(
+                    f"1d20+{attack['to_hit']}",
+                    seed=hit_seed,
+                    adv=adv_mode == "adv",
+                    disadv=adv_mode == "dis",
+                )
+                if os.getenv("GB_TESTING"):
+                    print(f"[dbg] adv_mode={adv_mode}")
                 hit = atk_res["total"] >= target.ac
                 roll_val = atk_res["detail"].get("chosen", atk_res["detail"].get("rolls", [0])[0])
                 crit = roll_val == 20
@@ -684,7 +704,7 @@ def run_campaign_cli(path: str | Path, *, start: str | None = None, seed: int | 
                     choice_line = next(input_iter)
                     print(f"> {choice_line}")
                 except StopIteration:
-                    choice_line = ""
+                    break
             else:
                 choice_line = input("> ")
             try:
