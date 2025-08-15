@@ -63,6 +63,7 @@ from grimbrain.fallback_monsters import FALLBACK_MONSTERS
 from grimbrain.engine.encounter import compute_encounter, apply_difficulty
 from grimbrain.content.packs import load_packs
 from grimbrain.content.select import select_monster
+from grimbrain import pc_wizard
 from grimbrain.rules import (
     ActionState,
     apply_dodge,
@@ -418,6 +419,8 @@ def play_cli(
                     )
                 elif parts[0] == "quit":
                     return
+                elif parts[0] == "end":
+                    break
                 elif parts[0] == "save":
                     if len(parts) == 2:
                         _save_game(parts[1], seed, round_num, turn, combatants, condition_state)
@@ -565,17 +568,44 @@ def play_cli(
                         spell_name, *rest = parts[1:]
                     target_spec = rest[0] if rest else "all"
                     _do_cast(spell_name, target_spec)
-            turn = (turn + 1) % len(combatants)
-            if turn == 0:
-                round_num += 1
+        else:
+            enemies = [c for c in combatants if c.side != actor.side and not c.defeated]
+            if enemies and actor.attacks:
+                target = rng.choice(enemies)
+                attack = actor.attacks[0]
+                hit_seed = rng.randint(0, 10_000_000)
+                atk_res = roll(f"1d20+{attack['to_hit']}", seed=hit_seed)
+                hit = atk_res["total"] >= target.ac
+                roll_val = atk_res["detail"].get("chosen", atk_res["detail"].get("rolls", [0])[0])
+                crit = roll_val == 20
+                if hit:
+                    dmg_seed = rng.randint(0, 10_000_000)
+                    dmg = checks.damage_roll(attack["damage_dice"], dmg_seed)
+                    print(f"{actor.name} hits {target.name} for {dmg['total']}")
+                    _apply_damage(target, dmg["total"], attack.get("type", "melee"), crit)
+                else:
+                    print(f"{actor.name} misses {target.name}")
+        turn = (turn + 1) % len(combatants)
+        if turn == 0:
+            round_num += 1
     return finalize_result(_check_victory(combatants) or "monsters", combatants, rounds=round_num)
 
 
 def run_campaign_cli(path: str | Path, *, start: str | None = None, seed: int | None = None, save: str | None = None, resume: str | None = None, max_rounds: int = 20) -> dict | None:
-    """Run a minimal campaign for testing purposes."""
+    """Run a minimal campaign for testing or CLI use.
+
+    The function prints narrative text and handles encounters, checks and
+    simple branching choices. When ``save`` is provided, a ``SessionLogger``
+    writes accompanying ``.jsonl`` and ``.md`` logs beside the save file.
+    Choices are read from ``stdin`` when not attached to a TTY so tests can
+    feed scripted input.
+    """
+
     camp = campaign_engine.load_campaign(path)
     base = Path(path).parent if Path(path).is_file() else Path(path)
     pcs = campaign_engine.load_party(camp, base)
+    if not pcs:
+        raise RuntimeError("No PCs were loaded")
     if resume:
         data = json.loads(Path(resume).read_text())
         start = data.get("scene", start or camp.start)
@@ -583,11 +613,18 @@ def run_campaign_cli(path: str | Path, *, start: str | None = None, seed: int | 
         for pc in pcs:
             if pc.name in hp:
                 pc.hp = hp[pc.name]
+
+    logger = SessionLogger(save) if save else None
     current = start or camp.start
     rng = random.Random(seed or camp.seed)
+    seen: set[str] = set()
+    input_iter = None
+
     while current:
         scene = camp.scenes[current]
         print(scene.text)
+        if logger:
+            logger.log_event("narration", text=scene.text)
         if scene.rest:
             if scene.rest.lower().startswith("short"):
                 rests.apply_short_rest(pcs, rng)
@@ -595,7 +632,30 @@ def run_campaign_cli(path: str | Path, *, start: str | None = None, seed: int | 
                 rests.apply_long_rest(pcs)
             current = scene.on_victory or scene.on_defeat
         elif scene.encounter:
-            res = campaign_engine.run_encounter(pcs, scene.encounter, seed=seed, max_rounds=max_rounds)
+            if not pcs:
+                raise RuntimeError("Encounter requires PCs")
+            enemy_spec = scene.encounter
+            enemy_name = ""
+            if isinstance(enemy_spec, dict) and "random" in enemy_spec:
+                opts = enemy_spec["random"]
+                enemy_name = select_monster(
+                    tags=opts.get("tags"),
+                    cr=opts.get("cr"),
+                    exclude=seen if opts.get("exclude_seen") else set(),
+                    seed=seed,
+                )
+                if opts.get("exclude_seen"):
+                    seen.add(enemy_name.lower())
+            else:
+                enemy_name = str(enemy_spec)
+            res = campaign_engine.run_encounter(pcs, enemy_name, seed=seed, max_rounds=max_rounds)
+            if logger:
+                logger.log_event(
+                    "encounter",
+                    enemy=enemy_name,
+                    result=res.get("result"),
+                    summary=res.get("summary", ""),
+                )
             hp_map = res.get("hp", {})
             for pc in pcs:
                 if pc.name in hp_map:
@@ -603,11 +663,112 @@ def run_campaign_cli(path: str | Path, *, start: str | None = None, seed: int | 
             current = scene.on_victory if res.get("result") == "victory" else scene.on_defeat
         elif scene.check:
             roll_res = checks.roll_check(0, scene.check.dc, advantage=scene.check.advantage, seed=seed)
+            if logger:
+                logger.log_event(
+                    "check",
+                    ability=scene.check.ability,
+                    skill=scene.check.skill,
+                    dc=scene.check.dc,
+                    success=roll_res["success"],
+                    roll=roll_res["roll"],
+                    total=roll_res["total"],
+                )
             current = scene.check.on_success if roll_res["success"] else scene.check.on_failure
         elif scene.choices:
-            current = scene.choices[0].next if scene.choices else None
+            for idx, choice in enumerate(scene.choices, 1):
+                print(f"{idx}. {choice.text}")
+            if input_iter is None and not sys.stdin.isatty():
+                input_iter = iter([line.rstrip("\n") for line in sys.stdin])
+            if input_iter:
+                try:
+                    choice_line = next(input_iter)
+                    print(f"> {choice_line}")
+                except StopIteration:
+                    choice_line = ""
+            else:
+                choice_line = input("> ")
+            try:
+                idx = int(choice_line.strip())
+            except ValueError:
+                idx = 1
+            idx = max(1, min(idx, len(scene.choices)))
+            chosen = scene.choices[idx - 1]
+            if logger:
+                logger.log_event("choice", choice=idx, next=chosen.next)
+            current = chosen.next
         else:
             break
     if save:
         Path(save).write_text(json.dumps({"hp": {pc.name: pc.hp for pc in pcs}, "scene": current}))
     return {"hp": {pc.name: pc.hp for pc in pcs}}
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Grimbrain CLI")
+    parser.add_argument("--play", action="store_true", help="Run combat simulator")
+    parser.add_argument("--campaign", help="Path to campaign directory or YAML", default=None)
+    parser.add_argument("--start", help="Starting scene for campaign", default=None)
+    parser.add_argument("--pc", help="Path to party JSON file", default=None)
+    parser.add_argument("--encounter", help="Monster spec for play mode", default=None)
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--max-rounds", type=int, default=20)
+    parser.add_argument("--packs", help="Comma-separated pack names or paths", default=None)
+    parser.add_argument("--autosave", action="store_true", help="Autosave play log")
+    parser.add_argument("--save", help="Path to save campaign state", default=None)
+    parser.add_argument("--resume", help="Resume state JSON", default=None)
+    parser.add_argument("--pc-wizard", action="store_true", help="Create party JSON interactively or from preset")
+    parser.add_argument("--preset", help="Preset name for pc-wizard", default=None)
+    parser.add_argument("--out", help="Output path for pc-wizard", default=None)
+
+    args = parser.parse_args()
+
+    if args.pc_wizard:
+        pc_wizard.main(out=args.out, preset=args.preset)
+    elif args.resume and not args.campaign and not args.play:
+        sess = Session.load(args.resume)
+        print(f"Resumed scene '{sess.scene}' with {len(sess.steps)} steps")
+    elif args.play:
+        camp = None
+        base = None
+        if args.campaign:
+            camp = campaign_engine.load_campaign(args.campaign)
+            base = Path(args.campaign).parent if Path(args.campaign).is_file() else Path(args.campaign)
+        if args.pc:
+            pcs = load_party_file(Path(args.pc))
+        elif camp:
+            pcs = campaign_engine.load_party(camp, base)
+        else:
+            raise SystemExit("--pc is required for play mode")
+
+        packs = load_packs(args.packs.split(",")) if args.packs else {}
+
+        def _lookup(name: str) -> MonsterSidecar:
+            data = packs.get(name.lower()) if packs else None
+            if data:
+                return MonsterSidecar(**data)
+            return _lookup_fallback(name)
+
+        encounter_spec = args.encounter
+        if encounter_spec is None:
+            if camp is None:
+                raise SystemExit("--encounter is required for play mode")
+            scene_id = args.start or camp.start
+            encounter_spec = camp.scenes[scene_id].encounter
+        if isinstance(encounter_spec, dict) and "random" in encounter_spec:
+            opts = encounter_spec["random"]
+            encounter_spec = select_monster(
+                tags=opts.get("tags"), cr=opts.get("cr"), seed=args.seed
+            )
+        monsters = parse_monster_spec(str(encounter_spec), _lookup)
+        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds, autosave=args.autosave)
+    elif args.campaign:
+        run_campaign_cli(
+            args.campaign,
+            start=args.start,
+            seed=args.seed,
+            save=args.save,
+            resume=args.resume,
+            max_rounds=args.max_rounds,
+        )
+    else:
+        parser.print_help()
