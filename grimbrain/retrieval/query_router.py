@@ -77,31 +77,6 @@ AUTO_KEYWORDS = {
 # reference at import time.
 LAST_MONSTER_JSON: dict = {}
 
-# Minimal hardcoded stat blocks for common low-CR goblins live in
-# ``fallback_monsters`` so that lightweight modules can use them without
-# importing this file and its heavy dependencies.
-from ..fallback_monsters import FALLBACK_MONSTERS
-
-# Minimal fallback spell data for critical test cases
-FALLBACK_SPELLS: dict[str, dict] = {
-    "fireball": {
-        "name": "Fireball",
-        "level": 3,
-        "school": "Evocation",
-        "casting_time": "1 action",
-        "range": "150 feet",
-        "components": "V, S, M (a tiny ball of bat guano and sulfur)",
-        "duration": "Instantaneous",
-        "damage": "8d6 fire",
-        "classes": ["Wizard"],
-        "text": (
-            "A bright streak flashes from your pointing finger to a point you choose within range "
-            "and then blossoms with a low roar into an explosion of flame."
-        ),
-        "provenance": ["PHB · Fireball"],
-    },
-}
-
 
 def _monster_json_to_markdown(data: Dict[str, Any]) -> str:
     """Render a simple monster stat block from a JSON dict.
@@ -573,16 +548,6 @@ def run_query(
         learn_aliases = False
 
     key = query.strip().lower()
-    if query_type == "monster" and alias_map_enabled and key in FALLBACK_MONSTERS:
-        LAST_MONSTER_JSON.clear()
-        LAST_MONSTER_JSON.update(FALLBACK_MONSTERS[key])
-        md = _monster_json_to_markdown(LAST_MONSTER_JSON)
-        prov = LAST_MONSTER_JSON.get("provenance", [])
-        return md, LAST_MONSTER_JSON, prov
-    if query_type == "spell" and key in FALLBACK_SPELLS:
-        data = FALLBACK_SPELLS[key]
-        md = _spell_json_to_markdown(data)
-        return md, data, data.get("provenance", [])
 
     collection_name = COLLECTION_MAP[query_type]
 

@@ -1,7 +1,0 @@
-status
-actions
-cast "Fire Bolt" "Goblin" --level 1
-end
-cast "Fire Bolt" "Goblin" --level 1
-end
-status

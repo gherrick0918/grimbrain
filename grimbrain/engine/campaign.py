@@ -7,10 +7,10 @@ import json
 import yaml
 
 from ..models import PC, MonsterSidecar
-from ..fallback_monsters import FALLBACK_MONSTERS
 from .combat import run_encounter as _run_encounter
 from .encounter import apply_difficulty
 from ..campaign import load_party_file
+from ..retrieval.query_router import run_query
 
 
 @dataclass
@@ -105,7 +105,9 @@ def run_encounter(
     difficulty: str = "normal",
     scale: bool = False,
 ) -> Dict[str, object]:
-    data = FALLBACK_MONSTERS[enemy_name.lower()]
+    _, data, _ = run_query(enemy_name, "monster")
+    if not data:
+        raise ValueError(f"Monster '{enemy_name}' not found in index")
     mon = MonsterSidecar(**data)
     apply_difficulty([mon], difficulty, scale, len(pcs))
     res = _run_encounter(pcs, [mon], seed=seed, max_rounds=max_rounds)
