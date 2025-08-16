@@ -17,7 +17,7 @@ def test_reload_clears_cache(tmp_path):
     assert rule is None
 
     # mutate rule to include new alias
-    path = Path("rules/attack.json")
+    path = Path("rules/custom/attack.json")
     orig = path.read_text()
     data = json.loads(orig)
     data["aliases"].append("swing")

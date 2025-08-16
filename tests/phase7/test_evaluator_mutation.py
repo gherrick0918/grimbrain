@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 from grimbrain.rules.resolver import RuleResolver
@@ -28,7 +27,7 @@ def test_mutation_changes_behavior(tmp_path):
     chroma = tmp_path / "chroma"
     _build(chroma)
     before = _eval_attack(chroma)
-    path = Path("rules/attack.json")
+    path = Path("rules/custom/attack.json")
     orig = path.read_text()
     try:
         data = json.loads(orig)
