@@ -48,7 +48,7 @@ class RuleResolver:
     def _load_rules(self) -> None:
         self.rules: Dict[str, dict] = {}
         self.name_map: Dict[str, str] = {}
-        rule_list, _, _ = load_rules(self.rules_dir)
+        rule_list, _, _, _ = load_rules(self.rules_dir)
         for rule in rule_list:
             rid = rule["id"]
             self.rules[rid] = rule
@@ -94,7 +94,14 @@ class RuleResolver:
         suggestions: List[str] = []
         rule: Optional[dict] = None
         if rid and score >= 0.42:
-            rule = self.rules[rid]
+            candidate = self.rules.get(rid)
+            if candidate is not None:
+                q_tokens = set(text.lower().split())
+                doc_tokens = {rid.lower()}
+                doc_tokens.update(candidate.get("cli_verb", "").lower().split())
+                doc_tokens.update(a.lower() for a in candidate.get("aliases", []))
+                if not q_tokens.isdisjoint(doc_tokens):
+                    rule = candidate
         elif rid and 0.30 <= score < 0.42:
             suggestions = [self.rules[rid]["id"]]
         self._cache_put(key, rule)

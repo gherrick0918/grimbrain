@@ -4,7 +4,7 @@ import argparse
 import json
 import hashlib
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, List
 
 try:  # pragma: no cover - chromadb is heavy but optional for tests
     from chromadb import PersistentClient
@@ -40,7 +40,16 @@ class SimpleEmbeddingFunction:
 EMBED_FN = SimpleEmbeddingFunction()
 
 
-def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
+def _index_signature(files: Iterable[tuple[str, int, int]]) -> str:
+    """Return a short digest for the given ``files`` list."""
+
+    payload = json.dumps(sorted(files), separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:7]
+
+
+def load_rules(
+    rules_dir: Path,
+) -> Tuple[List[dict], int, int, List[tuple[str, int, int]]]:
     """Load rule documents from ``rules_dir``.
 
     When ``rules_dir`` contains ``generated`` and ``custom`` subdirectories the
@@ -49,6 +58,7 @@ def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
     """
 
     rules: dict[str, dict] = {}
+    stats: dict[str, tuple[int, int]] = {}
     gen_count = 0
     custom_count = 0
 
@@ -63,6 +73,8 @@ def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
             rid = rule.get("id")
             if rid:
                 rules[rid] = rule
+                s = path.stat()
+                stats[rid] = (s.st_size, int(s.st_mtime))
                 gen_count += 1
     if custom_dir.exists():
         for path in sorted(custom_dir.rglob("*.json")):
@@ -73,6 +85,8 @@ def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
             rid = rule.get("id")
             if rid:
                 rules[rid] = rule  # overrides generated
+                s = path.stat()
+                stats[rid] = (s.st_size, int(s.st_mtime))
                 custom_count += 1
 
     if not gen_dir.exists() and not custom_dir.exists():
@@ -84,9 +98,20 @@ def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
             rid = rule.get("id")
             if rid:
                 rules[rid] = rule
+                s = path.stat()
+                stats[rid] = (s.st_size, int(s.st_mtime))
         gen_count = len(rules)
 
-    return list(rules.values()), gen_count, custom_count
+    files: List[tuple[str, int, int]] = []
+    for rid, rule in rules.items():
+        if rid in stats:
+            size, mtime = stats[rid]
+        else:  # pragma: no cover - future-proof
+            size = len(json.dumps(rule, separators=(",", ":")))
+            mtime = 0
+        files.append((rid, size, mtime))
+
+    return list(rules.values()), gen_count, custom_count, files
 
 
 def build_index(rules_dir: str | Path, out_dir: str | Path) -> int:
@@ -99,8 +124,12 @@ def build_index(rules_dir: str | Path, out_dir: str | Path) -> int:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    rules, gen_count, custom_count = load_rules(rules_path)
+    rules, gen_count, custom_count, files = load_rules(rules_path)
     total = len(rules)
+    if total == 0:
+        print(f'No rules found in "{rules_path}".')
+        return 1
+    idx = _index_signature(files)
 
     client = PersistentClient(path=str(out_path))
     # Recreate the collection on every run for determinism
@@ -134,8 +163,10 @@ def build_index(rules_dir: str | Path, out_dir: str | Path) -> int:
     if ids:
         collection.upsert(ids=ids, documents=docs, metadatas=metas)
 
-    print(f"Indexed {total} rules (generated={gen_count}, custom={custom_count}).")
-    return 0 if total > 0 else 1
+    print(
+        f"Indexed {total} rules (generated={gen_count}, custom={custom_count}, idx={idx})."
+    )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapper

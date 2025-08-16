@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
 
 from .resolver import RuleResolver
 from .evaluator import Evaluator
@@ -34,9 +35,17 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(rule, indent=2))
             return 0
         if len(ns.args) >= 2 and ns.args[1] == "reload":
-            index_mod.build_index(rules_dir, chroma_dir)
+            code = index_mod.build_index(rules_dir, chroma_dir)
+            if code != 0:
+                return code
             resolver.reload()
-            print("Rules reloaded")
+            rules, gen_count, custom_count, files = index_mod.load_rules(
+                Path(rules_dir)
+            )
+            idx = index_mod._index_signature(files)
+            print(
+                f"Rules reloaded ({len(rules)} docs, generated={gen_count}, custom={custom_count}, idx={idx})."
+            )
             return 0
         if len(ns.args) >= 2 and ns.args[1] == "list":
             for rid in sorted(resolver.rules):

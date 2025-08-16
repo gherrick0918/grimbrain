@@ -92,11 +92,24 @@ See ``schema/rule.schema.json`` for the rule document format.
 
 ### Data-driven quickstart
 
-```bash
+PowerShell
+```powershell
 $env:GB_ENGINE="data"; $env:GB_RULES_DIR="rules"; $env:GB_CHROMA_DIR=".chroma"
 python tools/convert_data_to_rules.py
 python -m grimbrain.rules.index --rules $env:GB_RULES_DIR --out $env:GB_CHROMA_DIR
 python .\main.py rules list
 python .\main.py rules show attack.shortsword
+python -m grimbrain.rules.cli "attack.shortsword Goblin"
+```
+
+bash
+```bash
+export GB_ENGINE="data"
+export GB_RULES_DIR="rules"
+export GB_CHROMA_DIR=".chroma"
+python tools/convert_data_to_rules.py
+python -m grimbrain.rules.index --rules "$GB_RULES_DIR" --out "$GB_CHROMA_DIR"
+python main.py rules list
+python main.py rules show attack.shortsword
 python -m grimbrain.rules.cli "attack.shortsword Goblin"
 ```
