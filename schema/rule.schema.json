@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Grimbrain Rule",
+  "type": "object",
+  "required": ["schema_version", "id", "kind", "cli_verb", "effects"],
+  "properties": {
+    "schema_version": {"type": "integer"},
+    "id": {"type": "string"},
+    "kind": {"type": "string"},
+    "subkind": {"type": "string"},
+    "aliases": {"type": "array", "items": {"type": "string"}},
+    "cli_verb": {"type": "string"},
+    "targets": {"type": "array", "items": {"type": "string"}},
+    "prereq": {"type": ["object", "null"]},
+    "formulas": {"type": "object"},
+    "dc": {"type": ["integer", "string"]},
+    "effects": {"type": "array", "items": {"type": "object"}},
+    "log_templates": {"type": "object"},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}
