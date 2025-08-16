@@ -1,7 +1,0 @@
-2
-1
-status
-rest short Malrick 1
-rest long Malrick
-rest short Brynn 1
-rest long Brynn

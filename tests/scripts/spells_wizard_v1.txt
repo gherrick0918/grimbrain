@@ -1,7 +1,0 @@
-status
-actions
-cast "Magic Missile" "Goblin" --level 1
-end
-cast "Thunderwave" --level 1
-end
-status

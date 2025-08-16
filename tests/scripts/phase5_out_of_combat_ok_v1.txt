@@ -1,7 +1,0 @@
-2
-dev shell
-status
-rest short Malrick 2
-status
-rest long Malrick
-status
