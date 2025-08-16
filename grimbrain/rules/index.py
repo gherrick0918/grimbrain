@@ -4,7 +4,7 @@ import argparse
 import json
 import hashlib
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Tuple
 
 try:  # pragma: no cover - chromadb is heavy but optional for tests
     from chromadb import PersistentClient
@@ -40,24 +40,67 @@ class SimpleEmbeddingFunction:
 EMBED_FN = SimpleEmbeddingFunction()
 
 
-def load_rules(rules_dir: Path) -> list[dict]:
-    rules: list[dict] = []
-    for path in sorted(rules_dir.rglob("*.json")):
-        try:
-            rules.append(json.loads(path.read_text()))
-        except Exception as exc:  # pragma: no cover - defensive
-            raise RuntimeError(f"Failed loading rule {path}") from exc
-    return rules
+def load_rules(rules_dir: Path) -> Tuple[list[dict], int, int]:
+    """Load rule documents from ``rules_dir``.
+
+    When ``rules_dir`` contains ``generated`` and ``custom`` subdirectories the
+    former is loaded first followed by the latter so custom rules override
+    generated ones.  The return value is a tuple ``(rules, gen_count, custom_count)``.
+    """
+
+    rules: dict[str, dict] = {}
+    gen_count = 0
+    custom_count = 0
+
+    gen_dir = rules_dir / "generated"
+    custom_dir = rules_dir / "custom"
+    if gen_dir.exists():
+        for path in sorted(gen_dir.rglob("*.json")):
+            try:
+                rule = json.loads(path.read_text())
+            except Exception as exc:  # pragma: no cover - defensive
+                raise RuntimeError(f"Failed loading rule {path}") from exc
+            rid = rule.get("id")
+            if rid:
+                rules[rid] = rule
+                gen_count += 1
+    if custom_dir.exists():
+        for path in sorted(custom_dir.rglob("*.json")):
+            try:
+                rule = json.loads(path.read_text())
+            except Exception as exc:  # pragma: no cover - defensive
+                raise RuntimeError(f"Failed loading rule {path}") from exc
+            rid = rule.get("id")
+            if rid:
+                rules[rid] = rule  # overrides generated
+                custom_count += 1
+
+    if not gen_dir.exists() and not custom_dir.exists():
+        for path in sorted(rules_dir.rglob("*.json")):
+            try:
+                rule = json.loads(path.read_text())
+            except Exception as exc:  # pragma: no cover - defensive
+                raise RuntimeError(f"Failed loading rule {path}") from exc
+            rid = rule.get("id")
+            if rid:
+                rules[rid] = rule
+        gen_count = len(rules)
+
+    return list(rules.values()), gen_count, custom_count
 
 
-def build_index(rules_dir: str | Path, out_dir: str | Path) -> None:
+def build_index(rules_dir: str | Path, out_dir: str | Path) -> int:
     """Index rule JSON files into a persistent Chroma collection."""
+
     if PersistentClient is None:  # pragma: no cover - chromadb missing
         raise RuntimeError("chromadb is required for rule indexing")
 
     rules_path = Path(rules_dir)
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+
+    rules, gen_count, custom_count = load_rules(rules_path)
+    total = len(rules)
 
     client = PersistentClient(path=str(out_path))
     # Recreate the collection on every run for determinism
@@ -72,7 +115,7 @@ def build_index(rules_dir: str | Path, out_dir: str | Path) -> None:
     docs: list[str] = []
     ids: list[str] = []
     metas: list[dict] = []
-    for rule in load_rules(rules_path):
+    for rule in rules:
         rid = rule.get("id")
         if not rid:
             continue
@@ -91,14 +134,18 @@ def build_index(rules_dir: str | Path, out_dir: str | Path) -> None:
     if ids:
         collection.upsert(ids=ids, documents=docs, metadatas=metas)
 
+    print(f"Indexed {total} rules (generated={gen_count}, custom={custom_count}).")
+    return 0 if total > 0 else 1
+
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapper
     parser = argparse.ArgumentParser(description="Index grimbrain rules")
     parser.add_argument("--rules", required=True, help="Directory of rule JSON files")
-    parser.add_argument("--out", required=True, help="Output directory for Chroma store")
+    parser.add_argument(
+        "--out", required=True, help="Output directory for Chroma store"
+    )
     args = parser.parse_args(argv)
-    build_index(args.rules, args.out)
-    return 0
+    return build_index(args.rules, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

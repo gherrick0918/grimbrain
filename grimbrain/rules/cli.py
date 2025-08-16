@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from typing import Any
 
 from .resolver import RuleResolver
 from .evaluator import Evaluator
@@ -39,7 +38,14 @@ def main(argv: list[str] | None = None) -> int:
             resolver.reload()
             print("Rules reloaded")
             return 0
-        parser.error("usage: rules [show|reload] ...")
+        if len(ns.args) >= 2 and ns.args[1] == "list":
+            for rid in sorted(resolver.rules):
+                rule = resolver.rules[rid]
+                kind = rule.get("kind", "")
+                subkind = rule.get("subkind", "")
+                print(f"{rid}  {kind}/{subkind}")
+            return 0
+        parser.error("usage: rules [show|reload|list] ...")
 
     if not ns.args:
         parser.print_help()
@@ -66,7 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     logs = ev.apply(rule, ctx)
     for line in logs:
         print(line)
-    print(json.dumps({"actor_hp": ctx["actor"]["hp"], "target_hp": ctx["target"]["hp"]}))
+    print(
+        json.dumps({"actor_hp": ctx["actor"]["hp"], "target_hp": ctx["target"]["hp"]})
+    )
     return 0
 
 

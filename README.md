@@ -89,3 +89,14 @@ GB_ENGINE=data python main.py rules reload
 ```
 
 See ``schema/rule.schema.json`` for the rule document format.
+
+### Data-driven quickstart
+
+```bash
+$env:GB_ENGINE="data"; $env:GB_RULES_DIR="rules"; $env:GB_CHROMA_DIR=".chroma"
+python tools/convert_data_to_rules.py
+python -m grimbrain.rules.index --rules $env:GB_RULES_DIR --out $env:GB_CHROMA_DIR
+python .\main.py rules list
+python .\main.py rules show attack.shortsword
+python -m grimbrain.rules.cli "attack.shortsword Goblin"
+```

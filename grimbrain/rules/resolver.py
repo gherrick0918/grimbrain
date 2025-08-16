@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import json
 import difflib
 from pathlib import Path
 from typing import Dict, Tuple, List, Optional
@@ -12,7 +11,7 @@ try:  # pragma: no cover - optional dependency
 except Exception:  # pragma: no cover
     PersistentClient = None  # type: ignore
 
-from .index import EMBED_FN, load_rules
+from .index import load_rules
 
 
 class RuleResolver:
@@ -24,10 +23,14 @@ class RuleResolver:
     tests can run without the Chroma dependency.
     """
 
-    def __init__(self, rules_dir: str | Path | None = None, chroma_dir: str | Path | None = None):
+    def __init__(
+        self, rules_dir: str | Path | None = None, chroma_dir: str | Path | None = None
+    ):
         self.rules_dir = Path(rules_dir or os.getenv("GB_RULES_DIR", "rules"))
         self.chroma_dir = Path(chroma_dir or os.getenv("GB_CHROMA_DIR", ".chroma"))
-        self._cache: OrderedDict[Tuple[str, Optional[str], Optional[str]], Optional[dict]] = OrderedDict()
+        self._cache: OrderedDict[
+            Tuple[str, Optional[str], Optional[str]], Optional[dict]
+        ] = OrderedDict()
         self._cache_size = 512
         self._load_rules()
         self._init_collection()
@@ -45,7 +48,8 @@ class RuleResolver:
     def _load_rules(self) -> None:
         self.rules: Dict[str, dict] = {}
         self.name_map: Dict[str, str] = {}
-        for rule in load_rules(self.rules_dir):
+        rule_list, _, _ = load_rules(self.rules_dir)
+        for rule in rule_list:
             rid = rule["id"]
             self.rules[rid] = rule
             self.name_map[rid.lower()] = rid
@@ -68,7 +72,9 @@ class RuleResolver:
         self._init_collection()
 
     # public API -------------------------------------------------------
-    def resolve(self, text: str, kind: str | None = None, subkind: str | None = None) -> Tuple[Optional[dict], List[str]]:
+    def resolve(
+        self, text: str, kind: str | None = None, subkind: str | None = None
+    ) -> Tuple[Optional[dict], List[str]]:
         key = (text.lower(), kind, subkind)
         if key in self._cache:
             result = self._cache[key]
@@ -95,7 +101,9 @@ class RuleResolver:
         return rule, suggestions
 
     # helpers ----------------------------------------------------------
-    def _vector_lookup(self, text: str, kind: str | None, subkind: str | None) -> Tuple[Optional[str], float]:
+    def _vector_lookup(
+        self, text: str, kind: str | None, subkind: str | None
+    ) -> Tuple[Optional[str], float]:
         if self.collection is not None:
             where = {}
             if kind:
@@ -103,7 +111,9 @@ class RuleResolver:
             if subkind:
                 where["subkind"] = subkind
             try:
-                res = self.collection.query(query_texts=[text], n_results=1, where=where)
+                res = self.collection.query(
+                    query_texts=[text], n_results=1, where=where
+                )
                 ids = res.get("ids", [[]])[0]
                 dists = res.get("distances", [[]])[0]
                 if ids:
