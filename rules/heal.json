@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "heal",
+  "kind": "action",
+  "cli_verb": "heal",
+  "targets": ["target"],
+  "effects": [
+    {"op": "heal", "target": "target", "amount": "1"}
+  ],
+  "log_templates": {}
+}

@@ -66,3 +66,26 @@ function always returns a `(markdown, json, provenance)` tuple.
 - `--md-out` writes the markdown output
 - `--play` enables interactive combat
 - `--autosave` appends turn summaries to paired markdown/JSON logs
+
+## Data-driven rules (Phase 7)
+
+The new rules engine loads JSON rule documents and resolves them through a
+lightweight vector search index.  Enable it by setting ``GB_ENGINE=data``:
+
+```bash
+GB_ENGINE=data python main.py rules show attack
+```
+
+Before the first run, index your rule files:
+
+```bash
+python -m grimbrain.rules.index --rules rules --out .chroma
+```
+
+At runtime you can reload rules and rebuild the index via:
+
+```bash
+GB_ENGINE=data python main.py rules reload
+```
+
+See ``schema/rule.schema.json`` for the rule document format.

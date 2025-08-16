@@ -791,7 +791,12 @@ def run_campaign_cli(
 
     return 0
 
-def main() -> None:
+def main() -> int:
+    # Phase 7: data-driven rule engine entry point.
+    if os.getenv("GB_ENGINE") == "data":
+        from grimbrain.rules.cli import main as rules_main  # lazy import
+        return rules_main(sys.argv[1:])
+
     parser = argparse.ArgumentParser(description="Grimbrain CLI")
     parser.add_argument("--play", action="store_true", help="Run combat simulator")
     parser.add_argument("--campaign", help="Path to campaign directory or YAML", default=None)
