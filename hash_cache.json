@@ -464,5 +464,6 @@
   "spells\\spells-tce.json": "7e82020c17dffaca53b1463edf7e45ddeb03e61c7908782279cd3e3a740aeb0f",
   "spells\\spells-tdcsr.json": "760627e7802922ac0bcc10473a69f7fa8ec613c36ddc5bed83e776f9743120ea",
   "spells\\spells-xge.json": "7d3a0dd1766843dc691978d6ad65cebe9d59abeacb2a3f15640399e96665bbc6",
-  "spells\\spells-xphb.json": "9eb231c444065fa9c451fee429f7683c596ef9b0ac5178b624a8eb00ede25578"
+  "spells\\spells-xphb.json": "9eb231c444065fa9c451fee429f7683c596ef9b0ac5178b624a8eb00ede25578",
+  "bestiary.json": "c4a35165dd02ee5ccf6024612d895cd9ea3406bfabe951ba02606a8bffaa7257"
 }
