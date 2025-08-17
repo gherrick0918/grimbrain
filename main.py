@@ -794,6 +794,9 @@ def run_campaign_cli(
 def main() -> int:
     # Phase 7: data-driven rule engine entry point.
     if os.getenv("GB_ENGINE") == "data":
+        if len(sys.argv) > 1 and sys.argv[1] == "content":
+            from grimbrain.content.cli import main as content_main
+            return content_main(sys.argv[2:])
         from grimbrain.rules.cli import main as rules_main  # lazy import
         return rules_main(sys.argv[1:])
 

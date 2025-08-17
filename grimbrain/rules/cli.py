@@ -4,10 +4,11 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import List
 
+from grimbrain.content import cli as content_cli
 from .resolver import RuleResolver
 from .evaluator import Evaluator
-from . import index as index_mod
 
 
 def _default_context() -> dict:
@@ -17,7 +18,7 @@ def _default_context() -> dict:
     return {"actor": actor, "target": target, "mods": {"STR": 1}, "prof": 2}
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gb", description="Data-driven rules CLI")
     parser.add_argument("args", nargs="*")
     ns = parser.parse_args(argv)
@@ -27,33 +28,13 @@ def main(argv: list[str] | None = None) -> int:
     resolver = RuleResolver(rules_dir=rules_dir, chroma_dir=chroma_dir)
 
     if ns.args and ns.args[0] == "rules":
-        if len(ns.args) >= 3 and ns.args[1] == "show":
-            rule, _ = resolver.resolve(ns.args[2])
-            if not rule:
-                print("Unknown rule")
-                return 1
-            print(json.dumps(rule, indent=2))
-            return 0
-        if len(ns.args) >= 2 and ns.args[1] == "reload":
-            code = index_mod.build_index(rules_dir, chroma_dir)
-            if code != 0:
-                return code
-            resolver.reload()
-            rules, gen_count, custom_count, files = index_mod.load_rules(
-                Path(rules_dir)
-            )
-            idx = index_mod._index_signature(files)
-            print(
-                f"Rules reloaded ({len(rules)} docs, generated={gen_count}, custom={custom_count}, idx={idx})."
-            )
-            return 0
-        if len(ns.args) >= 2 and ns.args[1] == "list":
-            for rid in sorted(resolver.rules):
-                rule = resolver.rules[rid]
-                kind = rule.get("kind", "")
-                subkind = rule.get("subkind", "")
-                print(f"{rid}  {kind}/{subkind}")
-            return 0
+        sub = ns.args[1:]
+        if sub and sub[0] == "list":
+            return content_cli.main(["list", "--type", "rule"] + sub[1:])
+        if sub and sub[0] == "show" and len(sub) >= 2:
+            return content_cli.main(["show", f"rule/{sub[1]}"])
+        if sub and sub[0] == "reload":
+            return content_cli.main(["reload", "--types", "rule"] + sub[1:])
         parser.error("usage: rules [show|reload|list] ...")
 
     if not ns.args:
@@ -81,9 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     logs = ev.apply(rule, ctx)
     for line in logs:
         print(line)
-    print(
-        json.dumps({"actor_hp": ctx["actor"]["hp"], "target_hp": ctx["target"]["hp"]})
-    )
+    print(json.dumps({"actor_hp": ctx["actor"]["hp"], "target_hp": ctx["target"]["hp"]}))
     return 0
 
 
