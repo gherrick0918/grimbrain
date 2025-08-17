@@ -113,3 +113,17 @@ python main.py rules list
 python main.py rules show attack.shortsword
 python -m grimbrain.rules.cli "attack.shortsword Goblin"
 ```
+
+## Unified content indexing
+
+The `content` command indexes rules, monsters, spells and other docs.
+
+```bash
+export GB_ENGINE="data"
+export GB_RULES_DIR="rules"
+export GB_DATA_DIR="data"
+export GB_CHROMA_DIR=".chroma"
+python main.py content reload
+python main.py content list --type monster
+python main.py content show monster/goblin
+```

@@ -41,7 +41,7 @@ class RuleResolver:
             return
         try:
             client = PersistentClient(path=str(self.chroma_dir))
-            self.collection = client.get_collection("rules")
+            self.collection = client.get_collection("content")
         except Exception:
             self.collection = None
 
@@ -112,7 +112,7 @@ class RuleResolver:
         self, text: str, kind: str | None, subkind: str | None
     ) -> Tuple[Optional[str], float]:
         if self.collection is not None:
-            where = {}
+            where = {"doc_type": "rule"}
             if kind:
                 where["kind"] = kind
             if subkind:

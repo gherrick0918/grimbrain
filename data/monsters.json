@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Goblin",
+    "hp": 7,
+    "ac": 15,
+    "type": "humanoid",
+    "size": "small"
+  }
+]
