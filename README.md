@@ -128,6 +128,8 @@ python main.py content list --type monster
 python main.py content show monster/monster.goblin
 ```
 
+IDs are canonical (for example `monster/goblin`), but older forms remain available as aliases. If an id is unknown, the CLI now prints the nearest suggestions.
+
 ### Monsters & spells from legacy data
 
 ```bash

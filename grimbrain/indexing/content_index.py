@@ -8,10 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Dict, List, Tuple, Mapping
 
-try:  # pragma: no cover - chromadb is optional for tests
-    from chromadb import PersistentClient
-except Exception:  # pragma: no cover
-    PersistentClient = None  # type: ignore
+from grimbrain.content.ids import canonicalize_id
+
+PersistentClient = None  # type: ignore
 
 
 class SimpleEmbeddingFunction:
@@ -92,6 +91,20 @@ def index_signature(items: Mapping[Tuple[str, str], str]) -> str:
     return hashlib.sha256(payload).hexdigest()[:7]
 
 
+def _normalize_doc(doc: ContentDoc) -> ContentDoc:
+    """Normalize ``doc.id`` and collect aliases."""
+
+    raw_id = (doc.id or "").lower()
+    canon = canonicalize_id(doc.doc_type, raw_id)
+    alias_set = {canonicalize_id(doc.doc_type, a) for a in (doc.aliases or []) if a}
+    if raw_id != canon:
+        alias_set.add(raw_id)
+    alias_set.discard(canon)
+    doc.id = canon
+    doc.aliases = sorted(alias_set)
+    return doc
+
+
 # ---------------------------------------------------------------------------
 # loaders
 
@@ -108,17 +121,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 except Exception:
                     continue
                 rid = rule.get("id") or path.stem
-                yield ContentDoc(
-                    doc_type="rule",
-                    id=rid,
-                    name=rule.get("name", rid),
-                    kind=rule.get("kind"),
-                    subkind=rule.get("subkind"),
-                    pack="generated",
-                    pack_version="",
-                    payload=rule,
-                    aliases=rule.get("aliases", []),
-                    metadata={"source": str(path)},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="rule",
+                        id=rid,
+                        name=rule.get("name", rid),
+                        kind=rule.get("kind"),
+                        subkind=rule.get("subkind"),
+                        pack="generated",
+                        pack_version="",
+                        payload=rule,
+                        aliases=rule.get("aliases", []),
+                        metadata={"source": str(path)},
+                    )
                 )
         custom_dir = base / "custom"
         src_pack = "custom"
@@ -129,17 +144,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 except Exception:
                     continue
                 rid = rule.get("id") or path.stem
-                yield ContentDoc(
-                    doc_type="rule",
-                    id=rid,
-                    name=rule.get("name", rid),
-                    kind=rule.get("kind"),
-                    subkind=rule.get("subkind"),
-                    pack=src_pack,
-                    pack_version="",
-                    payload=rule,
-                    aliases=rule.get("aliases", []),
-                    metadata={"source": str(path)},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="rule",
+                        id=rid,
+                        name=rule.get("name", rid),
+                        kind=rule.get("kind"),
+                        subkind=rule.get("subkind"),
+                        pack=src_pack,
+                        pack_version="",
+                        payload=rule,
+                        aliases=rule.get("aliases", []),
+                        metadata={"source": str(path)},
+                    )
                 )
         # flat files fallback
         if not gen_dir.exists() and not custom_dir.exists():
@@ -149,17 +166,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 except Exception:
                     continue
                 rid = rule.get("id") or path.stem
-                yield ContentDoc(
-                    doc_type="rule",
-                    id=rid,
-                    name=rule.get("name", rid),
-                    kind=rule.get("kind"),
-                    subkind=rule.get("subkind"),
-                    pack="generated",
-                    pack_version="",
-                    payload=rule,
-                    aliases=rule.get("aliases", []),
-                    metadata={"source": str(path)},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="rule",
+                        id=rid,
+                        name=rule.get("name", rid),
+                        kind=rule.get("kind"),
+                        subkind=rule.get("subkind"),
+                        pack="generated",
+                        pack_version="",
+                        payload=rule,
+                        aliases=rule.get("aliases", []),
+                        metadata={"source": str(path)},
+                    )
                 )
         return
 
@@ -175,17 +194,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 slug = _slug(w.get("name", ""))
                 if not slug:
                     continue
-                yield ContentDoc(
-                    doc_type="rule",
-                    id=f"attack.{slug}",
-                    name=w.get("name", slug),
-                    kind="attack",
-                    subkind=w.get("range"),
-                    pack="legacy-data",
-                    pack_version="",
-                    payload=w,
-                    aliases=[w.get("name", slug)],
-                    metadata={"source": f"virtual:legacy-data/{wpath.name}"},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="rule",
+                        id=f"attack.{slug}",
+                        name=w.get("name", slug),
+                        kind="attack",
+                        subkind=w.get("range"),
+                        pack="legacy-data",
+                        pack_version="",
+                        payload=w,
+                        aliases=[w.get("name", slug)],
+                        metadata={"source": f"virtual:legacy-data/{wpath.name}"},
+                    )
                 )
         # spells.json -> spell
         spath = base / "spells.json"
@@ -201,17 +222,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 school = s.get("school")
                 kind = school.lower() if isinstance(school, str) else None
                 subkind = "attack" if s.get("damage_dice") else "utility"
-                yield ContentDoc(
-                    doc_type="spell",
-                    id=f"spell.{slug}",
-                    name=s.get("name", slug),
-                    kind=kind,
-                    subkind=subkind,
-                    pack="legacy-data",
-                    pack_version="",
-                    payload=s,
-                    aliases=[s.get("name", slug)],
-                    metadata={"source": f"virtual:legacy-data/{spath.name}"},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="spell",
+                        id=f"spell.{slug}",
+                        name=s.get("name", slug),
+                        kind=kind,
+                        subkind=subkind,
+                        pack="legacy-data",
+                        pack_version="",
+                        payload=s,
+                        aliases=[s.get("name", slug)],
+                        metadata={"source": f"virtual:legacy-data/{spath.name}"},
+                    )
                 )
         # monsters.json -> monster
         mpath = base / "monsters.json"
@@ -225,17 +248,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                 if not slug:
                     continue
                 subkind = m.get("cr") or m.get("size")
-                yield ContentDoc(
-                    doc_type="monster",
-                    id=f"monster.{slug}",
-                    name=m.get("name", slug),
-                    kind=m.get("type"),
-                    subkind=subkind,
-                    pack="legacy-data",
-                    pack_version="",
-                    payload=m,
-                    aliases=[m.get("name", slug)],
-                    metadata={"source": f"virtual:legacy-data/{mpath.name}"},
+                yield _normalize_doc(
+                    ContentDoc(
+                        doc_type="monster",
+                        id=f"monster.{slug}",
+                        name=m.get("name", slug),
+                        kind=m.get("type"),
+                        subkind=subkind,
+                        pack="legacy-data",
+                        pack_version="",
+                        payload=m,
+                        aliases=[m.get("name", slug)],
+                        metadata={"source": f"virtual:legacy-data/{mpath.name}"},
+                    )
                 )
         return
 
@@ -267,17 +292,19 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         data.get("id") or data.get("name") or path.stem
                     )
                     doc_id = f"{doc_type}.{slug}" if doc_type in {"monster", "spell"} else slug
-                    yield ContentDoc(
-                        doc_type=doc_type,
-                        id=doc_id,
-                        name=data.get("name", slug),
-                        kind=data.get("kind"),
-                        subkind=data.get("subkind"),
-                        pack=pack_name,
-                        pack_version=pack_ver,
-                        payload=data,
-                        aliases=data.get("aliases", [data.get("name", slug)]),
-                        metadata={"source": str(path)},
+                    yield _normalize_doc(
+                        ContentDoc(
+                            doc_type=doc_type,
+                            id=doc_id,
+                            name=data.get("name", slug),
+                            kind=data.get("kind"),
+                            subkind=data.get("subkind"),
+                            pack=pack_name,
+                            pack_version=pack_ver,
+                            payload=data,
+                            aliases=data.get("aliases", [data.get("name", slug)]),
+                            metadata={"source": str(path)},
+                        )
                     )
 
         for src in packs:
@@ -369,6 +396,8 @@ def incremental_index(
             "sha256": sig,
             "size": len(canonical_json(doc.payload or {})),
             "mtime": 0.0,
+            "aliases": doc.aliases or [],
+            "payload": doc.payload or {},
         }
         new_manifest[key] = entry
         old = old_manifest.get(key)
@@ -404,7 +433,7 @@ def incremental_index(
                         "subkind": doc.subkind,
                         "pack": doc.pack,
                         "pack_version": doc.pack_version,
-                        "aliases": ",".join(doc.aliases or []),
+                        "aliases": json.dumps(doc.aliases or []),
                         "payload": json.dumps(doc.payload or {}),
                     }
                 )
