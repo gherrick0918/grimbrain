@@ -1,0 +1,134 @@
+{
+  "rule/attack.shortsword": {
+    "doc_type": "rule",
+    "id": "attack.shortsword",
+    "pack": "legacy-data",
+    "kind": "attack",
+    "subkind": "melee",
+    "pack_version": "",
+    "sha256": "5cfc6cb04df55491e4c4816c81172bc070330eb28a15b14a881aab030a52d994",
+    "size": 107,
+    "mtime": 0.0
+  },
+  "rule/attack.shortbow": {
+    "doc_type": "rule",
+    "id": "attack.shortbow",
+    "pack": "legacy-data",
+    "kind": "attack",
+    "subkind": "ranged",
+    "pack_version": "",
+    "sha256": "5687856cf4c20442c60551e4507f2644dfaae580d850b0d94c88d9cca62066fc",
+    "size": 97,
+    "mtime": 0.0
+  },
+  "rule/bookref-dmscreen-index": {
+    "doc_type": "rule",
+    "id": "bookref-dmscreen-index",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "8ff4bbed730230c24d40e6e2e1e2944ccb7a37d5d94066769ff3635dd3625964",
+    "size": 3879,
+    "mtime": 0.0
+  },
+  "rule/bookref-dmscreen": {
+    "doc_type": "rule",
+    "id": "bookref-dmscreen",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "d3d319b9cfc3d83556d6ccbae47d7693bf3bab76d607fefadc48dfa4e36c33db",
+    "size": 348925,
+    "mtime": 0.0
+  },
+  "rule/bookref-quick": {
+    "doc_type": "rule",
+    "id": "bookref-quick",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "0d7f5257b526554ce3b7cff3ff4e58881aa584ba693d0280b50ad7f6d8d03d5a",
+    "size": 259047,
+    "mtime": 0.0
+  },
+  "rule/gendata-maps": {
+    "doc_type": "rule",
+    "id": "gendata-maps",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "d4881ae376c46f0d651f9a09b48bfa250ca243f486f5b169b473cb23b1b73c69",
+    "size": 2629894,
+    "mtime": 0.0
+  },
+  "rule/gendata-nav-adventure-book-index": {
+    "doc_type": "rule",
+    "id": "gendata-nav-adventure-book-index",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "9c960e0aeae71001be2e42ee1e18698efb9c6874bbb6dc2c6bbde56596e8582e",
+    "size": 26153,
+    "mtime": 0.0
+  },
+  "rule/gendata-spell-source-lookup": {
+    "doc_type": "rule",
+    "id": "gendata-spell-source-lookup",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "b3a0a017a1fa94f4181b9d2c901c396b48ada98d2bb509fd1994561cae47160f",
+    "size": 593694,
+    "mtime": 0.0
+  },
+  "rule/gendata-subclass-lookup": {
+    "doc_type": "rule",
+    "id": "gendata-subclass-lookup",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "546aa8c27806be78197ba6024409c6cb67801cf7ad5c977ffe1ca9681766f414",
+    "size": 13908,
+    "mtime": 0.0
+  },
+  "rule/gendata-tables": {
+    "doc_type": "rule",
+    "id": "gendata-tables",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "9524caf26f7ee39f3c323a483e4ab68551692fcb2ff05514f5225e6e7508400f",
+    "size": 2702331,
+    "mtime": 0.0
+  },
+  "rule/gendata-tag-redirects": {
+    "doc_type": "rule",
+    "id": "gendata-tag-redirects",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "aab8d5a90856b9b598735129d41c80e02440b91c92013c2ec34d913a857467c4",
+    "size": 116236,
+    "mtime": 0.0
+  },
+  "rule/gendata-variantrules": {
+    "doc_type": "rule",
+    "id": "gendata-variantrules",
+    "pack": "generated",
+    "kind": null,
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "98be87b1da34de77dc1d076aed1714a82f3cf88174dd4831ed8ad1195c0c7f7e",
+    "size": 41401,
+    "mtime": 0.0
+  }
+}
