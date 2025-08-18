@@ -2,49 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import hashlib
 from pathlib import Path
-from typing import Iterable, Tuple, List
+from typing import Tuple, List
 
-try:  # pragma: no cover - chromadb is heavy but optional for tests
-    from chromadb import PersistentClient
-    from chromadb.utils import embedding_functions
-except Exception:  # pragma: no cover
-    PersistentClient = None  # type: ignore
-    embedding_functions = None  # type: ignore
-
-
-class SimpleEmbeddingFunction:
-    """Deterministic, tiny embedding function.
-
-    This avoids heavy model downloads while still exercising the vector search
-    path in tests.  It is **not** suitable for production quality retrieval but
-    suffices for unit tests where we just need a reproducible number sequence.
-    """
-
-    def __call__(self, input: Iterable[str]):  # pragma: no cover - tiny utility
-        vectors: list[list[float]] = []
-        for text in input:
-            buckets = [0.0] * 32
-            for token in text.lower().split():
-                h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-                buckets[h % 32] += 1.0
-            vectors.append(buckets)
-        return vectors
-
-    # Chroma expects a ``name`` method for persistence metadata.
-    def name(self) -> str:  # pragma: no cover - trivial
-        return "simple"
-
-
-EMBED_FN = SimpleEmbeddingFunction()
-
-
-def _index_signature(files: Iterable[tuple[str, int, int]]) -> str:
-    """Return a short digest for the given ``files`` list."""
-
-    payload = json.dumps(sorted(files), separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()[:7]
+from grimbrain.indexing.content_index import load_sources, incremental_index
 
 
 def load_rules(
@@ -114,57 +75,14 @@ def load_rules(
     return list(rules.values()), gen_count, custom_count, files
 
 
-def build_index(rules_dir: str | Path, out_dir: str | Path) -> int:
-    """Index rule JSON files into a persistent Chroma collection."""
+def build_index(adapter: str, rules_dir: str | Path, out_dir: str | Path) -> int:
+    """Index rules via the generic content indexing helpers."""
 
-    if PersistentClient is None:  # pragma: no cover - chromadb missing
-        raise RuntimeError("chromadb is required for rule indexing")
-
-    rules_path = Path(rules_dir)
-    out_path = Path(out_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-
-    rules, gen_count, custom_count, files = load_rules(rules_path)
-    total = len(rules)
-    if total == 0:
-        print(f'No rules found in "{rules_path}".')
-        return 1
-    idx = _index_signature(files)
-
-    client = PersistentClient(path=str(out_path))
-    # Recreate the collection on every run for determinism
-    try:
-        client.delete_collection("rules")
-    except Exception:
-        pass
-    collection = client.get_or_create_collection(
-        name="rules", embedding_function=EMBED_FN
-    )
-
-    docs: list[str] = []
-    ids: list[str] = []
-    metas: list[dict] = []
-    for rule in rules:
-        rid = rule.get("id")
-        if not rid:
-            continue
-        ids.append(rid)
-        text_parts = [rid, rule.get("cli_verb", ""), " ".join(rule.get("aliases", []))]
-        docs.append(" ".join(p for p in text_parts if p))
-        meta = {
-            "id": rid,
-            "kind": rule.get("kind"),
-            "cli_verb": rule.get("cli_verb"),
-            "aliases": ",".join(rule.get("aliases", [])),
-            "subkind": rule.get("subkind"),
-            "tags": ",".join(rule.get("tags", [])),
-        }
-        metas.append(meta)
-    if ids:
-        collection.upsert(ids=ids, documents=docs, metadatas=metas)
-
+    docs = (d for d in load_sources(adapter, rules_dir) if d.doc_type == "rule")
+    manifest_path = Path(out_dir) / "manifest.json"
+    res = incremental_index(docs, manifest_path, out_dir)
     print(
-        f"Indexed {total} rules (generated={gen_count}, custom={custom_count}, idx={idx})."
+        f"Indexed {res.total} docs (+{res.add} / ~{res.upd} / -{res.rem}) (by_type={res.by_type}, packs={res.by_pack}, idx={res.idx})."
     )
     return 0
 
@@ -175,8 +93,14 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapp
     parser.add_argument(
         "--out", required=True, help="Output directory for Chroma store"
     )
+    parser.add_argument(
+        "--adapter",
+        choices=["rules-json", "legacy-data"],
+        default="rules-json",
+        help="Content adapter to use",
+    )
     args = parser.parse_args(argv)
-    return build_index(args.rules, args.out)
+    return build_index(args.adapter, args.rules, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover
