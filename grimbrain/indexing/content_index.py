@@ -66,6 +66,12 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
+def _slug_dots(name: str) -> str:
+    import re
+
+    return re.sub(r"[^a-z0-9]+", ".", name.lower()).strip(".")
+
+
 def canonical_json(doc: Mapping) -> bytes:
     """Return canonical JSON representation of ``doc``."""
 
@@ -176,7 +182,7 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                     pack="legacy-data",
                     pack_version="",
                     payload=w,
-                    aliases=[slug],
+                    aliases=[w.get("name", slug)],
                     metadata={"source": f"virtual:legacy-data/{wpath.name}"},
                 )
         # spells.json -> spell
@@ -187,19 +193,22 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
             except Exception:
                 spells = []
             for s in spells:
-                slug = _slug(s.get("name", ""))
+                slug = _slug_dots(s.get("name", ""))
                 if not slug:
                     continue
+                school = s.get("school")
+                kind = school.lower() if isinstance(school, str) else None
+                subkind = "attack" if s.get("damage_dice") else "utility"
                 yield ContentDoc(
                     doc_type="spell",
-                    id=slug,
+                    id=f"spell.{slug}",
                     name=s.get("name", slug),
-                    kind="spell",
-                    subkind=s.get("school"),
+                    kind=kind,
+                    subkind=subkind,
                     pack="legacy-data",
                     pack_version="",
                     payload=s,
-                    aliases=[],
+                    aliases=[s.get("name", slug)],
                     metadata={"source": f"virtual:legacy-data/{spath.name}"},
                 )
         # monsters.json -> monster
@@ -210,19 +219,20 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
             except Exception:
                 monsters = []
             for m in monsters:
-                slug = _slug(m.get("name", ""))
+                slug = _slug_dots(m.get("name", ""))
                 if not slug:
                     continue
+                subkind = m.get("cr") or m.get("size")
                 yield ContentDoc(
                     doc_type="monster",
-                    id=slug,
+                    id=f"monster.{slug}",
                     name=m.get("name", slug),
                     kind=m.get("type"),
-                    subkind=m.get("size"),
+                    subkind=subkind,
                     pack="legacy-data",
                     pack_version="",
                     payload=m,
-                    aliases=[],
+                    aliases=[m.get("name", slug)],
                     metadata={"source": f"virtual:legacy-data/{mpath.name}"},
                 )
         return
@@ -248,17 +258,20 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         data = json.loads(path.read_text())
                     except Exception:
                         continue
-                    slug = _slug(data.get("id") or data.get("name") or path.stem)
+                    slug = _slug_dots(
+                        data.get("id") or data.get("name") or path.stem
+                    )
+                    doc_id = f"{doc_type}.{slug}" if doc_type in {"monster", "spell"} else slug
                     yield ContentDoc(
                         doc_type=doc_type,
-                        id=slug,
+                        id=doc_id,
                         name=data.get("name", slug),
                         kind=data.get("kind"),
                         subkind=data.get("subkind"),
                         pack=pack_name,
                         pack_version=pack_ver,
                         payload=data,
-                        aliases=data.get("aliases", []),
+                        aliases=data.get("aliases", [data.get("name", slug)]),
                         metadata={"source": str(path)},
                     )
         return
@@ -281,23 +294,34 @@ def incremental_index(
         except Exception:
             old_manifest = {}
 
-    # apply precedence by iterating in order and overriding
+    # apply precedence based on source
     final_docs: Dict[Tuple[str, str], ContentDoc] = {}
+
     def _rank(d: ContentDoc) -> int:
-        if d.pack == "legacy-data":
-            return 0
-        if d.pack == "generated":
-            return 2
         if d.pack == "custom":
             return 3
-        return 1
+        if d.pack == "generated":
+            return 2
+        if d.pack == "legacy-data":
+            return 0
+        return 1  # packs
+
     for doc in docs:
         key = (doc.doc_type, doc.id)
-        if key in final_docs:
-            prev = final_docs[key]
-            if _rank(prev) == _rank(doc):
-                print(f"Warning: conflict for {doc.doc_type}/{doc.id} ({prev.pack} -> {doc.pack})")
-        final_docs[key] = doc
+        prev = final_docs.get(key)
+        if prev is None:
+            final_docs[key] = doc
+            continue
+        r_prev = _rank(prev)
+        r_doc = _rank(doc)
+        if r_doc > r_prev or (r_doc == r_prev and prev.pack != doc.pack):
+            final_docs[key] = doc
+            winner, loser = doc, prev
+        else:
+            winner, loser = prev, doc
+        print(
+            f"Conflict: {doc.doc_type}/{doc.id} -> keeping {winner.pack}, ignoring {loser.pack}"
+        )
 
     # compute signatures and determine changes
     new_manifest: Dict[str, dict] = {}
@@ -313,6 +337,7 @@ def incremental_index(
         entry = {
             "doc_type": dt,
             "id": did,
+            "name": doc.name,
             "pack": doc.pack,
             "kind": doc.kind,
             "subkind": doc.subkind,

@@ -33,8 +33,8 @@ def test_precedence_crosspacks(env_setup, tmp_path):
         env,
         root,
     )
-    assert res.stdout.lower().count("conflict for monster/goblin") == 1
+    assert res.stdout.count("Conflict: monster/monster.goblin") == 1
 
-    show = run([sys.executable, "main.py", "content", "show", "monster/goblin"], env, root)
+    show = run([sys.executable, "main.py", "content", "show", "monster/monster.goblin"], env, root)
     payload = json.loads(show.stdout)
     assert payload.get("hp") == 15

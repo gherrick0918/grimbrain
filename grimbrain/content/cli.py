@@ -62,6 +62,7 @@ def cmd_list(args) -> int:
         if doc_types == {"rule"}:
             args.type = "rule"
 
+    pattern = args.grep.lower() if args.grep else None
     for _, entry in sorted(manifest.items()):
         dt = entry.get("doc_type")
         if args.type and dt != args.type:
@@ -70,13 +71,15 @@ def cmd_list(args) -> int:
             continue
         if args.pack and entry.get("pack") != args.pack:
             continue
+        if pattern:
+            hay = (entry.get("id", "") + entry.get("name", "")).lower()
+            if pattern not in hay:
+                continue
         line = (
             f"{dt}/{entry.get('id')}  "
             f"{entry.get('kind','')}/{entry.get('subkind','')}  "
             f"[{entry.get('pack')}@{entry.get('pack_version','')}]"
         )
-        if args.grep and args.grep not in line:
-            continue
         print(line)
     return 0
 
@@ -115,6 +118,24 @@ def cmd_show(args) -> int:
     return 0
 
 
+def cmd_packs(_args) -> int:
+    chroma_dir = _env_path("GB_CHROMA_DIR", ".chroma")
+    manifest = _load_manifest(chroma_dir / "manifest.json")
+    counts: dict[str, int] = {}
+    versions: dict[str, str] = {}
+    for entry in manifest.values():
+        pack = entry.get("pack", "")
+        if not pack:
+            continue
+        counts[pack] = counts.get(pack, 0) + 1
+        versions.setdefault(pack, entry.get("pack_version", ""))
+    for pack, count in sorted(counts.items()):
+        ver = versions.get(pack, "")
+        suffix = f"@{ver}" if ver else ""
+        print(f"{pack}{suffix}: {count}")
+    return 0
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="content")
     sub = parser.add_subparsers(dest="cmd")
@@ -135,6 +156,9 @@ def main(argv: List[str] | None = None) -> int:
     p_reload.add_argument("--packs")
     p_reload.add_argument("--types")
     p_reload.set_defaults(func=cmd_reload)
+
+    p_packs = sub.add_parser("packs")
+    p_packs.set_defaults(func=cmd_packs)
 
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):

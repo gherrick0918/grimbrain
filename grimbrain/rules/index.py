@@ -78,7 +78,7 @@ def load_rules(
 def build_index(adapter: str, rules_dir: str | Path, out_dir: str | Path) -> int:
     """Index rules via the generic content indexing helpers."""
 
-    docs = (d for d in load_sources(adapter, rules_dir) if d.doc_type == "rule")
+    docs = load_sources(adapter, rules_dir)
     manifest_path = Path(out_dir) / "manifest.json"
     res = incremental_index(docs, manifest_path, out_dir)
     print(
