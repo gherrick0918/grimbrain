@@ -306,12 +306,15 @@ def incremental_index(
             return 0
         return 1  # packs
 
+    conflicts: Dict[Tuple[str, str], set[str]] = {}
+
     for doc in docs:
         key = (doc.doc_type, doc.id)
         prev = final_docs.get(key)
         if prev is None:
             final_docs[key] = doc
             continue
+
         r_prev = _rank(prev)
         r_doc = _rank(doc)
         if r_doc > r_prev or (r_doc == r_prev and prev.pack != doc.pack):
@@ -319,8 +322,13 @@ def incremental_index(
             winner, loser = doc, prev
         else:
             winner, loser = prev, doc
+
+        conflicts.setdefault(key, set()).add(loser.pack)
+
+    for (dt, did), losers in conflicts.items():
+        winner_pack = final_docs[(dt, did)].pack
         print(
-            f"Conflict: {doc.doc_type}/{doc.id} -> keeping {winner.pack}, ignoring {loser.pack}"
+            f"Conflict: {dt}/{did} -> keeping {winner_pack}, ignoring {', '.join(sorted(losers))}"
         )
 
     # compute signatures and determine changes
