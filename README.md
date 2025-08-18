@@ -125,5 +125,17 @@ export GB_DATA_DIR="data"
 export GB_CHROMA_DIR=".chroma"
 python main.py content reload
 python main.py content list --type monster
-python main.py content show monster/goblin
+python main.py content show monster/monster.goblin
+```
+
+### Monsters & spells from legacy data
+
+```bash
+$env:GB_ENGINE="data"
+$env:GB_RULES_DIR="data"
+$env:GB_CHROMA_DIR=".chroma"
+python -m grimbrain.rules.index --rules $env:GB_RULES_DIR --out $env:GB_CHROMA_DIR --adapter legacy-data
+python .\main.py content list --type monster --grep goblin
+python .\main.py content show spell/spell.fire.bolt
+python .\main.py rules packs
 ```
