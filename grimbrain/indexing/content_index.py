@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import zipfile
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Dict, List, Tuple, Mapping
@@ -238,14 +240,17 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
         return
 
     if adapter == "packs":
-        for pack_dir in packs:
+        def _iter_pack(pack_dir: Path):
             pjson = pack_dir / "pack.json"
             if not pjson.exists():
-                continue
+                return
             try:
                 meta = json.loads(pjson.read_text())
             except Exception:
-                meta = {"name": pack_dir.name, "version": ""}
+                return
+            required = all(isinstance(meta.get(k), str) for k in ("name", "version", "license"))
+            if not required:
+                return
             pack_name = meta.get("name", pack_dir.name)
             pack_ver = meta.get("version", "")
             for folder in ["rules", "monsters", "spells", "items", "conditions"]:
@@ -274,6 +279,17 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         aliases=data.get("aliases", [data.get("name", slug)]),
                         metadata={"source": str(path)},
                     )
+
+        for src in packs:
+            if src.suffix == ".zip":
+                try:
+                    with zipfile.ZipFile(src) as z, tempfile.TemporaryDirectory() as tmp:
+                        z.extractall(tmp)
+                        yield from _iter_pack(Path(tmp))
+                except Exception:
+                    continue
+            else:
+                yield from _iter_pack(src)
         return
 
     return []

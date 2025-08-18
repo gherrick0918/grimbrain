@@ -11,13 +11,13 @@ def test_precedence_crosspacks(env_setup, tmp_path):
     env, root, _ = env_setup
     pack1 = tmp_path / "pack1"
     pack1.mkdir()
-    (pack1 / "pack.json").write_text(json.dumps({"name": "P1", "version": "1"}))
+    (pack1 / "pack.json").write_text(json.dumps({"name": "P1", "version": "1", "license": "MIT"}))
     (pack1 / "monsters").mkdir()
     (pack1 / "monsters" / "goblin.json").write_text(json.dumps({"name": "Goblin", "hp": 5}))
 
     pack2 = tmp_path / "pack2"
     pack2.mkdir()
-    (pack2 / "pack.json").write_text(json.dumps({"name": "P2", "version": "1"}))
+    (pack2 / "pack.json").write_text(json.dumps({"name": "P2", "version": "1", "license": "MIT"}))
     (pack2 / "monsters").mkdir()
     (pack2 / "monsters" / "goblin.json").write_text(json.dumps({"name": "Goblin", "hp": 15}))
 

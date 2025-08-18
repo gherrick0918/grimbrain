@@ -139,3 +139,13 @@ python .\main.py content list --type monster --grep goblin
 python .\main.py content show spell/spell.fire.bolt
 python .\main.py rules packs
 ```
+
+## Auto-reload in dev
+
+Automatically rebuild the rule index when editing files during development:
+
+```powershell
+python .\main.py rules reload --watch
+```
+
+Press <kbd>Ctrl+C</kbd> to stop watching.

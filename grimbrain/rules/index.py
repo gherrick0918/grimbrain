@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 from typing import Tuple, List
 
-from grimbrain.indexing.content_index import load_sources, incremental_index
+from grimbrain.indexing.content_index import (
+    load_sources,
+    incremental_index,
+    ContentDoc,
+)
 
 
 def load_rules(
@@ -75,10 +79,19 @@ def load_rules(
     return list(rules.values()), gen_count, custom_count, files
 
 
-def build_index(adapter: str, rules_dir: str | Path, out_dir: str | Path) -> int:
+def build_index(
+    adapter: str, rules_dir: str | Path, out_dir: str | Path, packs: str | None = None
+) -> int:
     """Index rules via the generic content indexing helpers."""
 
-    docs = load_sources(adapter, rules_dir)
+    docs: List[ContentDoc] = []
+    if adapter:
+        docs.extend(load_sources(adapter, rules_dir))
+    if packs:
+        pack_paths = [Path(p) for p in packs.split(",") if p]
+        if pack_paths:
+            docs.extend(load_sources("packs", Path("."), packs=pack_paths))
+
     manifest_path = Path(out_dir) / "manifest.json"
     res = incremental_index(docs, manifest_path, out_dir)
     print(
@@ -99,8 +112,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapp
         default="rules-json",
         help="Content adapter to use",
     )
+    parser.add_argument("--packs", help="Comma-separated content pack paths")
     args = parser.parse_args(argv)
-    return build_index(args.adapter, args.rules, args.out)
+    return build_index(args.adapter, args.rules, args.out, args.packs)
 
 
 if __name__ == "__main__":  # pragma: no cover
