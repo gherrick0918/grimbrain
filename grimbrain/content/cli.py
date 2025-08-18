@@ -55,7 +55,14 @@ def cmd_reload(args) -> int:
 def cmd_list(args) -> int:
     chroma_dir = _env_path("GB_CHROMA_DIR", ".chroma")
     manifest = _load_manifest(chroma_dir / "manifest.json")
-    for key, entry in sorted(manifest.items()):
+
+    # If only rules are indexed, default to that type for back-compat.
+    if not args.type:
+        doc_types = {e.get("doc_type") for e in manifest.values()}
+        if doc_types == {"rule"}:
+            args.type = "rule"
+
+    for _, entry in sorted(manifest.items()):
         dt = entry.get("doc_type")
         if args.type and dt != args.type:
             continue
@@ -77,30 +84,30 @@ def cmd_list(args) -> int:
 def cmd_show(args) -> int:
     chroma_dir = _env_path("GB_CHROMA_DIR", ".chroma")
     doc_id = args.docid
-    if "/" not in doc_id:
-        print("format doc_type/id")
-        return 1
-    dt, did = doc_id.split("/", 1)
+    if "/" in doc_id:
+        dt, did = doc_id.split("/", 1)
+    else:
+        dt, did = "rule", doc_id
+
     try:
         from chromadb import PersistentClient
     except Exception:
         print("Chroma unavailable")
         return 1
+
     client = PersistentClient(path=str(chroma_dir))
     try:
         col = client.get_collection("content")
-    except Exception:
-        print("Not indexed")
-        return 1
-    try:
         res = col.get(ids=[f"{dt}/{did}"])
     except Exception:
-        print("Not found")
-        return 1
+        print(f"Not found: {dt}/{did}")
+        return 2
+
     metas = res.get("metadatas") or []
     if not metas:
-        print("Not found")
-        return 1
+        print(f"Not found: {dt}/{did}")
+        return 2
+
     payload = metas[0].get("payload")
     if isinstance(payload, str):
         payload = json.loads(payload)
