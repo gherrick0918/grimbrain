@@ -20,7 +20,7 @@ def _default_context() -> dict:
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gb", description="Data-driven rules CLI")
-    parser.add_argument("args", nargs="*")
+    parser.add_argument("args", nargs=argparse.REMAINDER)
     ns = parser.parse_args(argv)
 
     rules_dir = os.getenv("GB_RULES_DIR", "rules")
@@ -37,7 +37,11 @@ def main(argv: List[str] | None = None) -> int:
             return content_cli.main(["reload", "--types", "rule"] + sub[1:])
         if sub and sub[0] == "packs":
             return content_cli.main(["packs"] + sub[1:])
-        parser.error("usage: rules [show|reload|list|packs] ...")
+        if sub and sub[0] == "doctor":
+            from .doctor import main as doctor_main
+
+            return doctor_main(sub[1:])
+        parser.error("usage: rules [show|reload|list|packs|doctor] ...")
 
     if not ns.args:
         parser.print_help()
