@@ -161,30 +161,58 @@ def cmd_show(args) -> int:
     else:
         dt, did = "rule", doc_id
 
-    try:
-        from chromadb import PersistentClient
-    except Exception:
-        print("Chroma unavailable")
-        return 1
+    from difflib import SequenceMatcher
+    from grimbrain.content.ids import canonicalize_id
 
-    client = PersistentClient(path=str(chroma_dir))
-    try:
-        col = client.get_collection("content")
-        res = col.get(ids=[f"{dt}/{did}"])
-    except Exception:
-        print(f"Not found: {dt}/{did}")
-        return 2
+    manifest = _load_manifest(Path(chroma_dir) / "manifest.json")
 
-    metas = res.get("metadatas") or []
-    if not metas:
-        print(f"Not found: {dt}/{did}")
-        return 2
+    # Build alias and id maps for the requested doc_type
+    alias_map: dict[str, str] = {}
+    id_map: dict[str, dict] = {}
+    for entry in manifest.values():
+        if entry.get("doc_type") != dt:
+            continue
+        cid = str(entry.get("id", ""))
+        alias_map[cid.lower()] = cid
+        id_map[cid] = entry
+        for a in entry.get("aliases", []) or []:
+            alias_map[str(a).lower()] = cid
 
-    payload = metas[0].get("payload")
-    if isinstance(payload, str):
-        payload = json.loads(payload)
-    print(json.dumps(payload, indent=2))
-    return 0
+    canon = canonicalize_id(dt, did)
+    entry = id_map.get(canon)
+    if entry is not None:
+        print(json.dumps(entry.get("payload"), indent=2))
+        return 0
+
+    alias_target = alias_map.get(did.lower())
+    if alias_target:
+        entry = id_map.get(alias_target)
+        if entry is not None:
+            print(json.dumps(entry.get("payload"), indent=2))
+            return 0
+
+    # Suggestions
+    query = did.lower()
+    suggestions: List[str] = []
+    scored: List[tuple[int, int, float, str]] = []
+    for alias, cid in alias_map.items():
+        start = 1 if alias.startswith(query) else 0
+        sub = 1 if query in alias else 0
+        ratio = SequenceMatcher(None, query, alias).ratio()
+        scored.append((start, sub, ratio, cid))
+    scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
+    seen: set[str] = set()
+    for _, _, _, cid in scored:
+        if cid not in seen:
+            seen.add(cid)
+            suggestions.append(cid)
+        if len(suggestions) >= 5:
+            break
+
+    print(f"Not found: {dt}/{did}")
+    if suggestions:
+        print("Did you mean: " + ", ".join(f"{dt}/{s}" for s in suggestions))
+    return 2
 
 
 def cmd_packs(_args) -> int:
