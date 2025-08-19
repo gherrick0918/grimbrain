@@ -92,6 +92,10 @@ See ``schema/rule.schema.json`` for the rule document format.
 
 Set ``GB_RULES_INSTANT_DEATH=true`` to enable the instant death variant.
 
+### Stabilize actions
+
+You can now stabilize a dying creature with a Medicine check or by casting *Spare the Dying*.
+
 ### Data-driven quickstart
 
 PowerShell

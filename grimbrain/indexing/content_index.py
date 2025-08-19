@@ -131,7 +131,7 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         pack="generated",
                         pack_version="",
                         payload=rule,
-                        aliases=rule.get("aliases", []),
+                        aliases=[a for a in [rule.get("cli_verb")] + rule.get("aliases", []) if a],
                         metadata={"source": str(path)},
                     )
                 )
@@ -154,7 +154,7 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         pack=src_pack,
                         pack_version="",
                         payload=rule,
-                        aliases=rule.get("aliases", []),
+                        aliases=[a for a in [rule.get("cli_verb")] + rule.get("aliases", []) if a],
                         metadata={"source": str(path)},
                     )
                 )
@@ -176,7 +176,7 @@ def load_sources(adapter: str, base_dir: str | Path, packs: List[Path] | None = 
                         pack="generated",
                         pack_version="",
                         payload=rule,
-                        aliases=rule.get("aliases", []),
+                        aliases=[a for a in [rule.get("cli_verb")] + rule.get("aliases", []) if a],
                         metadata={"source": str(path)},
                     )
                 )

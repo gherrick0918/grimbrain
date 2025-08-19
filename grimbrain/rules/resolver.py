@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import difflib
 from pathlib import Path
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Optional, Set
 from collections import OrderedDict
 
 try:  # pragma: no cover - optional dependency
@@ -48,6 +48,7 @@ class RuleResolver:
     def _load_rules(self) -> None:
         self.rules: Dict[str, dict] = {}
         self.name_map: Dict[str, str] = {}
+        self.verb_map: Dict[str, str] = {}
         rule_list, _, _, _ = load_rules(self.rules_dir)
         for rule in rule_list:
             rid = rule["id"]
@@ -56,8 +57,11 @@ class RuleResolver:
             verb = rule.get("cli_verb")
             if verb:
                 self.name_map[verb.lower()] = rid
+                self.verb_map[verb.lower()] = verb
             for alias in rule.get("aliases", []):
                 self.name_map[alias.lower()] = rid
+                if verb:
+                    self.verb_map[alias.lower()] = verb
 
     # cache management -------------------------------------------------
     def _cache_put(self, key, value):
@@ -68,6 +72,7 @@ class RuleResolver:
 
     def reload(self) -> None:
         self._cache.clear()
+        self.verb_map.clear()
         self._load_rules()
         self._init_collection()
 
@@ -104,8 +109,30 @@ class RuleResolver:
                     rule = candidate
         elif rid and 0.30 <= score < 0.42:
             suggestions = [self.rules[rid]["id"]]
+        if rule is None and not suggestions:
+            suggestions = self.suggest_verbs(text)
         self._cache_put(key, rule)
         return rule, suggestions
+
+    # verb suggestions -------------------------------------------------
+    def suggest_verbs(self, verb: str) -> List[str]:
+        query = verb.lower()
+        scored: List[Tuple[int, int, float, str]] = []
+        for alias, canon in self.verb_map.items():
+            start = 1 if alias.startswith(query) else 0
+            sub = 1 if query in alias else 0
+            ratio = difflib.SequenceMatcher(None, query, alias).ratio()
+            scored.append((start, sub, ratio, canon))
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
+        suggestions: List[str] = []
+        seen: Set[str] = set()
+        for _, _, _, canon in scored:
+            if canon not in seen:
+                seen.add(canon)
+                suggestions.append(canon)
+            if len(suggestions) >= 10:
+                break
+        return suggestions
 
     # helpers ----------------------------------------------------------
     def _vector_lookup(

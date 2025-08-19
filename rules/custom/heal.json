@@ -3,6 +3,7 @@
   "id": "heal",
   "kind": "action",
   "cli_verb": "heal",
+  "aliases": ["cure", "medic"],
   "targets": ["target"],
   "effects": [
     {"op": "heal", "target": "target", "amount": "1"},
