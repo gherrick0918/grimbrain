@@ -5,7 +5,8 @@
   "cli_verb": "heal",
   "targets": ["target"],
   "effects": [
-    {"op": "heal", "target": "target", "amount": "1"}
+    {"op": "heal", "target": "target", "amount": "1"},
+    {"op": "clear_death_saves", "target": "target"}
   ],
   "log_templates": {}
 }
