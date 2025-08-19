@@ -5,6 +5,8 @@ import json
 import os
 import random
 import re
+import sys
+import contextlib
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -83,12 +85,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--quiet", action="store_true", help="Suppress step logs")
     args = parser.parse_args(argv)
 
+    def log(*a, **k):
+        print(*a, file=sys.stderr if args.json else sys.stdout, **k)
+
     os.environ.setdefault("GB_ENGINE", "data")
 
     reload_args = ["reload", "--types", "rule,monster"]
     if args.packs:
         reload_args += ["--packs", args.packs]
-    content_cli.main(reload_args)
+    if args.json:
+        with contextlib.redirect_stdout(sys.stderr):
+            content_cli.main(reload_args)
+    else:
+        content_cli.main(reload_args)
 
     chroma_dir = Path(os.getenv("GB_CHROMA_DIR", ".chroma"))
     manifest = json.loads((chroma_dir / "manifest.json").read_text()) if (chroma_dir / "manifest.json").exists() else {}
@@ -103,7 +112,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             msg = f"Unknown monster '{name}'"
             if sugg:
                 msg += ". Did you mean: " + ", ".join(sugg)
-            print(msg)
+            log(msg)
             continue
         payload = mon_id_map.get(key, {})
         monsters.append({
@@ -138,17 +147,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         target_name = parts[1] if len(parts) > 1 else None
         rule, suggestions = resolver.resolve(verb)
         if rule is None:
-            print(f'Not found verb: "{verb}"')
+            log(f'Not found verb: "{verb}"')
             if suggestions:
-                print("Did you mean: " + ", ".join(suggestions))
+                log("Did you mean: " + ", ".join(suggestions))
             return
         actor = party[0]
         target = name_map.get(target_name.lower()) if target_name else None
         if target is None and target_name:
             sugg = _suggest(target_name, name_map.keys())
-            print(f"Unknown target: {target_name}")
+            log(f"Unknown target: {target_name}")
             if sugg:
-                print("Did you mean: " + ", ".join(sugg))
+                log("Did you mean: " + ", ".join(sugg))
             return
         use_rule = rule
         if not rule.get("effects") and rule.get("kind") == "attack" and rule.get("damage_dice"):
@@ -181,16 +190,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception:
             lines = []
     else:
-        def _iter() -> Iterable[str]:
-            while True:
-                try:
-                    line = input("> ")
-                except EOFError:
-                    return
-                if line.strip().lower() in {"quit", "exit"}:
-                    return
-                yield line
-        lines = _iter()
+        if not sys.stdin.isatty():
+            lines = []
+        else:
+            def _iter() -> Iterable[str]:
+                while True:
+                    try:
+                        if args.quiet:
+                            line = input()
+                        elif args.json:
+                            print("> ", end="", file=sys.stderr)
+                            line = input()
+                        else:
+                            line = input("> ")
+                    except EOFError:
+                        return
+                    if line.strip().lower() in {"quit", "exit"}:
+                        return
+                    yield line
+            lines = _iter()
 
     rounds = 0
     for cmd in lines:
@@ -200,7 +218,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     alive = [c["name"] for c in combatants if c.get("hp", 0) > 0 and not c.get("dead")]
     dead = [c["name"] for c in combatants if c.get("dead")]
     stable = [c["name"] for c in combatants if c.get("stable")]
+    summary = f"Summary: rounds={rounds}; alive={alive}; dead={dead}; stable={stable}"
     if args.json:
+        if not args.quiet:
+            log(summary)
         print(json.dumps({
             "event": "summary",
             "rounds": rounds,
@@ -209,7 +230,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "stable": stable,
         }))
     else:
-        print(f"Summary: rounds={rounds}; alive={alive}; dead={dead}; stable={stable}")
+        log(summary)
     return 0
 
 
