@@ -90,6 +90,8 @@ GB_ENGINE=data python main.py rules reload
 
 See ``schema/rule.schema.json`` for the rule document format.
 
+Set ``GB_RULES_INSTANT_DEATH=true`` to enable the instant death variant.
+
 ### Data-driven quickstart
 
 PowerShell
