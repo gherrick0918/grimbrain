@@ -1,116 +1,305 @@
 {
-  "rule/attack.shortsword": {
-    "doc_type": "rule",
-    "id": "attack.shortsword",
-    "name": "Shortsword",
-    "pack": "legacy-data",
-    "kind": "attack",
-    "subkind": "melee",
-    "pack_version": "",
-    "sha256": "5cfc6cb04df55491e4c4816c81172bc070330eb28a15b14a881aab030a52d994",
-    "size": 107,
-    "mtime": 0.0,
-    "aliases": [
-      "shortsword"
-    ],
-    "payload": {
-      "name": "Shortsword",
-      "range": "melee",
-      "properties": [
-        "finesse"
-      ],
-      "damage_dice": "1d6",
-      "damage_type": "slashing"
-    }
-  },
   "rule/attack.shortbow": {
     "doc_type": "rule",
     "id": "attack.shortbow",
     "name": "Shortbow",
-    "pack": "legacy-data",
+    "pack": "generated",
     "kind": "attack",
     "subkind": "ranged",
     "pack_version": "",
-    "sha256": "5687856cf4c20442c60551e4507f2644dfaae580d850b0d94c88d9cca62066fc",
-    "size": 97,
+    "sha256": "73c51d9f65435a4c5636117a3b37cb62e9e7e199c9756ce8979a4edf7304bf7c",
+    "size": 116,
     "mtime": 0.0,
-    "aliases": [
-      "shortbow"
-    ],
+    "aliases": [],
     "payload": {
+      "id": "attack.shortbow",
       "name": "Shortbow",
-      "range": "ranged",
-      "properties": [],
-      "damage_dice": "1d6",
-      "damage_type": "piercing"
+      "kind": "attack",
+      "subkind": "ranged",
+      "pack": "generated",
+      "damage_dice": "1d6"
     }
   },
-  "spell/magic.missile": {
-    "doc_type": "spell",
-    "id": "magic.missile",
-    "name": "Magic Missile",
-    "pack": "legacy-data",
-    "kind": "evocation",
-    "subkind": "attack",
+  "rule/attack.shortsword": {
+    "doc_type": "rule",
+    "id": "attack.shortsword",
+    "name": "Shortsword",
+    "pack": "generated",
+    "kind": "attack",
+    "subkind": "melee",
     "pack_version": "",
-    "sha256": "0e38ad57ebdf7ac74b5dc78b5b4506edd061dcf9d1c0019f03b951830c9f5b4f",
-    "size": 121,
+    "sha256": "b834a5dfdfd36e09d66986c4518a1ef09b6b5f5f12f916fd33a66f28f174d642",
+    "size": 119,
     "mtime": 0.0,
-    "aliases": [
-      "magic missile",
-      "spell.magic.missile"
-    ],
+    "aliases": [],
     "payload": {
-      "name": "Magic Missile",
-      "level": 1,
-      "school": "Evocation",
-      "damage_dice": "1d4+1",
-      "damage_type": "force",
-      "concentration": false
+      "id": "attack.shortsword",
+      "name": "Shortsword",
+      "kind": "attack",
+      "subkind": "melee",
+      "pack": "generated",
+      "damage_dice": "1d6"
     }
   },
-  "spell/mage.hand": {
-    "doc_type": "spell",
-    "id": "mage.hand",
-    "name": "Mage Hand",
-    "pack": "legacy-data",
-    "kind": "conjuration",
+  "rule/item.potion.healing": {
+    "doc_type": "rule",
+    "id": "item.potion.healing",
+    "name": "item.potion.healing",
+    "pack": "generated",
+    "kind": "item",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "6992ce90f1eef6fd8047fb34d6331c489adbd6c1950ea2e890ea38c85dc8639b",
+    "size": 266,
+    "mtime": 0.0,
+    "aliases": [],
+    "payload": {
+      "cli_verb": "use",
+      "effects": [
+        {
+          "amount": "2d4+2",
+          "op": "heal",
+          "target": "self"
+        },
+        {
+          "op": "clear_death_saves",
+          "target": "self"
+        }
+      ],
+      "id": "item.potion.healing",
+      "kind": "item",
+      "log_templates": {
+        "apply": "{actor.name} regains {last_amount} HP (Potion of Healing)"
+      },
+      "targets": [
+        "self"
+      ]
+    }
+  },
+  "rule/spell.mage.hand": {
+    "doc_type": "rule",
+    "id": "spell.mage.hand",
+    "name": "spell.mage.hand",
+    "pack": "generated",
+    "kind": "spell",
     "subkind": "utility",
     "pack_version": "",
-    "sha256": "4506f1635845c166bb8a3ef15cc872afa533e01f84a731cc69e1b9d45567e348",
-    "size": 75,
+    "sha256": "bda27ee97e4a948fe2270f3280ee1bbc48e8f39f1d489a44c37d841cef8cdc7e",
+    "size": 313,
     "mtime": 0.0,
     "aliases": [
-      "mage hand",
-      "spell.mage.hand"
+      "mage hand"
     ],
     "payload": {
-      "name": "Mage Hand",
-      "level": 0,
-      "school": "Conjuration",
-      "concentration": false
+      "aliases": [
+        "Mage Hand"
+      ],
+      "cli_verb": "cast",
+      "effects": [],
+      "id": "spell.mage.hand",
+      "kind": "spell",
+      "log_templates": {
+        "apply": "{target.name} takes {last_amount} {damage_type}",
+        "start": "{actor.name} casts Mage Hand at {target.name}"
+      },
+      "metadata": {
+        "level": 0,
+        "school": "Conjuration"
+      },
+      "subkind": "utility",
+      "targets": [
+        "target"
+      ]
     }
   },
-  "monster/goblin": {
-    "doc_type": "monster",
-    "id": "goblin",
-    "name": "Goblin",
-    "pack": "legacy-data",
-    "kind": "humanoid",
-    "subkind": "small",
+  "rule/spell.magic.missile": {
+    "doc_type": "rule",
+    "id": "spell.magic.missile",
+    "name": "spell.magic.missile",
+    "pack": "generated",
+    "kind": "spell",
+    "subkind": "attack",
     "pack_version": "",
-    "sha256": "b48a1e7acaca8b142ae86a13023f2ad13669989669fbcf122f2f59a2d935d569",
-    "size": 65,
+    "sha256": "16fe41a2937ca88b478119803428dd648756d6ac8cd410920e46f0ede9325ea1",
+    "size": 456,
     "mtime": 0.0,
     "aliases": [
-      "monster.goblin"
+      "magic missile"
     ],
     "payload": {
-      "name": "Goblin",
-      "hp": 7,
-      "ac": 15,
-      "type": "humanoid",
-      "size": "small"
+      "aliases": [
+        "Magic Missile"
+      ],
+      "cli_verb": "cast",
+      "effects": [
+        {
+          "amount": 1,
+          "op": "resource_spend",
+          "resource": "spell_slots.1"
+        },
+        {
+          "amount": "1d4+1",
+          "damage_type": "force",
+          "op": "damage",
+          "target": "target"
+        }
+      ],
+      "id": "spell.magic.missile",
+      "kind": "spell",
+      "log_templates": {
+        "apply": "{target.name} takes {last_amount} {damage_type}",
+        "start": "{actor.name} casts Magic Missile at {target.name}"
+      },
+      "metadata": {
+        "level": 1,
+        "school": "Evocation"
+      },
+      "subkind": "attack",
+      "targets": [
+        "target"
+      ]
+    }
+  },
+  "rule/attack": {
+    "doc_type": "rule",
+    "id": "attack",
+    "name": "attack",
+    "pack": "custom",
+    "kind": "action",
+    "subkind": "melee",
+    "pack_version": "",
+    "sha256": "1e2f367943f2557dab82a93e38b246b701f043af87319cc6f82008a185311ef6",
+    "size": 241,
+    "mtime": 0.0,
+    "aliases": [
+      "atk"
+    ],
+    "payload": {
+      "schema_version": 1,
+      "id": "attack",
+      "kind": "action",
+      "subkind": "melee",
+      "cli_verb": "attack",
+      "aliases": [
+        "atk"
+      ],
+      "targets": [
+        "target"
+      ],
+      "effects": [
+        {
+          "op": "damage",
+          "target": "target",
+          "amount": "1d1"
+        }
+      ],
+      "log_templates": {
+        "start": "{actor} attacks {target}"
+      }
+    }
+  },
+  "rule/heal": {
+    "doc_type": "rule",
+    "id": "heal",
+    "name": "heal",
+    "pack": "custom",
+    "kind": "action",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "82bc849c1f591a0f774eee0df2cf0c3b0fb8723fdea00f9b67554c7a754b1fb6",
+    "size": 208,
+    "mtime": 0.0,
+    "aliases": [],
+    "payload": {
+      "schema_version": 1,
+      "id": "heal",
+      "kind": "action",
+      "cli_verb": "heal",
+      "targets": [
+        "target"
+      ],
+      "effects": [
+        {
+          "op": "heal",
+          "target": "target",
+          "amount": "1"
+        },
+        {
+          "op": "clear_death_saves",
+          "target": "target"
+        }
+      ],
+      "log_templates": {}
+    }
+  },
+  "rule/obliterate": {
+    "doc_type": "rule",
+    "id": "obliterate",
+    "name": "obliterate",
+    "pack": "custom",
+    "kind": "action",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "29481ece3ff93b17d85c53d49c4a4ff0fb01726be4472704163b09351b68ab99",
+    "size": 257,
+    "mtime": 0.0,
+    "aliases": [],
+    "payload": {
+      "schema_version": 1,
+      "id": "obliterate",
+      "kind": "action",
+      "cli_verb": "obliterate",
+      "targets": [
+        "target"
+      ],
+      "effects": [
+        {
+          "op": "damage",
+          "target": "target",
+          "amount": "999",
+          "tags": [
+            "debug"
+          ]
+        }
+      ],
+      "log_templates": {
+        "start": "{actor.name} unleashes devastation at {target.name}"
+      }
+    }
+  },
+  "rule/stabilize": {
+    "doc_type": "rule",
+    "id": "stabilize",
+    "name": "stabilize",
+    "pack": "custom",
+    "kind": "action",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "9deee4bd6ef764740a7bda8585ebdec9d7360eff58ed21c128d5efb72e249c69",
+    "size": 266,
+    "mtime": 0.0,
+    "aliases": [],
+    "payload": {
+      "schema_version": 1,
+      "id": "stabilize",
+      "kind": "action",
+      "cli_verb": "stabilize",
+      "targets": [
+        "target"
+      ],
+      "effects": [
+        {
+          "op": "set_stable",
+          "target": "target"
+        },
+        {
+          "op": "clear_death_saves",
+          "target": "target"
+        }
+      ],
+      "log_templates": {
+        "apply": "{actor.name} stabilizes {target.name} at 0 HP"
+      }
     }
   }
 }
