@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "obliterate",
+  "kind": "action",
+  "cli_verb": "obliterate",
+  "targets": ["target"],
+  "effects": [
+    {"op":"damage","target":"target","amount":"999","tags":["debug"]}
+  ],
+  "log_templates": {
+    "start": "{actor.name} unleashes devastation at {target.name}"
+  }
+}

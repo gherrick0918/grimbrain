@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "attack",
+  "kind": "action",
+  "subkind": "melee",
+  "cli_verb": "attack",
+  "aliases": ["atk", "stab", "strike"],
+  "targets": ["target"],
+  "effects": [
+    {"op": "damage", "target": "target", "amount": "1d1"}
+  ],
+  "log_templates": {
+    "start": "{actor} attacks {target}"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "attack.shortbow",
+  "name": "Shortbow",
+  "kind": "attack",
+  "subkind": "ranged",
+  "pack": "generated",
+  "damage_dice": "1d6"
+}

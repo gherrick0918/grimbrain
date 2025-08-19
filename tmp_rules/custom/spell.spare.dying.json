@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "spell.spare.dying",
+  "kind": "spell",
+  "cli_verb": "spare",
+  "aliases": ["spare-dying"],
+  "targets": ["target"],
+  "prereq": {"target_at_zero": true},
+  "effects": [
+    {"op":"set_stable","target":"target"},
+    {"op":"clear_death_saves","target":"target"}
+  ],
+  "log_templates": {
+    "start": "{actor.name} casts Spare the Dying on {target.name}",
+    "apply": "{target.name} is stable at 0 HP"
+  }
+}

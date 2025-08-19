@@ -28,7 +28,7 @@
     "kind": "attack",
     "subkind": "melee",
     "pack_version": "",
-    "sha256": "b834a5dfdfd36e09d66986c4518a1ef09b6b5f5f12f916fd33a66f28f174d642",
+    "sha256": "fb7fd986995b4495424e2687ab16958e8cc4276a2ccb37d59e4b187f4f85b5d0",
     "size": 119,
     "mtime": 0.0,
     "aliases": [],
@@ -38,7 +38,7 @@
       "kind": "attack",
       "subkind": "melee",
       "pack": "generated",
-      "damage_dice": "1d6"
+      "damage_dice": "1d8"
     }
   },
   "rule/item.potion.healing": {
@@ -52,7 +52,9 @@
     "sha256": "6992ce90f1eef6fd8047fb34d6331c489adbd6c1950ea2e890ea38c85dc8639b",
     "size": 266,
     "mtime": 0.0,
-    "aliases": [],
+    "aliases": [
+      "use"
+    ],
     "payload": {
       "cli_verb": "use",
       "effects": [
@@ -88,6 +90,7 @@
     "size": 313,
     "mtime": 0.0,
     "aliases": [
+      "cast",
       "mage hand"
     ],
     "payload": {
@@ -124,6 +127,7 @@
     "size": 456,
     "mtime": 0.0,
     "aliases": [
+      "cast",
       "magic missile"
     ],
     "payload": {
@@ -168,11 +172,13 @@
     "kind": "action",
     "subkind": "melee",
     "pack_version": "",
-    "sha256": "1e2f367943f2557dab82a93e38b246b701f043af87319cc6f82008a185311ef6",
-    "size": 241,
+    "sha256": "d65ec7eef79a640c38a0b18381f6ab56f2491c34976c84d7e7dd2699492e2f84",
+    "size": 257,
     "mtime": 0.0,
     "aliases": [
-      "atk"
+      "atk",
+      "stab",
+      "strike"
     ],
     "payload": {
       "schema_version": 1,
@@ -181,7 +187,9 @@
       "subkind": "melee",
       "cli_verb": "attack",
       "aliases": [
-        "atk"
+        "atk",
+        "stab",
+        "strike"
       ],
       "targets": [
         "target"
@@ -206,15 +214,22 @@
     "kind": "action",
     "subkind": null,
     "pack_version": "",
-    "sha256": "82bc849c1f591a0f774eee0df2cf0c3b0fb8723fdea00f9b67554c7a754b1fb6",
-    "size": 208,
+    "sha256": "ed02f7ad1ea7346d77d6ebe45db4585f655184b9591044475c99fde2dca52bf0",
+    "size": 235,
     "mtime": 0.0,
-    "aliases": [],
+    "aliases": [
+      "cure",
+      "medic"
+    ],
     "payload": {
       "schema_version": 1,
       "id": "heal",
       "kind": "action",
       "cli_verb": "heal",
+      "aliases": [
+        "cure",
+        "medic"
+      ],
       "targets": [
         "target"
       ],
@@ -230,6 +245,55 @@
         }
       ],
       "log_templates": {}
+    }
+  },
+  "rule/medicine.check": {
+    "doc_type": "rule",
+    "id": "medicine.check",
+    "name": "medicine.check",
+    "pack": "custom",
+    "kind": "action",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "db4a2a588e0c4f6286e6da6feb60710644dbb0641d4243db5a81c22b643f13bc",
+    "size": 545,
+    "mtime": 0.0,
+    "aliases": [
+      "medicine"
+    ],
+    "payload": {
+      "schema_version": 1,
+      "id": "medicine.check",
+      "kind": "action",
+      "cli_verb": "medicine",
+      "targets": [
+        "target"
+      ],
+      "dc": 10,
+      "effects": [
+        {
+          "op": "check",
+          "ability": "WIS",
+          "proficiency": "medicine",
+          "dc": "{dc}",
+          "target": "actor"
+        },
+        {
+          "op": "set_stable",
+          "target": "target",
+          "when": "check.success"
+        },
+        {
+          "op": "clear_death_saves",
+          "target": "target",
+          "when": "check.success"
+        }
+      ],
+      "log_templates": {
+        "start": "{actor.name} makes a DC {dc} Medicine check to stabilize {target.name}",
+        "apply": "{actor.name} stabilizes {target.name} at 0 HP",
+        "fail": "{actor.name} fails to stabilize {target.name}"
+      }
     }
   },
   "rule/obliterate": {
@@ -267,6 +331,51 @@
       }
     }
   },
+  "rule/spell.spare.dying": {
+    "doc_type": "rule",
+    "id": "spell.spare.dying",
+    "name": "spell.spare.dying",
+    "pack": "custom",
+    "kind": "spell",
+    "subkind": null,
+    "pack_version": "",
+    "sha256": "c91197f0a0dfbb82877f5d09292ce16a9c92d290120eb94310cf7ffd42bc8d6c",
+    "size": 376,
+    "mtime": 0.0,
+    "aliases": [
+      "spare",
+      "spare-dying"
+    ],
+    "payload": {
+      "schema_version": 1,
+      "id": "spell.spare.dying",
+      "kind": "spell",
+      "cli_verb": "spare",
+      "aliases": [
+        "spare-dying"
+      ],
+      "targets": [
+        "target"
+      ],
+      "prereq": {
+        "target_at_zero": true
+      },
+      "effects": [
+        {
+          "op": "set_stable",
+          "target": "target"
+        },
+        {
+          "op": "clear_death_saves",
+          "target": "target"
+        }
+      ],
+      "log_templates": {
+        "start": "{actor.name} casts Spare the Dying on {target.name}",
+        "apply": "{target.name} is stable at 0 HP"
+      }
+    }
+  },
   "rule/stabilize": {
     "doc_type": "rule",
     "id": "stabilize",
@@ -275,15 +384,23 @@
     "kind": "action",
     "subkind": null,
     "pack_version": "",
-    "sha256": "9deee4bd6ef764740a7bda8585ebdec9d7360eff58ed21c128d5efb72e249c69",
-    "size": 266,
+    "sha256": "febb4d0abd68900e870912203b3a63da1e9ee0b47fa3bb546a7779cc6450e413",
+    "size": 308,
     "mtime": 0.0,
-    "aliases": [],
+    "aliases": [
+      "stabilise",
+      "stb"
+    ],
     "payload": {
       "schema_version": 1,
       "id": "stabilize",
       "kind": "action",
       "cli_verb": "stabilize",
+      "aliases": [
+        "stabilise",
+        "stabilize",
+        "stb"
+      ],
       "targets": [
         "target"
       ],

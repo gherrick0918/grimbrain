@@ -1,0 +1,4 @@
+*.json
+!attack.shortbow.json
+!attack.shortsword.json
+!/.gitignore
