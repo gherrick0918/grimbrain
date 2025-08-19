@@ -1,4 +1,25 @@
 {
+  "rule/attack.shortsword": {
+    "doc_type": "rule",
+    "id": "attack.shortsword",
+    "name": "Shortsword",
+    "pack": "generated",
+    "kind": "attack",
+    "subkind": "melee",
+    "pack_version": "",
+    "sha256": "b834a5dfdfd36e09d66986c4518a1ef09b6b5f5f12f916fd33a66f28f174d642",
+    "size": 119,
+    "mtime": 0.0,
+    "aliases": [],
+    "payload": {
+      "id": "attack.shortsword",
+      "name": "Shortsword",
+      "kind": "attack",
+      "subkind": "melee",
+      "pack": "generated",
+      "damage_dice": "1d6"
+    }
+  },
   "rule/attack.shortbow": {
     "doc_type": "rule",
     "id": "attack.shortbow",
@@ -20,25 +41,26 @@
       "damage_dice": "1d6"
     }
   },
-  "rule/attack.shortsword": {
-    "doc_type": "rule",
-    "id": "attack.shortsword",
-    "name": "Shortsword",
-    "pack": "generated",
-    "kind": "attack",
-    "subkind": "melee",
+  "monster/goblin": {
+    "doc_type": "monster",
+    "id": "goblin",
+    "name": "Goblin",
+    "pack": "legacy-data",
+    "kind": "humanoid",
+    "subkind": "small",
     "pack_version": "",
-    "sha256": "fb7fd986995b4495424e2687ab16958e8cc4276a2ccb37d59e4b187f4f85b5d0",
-    "size": 119,
+    "sha256": "b48a1e7acaca8b142ae86a13023f2ad13669989669fbcf122f2f59a2d935d569",
+    "size": 65,
     "mtime": 0.0,
-    "aliases": [],
+    "aliases": [
+      "monster.goblin"
+    ],
     "payload": {
-      "id": "attack.shortsword",
-      "name": "Shortsword",
-      "kind": "attack",
-      "subkind": "melee",
-      "pack": "generated",
-      "damage_dice": "1d8"
+      "name": "Goblin",
+      "hp": 7,
+      "ac": 15,
+      "type": "humanoid",
+      "size": "small"
     }
   },
   "rule/item.potion.healing": {
