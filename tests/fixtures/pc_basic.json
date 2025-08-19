@@ -1,0 +1,13 @@
+{
+  "party": [
+    {
+      "name": "Hero",
+      "hp": 10,
+      "ac": 10,
+      "max_hp": 10,
+      "mods": {"STR": 0, "WIS": 0},
+      "skills": ["medicine"],
+      "prof": 2
+    }
+  ]
+}

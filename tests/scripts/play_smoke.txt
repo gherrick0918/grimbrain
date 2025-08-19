@@ -1,0 +1,3 @@
+attack.shortsword Goblin
+medicine Goblin
+spare Goblin
