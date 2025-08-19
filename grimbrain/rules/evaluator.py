@@ -10,7 +10,7 @@ from grimbrain.engine.state import (
     set_dying,
     set_stable,
 )
-from grimbrain.rules.config import instant_death_enabled
+from grimbrain.config import flag
 
 
 def _format_expr(expr: str, ctx: Dict[str, Any]) -> str:
@@ -41,6 +41,7 @@ class Evaluator:
         touched: Set[int] = set()
         start_hp: Dict[int, int] = {}
         dmg_info: Dict[int, Tuple[int, bool]] = {}
+        max_hp_map: Dict[int, int] = {}
         for eff in effects:
             op = eff.get("op")
             target_name = eff.get("target", "target")
@@ -48,7 +49,15 @@ class Evaluator:
             if tgt is not None:
                 tid = id(tgt)
                 touched.add(tid)
-                start_hp.setdefault(tid, tgt.get("hp", 0))
+                prev = tgt.get("hp", 0)
+                start_hp.setdefault(tid, prev)
+                if tid not in max_hp_map:
+                    max_hp_map[tid] = (
+                        tgt.get("max_hp")
+                        or tgt.get("hp_max")
+                        or tgt.get("maxhp")
+                        or prev
+                    )
             if op == "damage" and tgt is not None:
                 amount = eval_formula(str(eff.get("amount", 0)), ctx)
                 tgt["hp"] = tgt.get("hp", 0) - amount
@@ -86,34 +95,37 @@ class Evaluator:
             actor = next(
                 v for v in ctx.values() if isinstance(v, dict) and id(v) == tid
             )
-            start = start_hp.get(tid, actor.get("hp", 0))
-            end = actor.get("hp", 0)
-            dmg, crit = dmg_info.get(tid, (0, False))
-            max_hp = actor.get("max_hp")
-            if max_hp is not None:
-                actor["hp"] = max(min(end, max_hp), -max_hp)
-                end = actor["hp"]
-            else:
-                actor["hp"] = end
+            prev = start_hp.get(tid, actor.get("hp", 0))
+            damage_total, crit = dmg_info.get(tid, (0, False))
+            max_hp = max_hp_map.get(
+                tid,
+                actor.get("max_hp")
+                or actor.get("hp_max")
+                or actor.get("maxhp")
+                or prev,
+            )
             if (
-                instant_death_enabled()
-                and max_hp is not None
-                and start > 0
-                and start - dmg <= -max_hp
+                flag("GB_RULES_INSTANT_DEATH", False)
+                and prev > 0
+                and (prev - damage_total) <= (-max_hp)
             ):
                 actor["hp"] = 0
                 actor["dead"] = True
                 actor["dying"] = False
                 actor["stable"] = False
+                clear_death_saves(actor)
                 logs.append(
                     f"{actor['name']} suffers catastrophic damage and dies outright."
                 )
                 continue
-            if start > 0 and end <= 0:
+            end = actor.get("hp", 0)
+            actor["hp"] = max(min(end, max_hp), -max_hp)
+            end = actor["hp"]
+            if prev > 0 and end <= 0:
                 actor["hp"] = 0
                 set_dying(actor)
                 logs.append(f"{actor['name']} drops to 0 HP and is dying.")
-            elif start <= 0 and dmg > 0:
+            elif prev <= 0 and damage_total > 0:
                 set_dying(actor)
                 actor["stable"] = False
                 fails = 2 if crit else 1
@@ -128,7 +140,7 @@ class Evaluator:
                     )
                 if actor.get("dead"):
                     logs.append(f"{actor['name']} dies.")
-            if start <= 0 and end > 0:
+            if prev <= 0 and end > 0:
                 clear_death_saves(actor)
                 actor["dying"] = False
                 actor["stable"] = False
