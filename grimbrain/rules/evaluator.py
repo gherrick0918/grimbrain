@@ -56,7 +56,7 @@ class Evaluator:
                         tgt.get("max_hp")
                         or tgt.get("hp_max")
                         or tgt.get("maxhp")
-                        or prev
+                        or None
                     )
             if op == "damage" and tgt is not None:
                 amount = eval_formula(str(eff.get("amount", 0)), ctx)
@@ -97,12 +97,12 @@ class Evaluator:
             )
             prev = start_hp.get(tid, actor.get("hp", 0))
             damage_total, crit = dmg_info.get(tid, (0, False))
-            max_hp = max_hp_map.get(
-                tid,
-                actor.get("max_hp")
+            max_hp = (
+                max_hp_map.get(tid)
+                or actor.get("max_hp")
                 or actor.get("hp_max")
                 or actor.get("maxhp")
-                or prev,
+                or 0
             )
             if (
                 flag("GB_RULES_INSTANT_DEATH", False)
@@ -119,8 +119,11 @@ class Evaluator:
                 )
                 continue
             end = actor.get("hp", 0)
-            actor["hp"] = max(min(end, max_hp), -max_hp)
-            end = actor["hp"]
+            if max_hp:
+                actor["hp"] = max(min(end, max_hp), -max_hp)
+                end = actor["hp"]
+            else:
+                actor["hp"] = end
             if prev > 0 and end <= 0:
                 actor["hp"] = 0
                 set_dying(actor)
