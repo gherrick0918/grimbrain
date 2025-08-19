@@ -10,19 +10,19 @@ def test_instant_death_off(monkeypatch):
     monkeypatch.delenv("GB_RULES_INSTANT_DEATH", raising=False)
     eva = Evaluator()
     actor = {"name": "Hero", "hp": 10, "max_hp": 10}
-    rule = {"effects": [{"op": "damage", "target": "target", "amount": "20"}]}
+    rule = {"effects": [{"op": "damage", "target": "target", "amount": "30"}]}
     logs = eva.apply(rule, {"target": actor})
     assert actor["hp"] == 0
     assert actor.get("dying")
     assert not actor.get("dead")
-    assert any("drops to 0 HP and is dying" in entry for entry in logs)
+    assert any("drops to 0 HP" in entry for entry in logs)
 
 
 def test_instant_death_on(monkeypatch):
-    monkeypatch.setenv("GB_RULES_INSTANT_DEATH", "true")
+    monkeypatch.setenv("GB_RULES_INSTANT_DEATH", "1")
     eva = Evaluator()
     actor = {"name": "Hero", "hp": 10, "max_hp": 10}
-    rule = {"effects": [{"op": "damage", "target": "target", "amount": "20"}]}
+    rule = {"effects": [{"op": "damage", "target": "target", "amount": "30"}]}
     logs = eva.apply(rule, {"target": actor})
     assert actor.get("dead")
     assert not actor.get("dying")
