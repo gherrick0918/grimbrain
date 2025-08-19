@@ -89,10 +89,18 @@ class Evaluator:
             start = start_hp.get(tid, actor.get("hp", 0))
             end = actor.get("hp", 0)
             dmg, crit = dmg_info.get(tid, (0, False))
-            max_hp = actor.get("max_hp", start)
-            actor["hp"] = max(min(end, max_hp), -max_hp)
-            end = actor["hp"]
-            if instant_death_enabled() and start > 0 and start - dmg <= -max_hp:
+            max_hp = actor.get("max_hp")
+            if max_hp is not None:
+                actor["hp"] = max(min(end, max_hp), -max_hp)
+                end = actor["hp"]
+            else:
+                actor["hp"] = end
+            if (
+                instant_death_enabled()
+                and max_hp is not None
+                and start > 0
+                and start - dmg <= -max_hp
+            ):
                 actor["hp"] = 0
                 actor["dead"] = True
                 actor["dying"] = False
