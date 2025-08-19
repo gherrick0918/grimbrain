@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Any, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from grimbrain.engine import dice
 from grimbrain.engine.state import (
+    add_death_failure,
+    clear_death_saves,
     set_dying,
     set_stable,
-    clear_death_saves,
-    add_death_failure,
 )
+from grimbrain.rules.config import instant_death_enabled
 
 
 def _format_expr(expr: str, ctx: Dict[str, Any]) -> str:
@@ -82,10 +83,24 @@ class Evaluator:
 
         for tid in touched:
             # find actor by id from ctx
-            actor = next(v for v in ctx.values() if isinstance(v, dict) and id(v) == tid)
+            actor = next(
+                v for v in ctx.values() if isinstance(v, dict) and id(v) == tid
+            )
             start = start_hp.get(tid, actor.get("hp", 0))
             end = actor.get("hp", 0)
             dmg, crit = dmg_info.get(tid, (0, False))
+            max_hp = actor.get("max_hp", start)
+            actor["hp"] = max(min(end, max_hp), -max_hp)
+            end = actor["hp"]
+            if instant_death_enabled() and start > 0 and start - dmg <= -max_hp:
+                actor["hp"] = 0
+                actor["dead"] = True
+                actor["dying"] = False
+                actor["stable"] = False
+                logs.append(
+                    f"{actor['name']} suffers catastrophic damage and dies outright."
+                )
+                continue
             if start > 0 and end <= 0:
                 actor["hp"] = 0
                 set_dying(actor)
