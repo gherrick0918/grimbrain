@@ -791,161 +791,28 @@ def run_campaign_cli(
 
     return 0
 
-def main() -> int:
-    # Phase 7: data-driven rule engine entry point.
+def main(argv: list[str] | None = None) -> int:
+    """Minimal entry point dispatching to the data-driven subcommands."""
+
+    args = sys.argv[1:] if argv is None else argv
+    os.environ.setdefault("GB_ENGINE", "data")
+
     if os.getenv("GB_ENGINE") == "data":
-        if len(sys.argv) > 1 and sys.argv[1] == "content":
+        if args and args[0] == "content":
             from grimbrain.content.cli import main as content_main
-            return content_main(sys.argv[2:])
+
+            return content_main(args[1:])
+        if args and args[0] == "play":
+            from grimbrain.play_cli import main as play_main
+
+            return play_main(args[1:])
         from grimbrain.rules.cli import main as rules_main  # lazy import
-        return rules_main(sys.argv[1:])
+
+        return rules_main(args)
 
     parser = argparse.ArgumentParser(description="Grimbrain CLI")
-    parser.add_argument("--play", action="store_true", help="Run combat simulator")
-    parser.add_argument("--campaign", help="Path to campaign directory or YAML", default=None)
-    parser.add_argument("--start", help="Starting scene for campaign", default=None)
-    parser.add_argument("--pc", help="Path to party JSON file", default=None)
-    parser.add_argument("--encounter", help="Monster spec for play mode", default=None)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--max-rounds", type=int, default=20)
-    parser.add_argument("--packs", help="Comma-separated pack names or paths", default=None)
-    parser.add_argument("--autosave", action="store_true", help="Autosave play log")
-    parser.add_argument("--save", help="Path to save campaign state", default=None)
-    parser.add_argument("--resume", help="Resume state JSON", default=None)
-    parser.add_argument("--pc-wizard", action="store_true", help="Create party JSON interactively or from preset")
-    parser.add_argument("--preset", help="Preset name for pc-wizard", default=None)
-    parser.add_argument("--out", help="Output path for pc-wizard", default=None)
-    parser.add_argument("--script", type=argparse.FileType("r"),
-                        help="Path to a text file of commands to feed into the in-combat CLI")
-
-    args = parser.parse_args()
-
-    if args.pc_wizard:
-        try:
-            from pc_wizard import main as wizard_main  # type: ignore
-        except Exception:
-            if not args.out:
-                print("pc_wizard not available")
-                return
-            preset = (args.preset or "fighter").lower()
-            party = {
-                "fighter": {
-                    "name": "Fighter",
-                    "ac": 16,
-                    "hp": 12,
-                    "attacks": [{"name": "Sword", "to_hit": 5, "damage_dice": "1d8+3", "type": "melee"}],
-                }
-            }.get(preset, {
-                "name": preset.title(),
-                "ac": 10,
-                "hp": 10,
-                "attacks": [{"name": "Punch", "to_hit": 0, "damage_dice": "1d4", "type": "melee"}],
-            })
-            Path(args.out).write_text(json.dumps({"party": [party]}))
-            return
-        wizard_main(out=args.out, preset=args.preset)  # type: ignore
-        return
-
-    if args.play:
-        camp = None
-        base = None
-        if args.campaign:
-            try:
-                from grimbrain import campaign_engine  # type: ignore
-            except Exception:
-                campaign_engine = None  # type: ignore
-            if campaign_engine:
-                camp = campaign_engine.load_campaign(args.campaign)  # type: ignore
-                base = Path(args.campaign).parent if Path(args.campaign).is_file() else Path(args.campaign)
-            else:
-                try:
-                    import yaml  # type: ignore
-                    path = Path(args.campaign)
-                    if path.is_dir():
-                        camp = yaml.safe_load((path / "campaign.yaml").read_text())
-                        base = path
-                    else:
-                        camp = yaml.safe_load(path.read_text())
-                        base = path.parent
-                except Exception:
-                    camp = None
-        if args.pc:
-            pcs = load_party_file(Path(args.pc))
-        elif camp and campaign_engine:
-            pcs = campaign_engine.load_party(camp, base)  # type: ignore
-        else:
-            raise SystemExit("--pc is required for play mode")
-
-        packs = load_packs(args.packs.split(",")) if args.packs else {}
-
-        def _lookup(name: str) -> MonsterSidecar:  # type: ignore
-            data = packs.get(name.lower()) if packs else None
-            if data:
-                return MonsterSidecar(**data)  # type: ignore
-            return _lookup_fallback(name)
-
-        encounter_spec: Any = args.encounter
-        if encounter_spec is None:
-            if not camp:
-                raise SystemExit("--encounter is required for play mode")
-            scene_id = args.start or (camp.get("start") if isinstance(camp, dict) else getattr(camp, "start", None))
-            visited = set()
-            while True:
-                scenes = camp.get("scenes", {}) if isinstance(camp, dict) else getattr(camp, "scenes", {})
-                scene = scenes.get(scene_id) if isinstance(scenes, dict) else None
-                if not scene:
-                    raise SystemExit(f"Scene '{scene_id}' not found in campaign.")
-                enc = scene.get("encounter") if isinstance(scene, dict) else getattr(scene, "encounter", None)
-                if enc:
-                    encounter_spec = enc
-                    break
-                visited.add(scene_id)
-                choices = scene.get("choices") if isinstance(scene, dict) else getattr(scene, "choices", None)
-                if choices:
-                    nxt = choices[0].get("goto") or choices[0].get("next") if isinstance(choices[0], dict) else getattr(choices[0], "goto", None) or getattr(choices[0], "next", None)
-                    if not nxt or nxt in visited:
-                        break
-                    scene_id = nxt
-                else:
-                    break
-
-        print(f"DEBUG: Encounter spec loaded: {encounter_spec}")
-        if isinstance(encounter_spec, dict) and "random" in encounter_spec:
-            opts = encounter_spec["random"]
-            encounter_spec = select_monster(tags=opts.get("tags"), cr=opts.get("cr"), seed=args.seed)  # type: ignore
-
-        monsters = parse_monster_spec(str(encounter_spec), _lookup)
-        monsters = [m for m in monsters if m is not None]
-        if not monsters:
-            print(f"ERROR: No valid monsters loaded from encounter spec: {encounter_spec}")
-            sys.exit(1)
-
-        play_cli(pcs, monsters, seed=args.seed, max_rounds=args.max_rounds,
-                 autosave=args.autosave, script=args.script)
-        return
-
-    if args.campaign:
-        return run_campaign_cli(
-            args.campaign,
-            start=args.start,
-            seed=args.seed,
-            save=args.save,
-            resume=args.resume,
-            max_rounds=args.max_rounds,
-        )
-
-    if args.resume:
-        try:
-            data = json.loads(Path(args.resume).read_text())
-        except Exception:
-            print("Could not resume", file=sys.stderr)
-            return 1
-        scene = data.get("scene", "")
-        steps = data.get("steps", [])
-        print(f"Resumed scene '{scene}' with {len(steps)} steps")
-        return 0
-
     parser.print_help()
+    return 0
 
 
 if __name__ == "__main__":
