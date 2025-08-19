@@ -156,7 +156,8 @@ def cmd_list(args) -> int:
 def cmd_show(args) -> int:
     chroma_dir = _env_path("GB_CHROMA_DIR", ".chroma")
     doc_id = args.docid
-    if "/" in doc_id:
+    explicit_dt = "/" in doc_id
+    if explicit_dt:
         dt, did = doc_id.split("/", 1)
     else:
         dt, did = "rule", doc_id
@@ -194,25 +195,53 @@ def cmd_show(args) -> int:
     # Suggestions
     query = did.lower()
     suggestions: List[str] = []
-    scored: List[tuple[int, int, float, str]] = []
-    for alias, cid in alias_map.items():
-        start = 1 if alias.startswith(query) else 0
-        sub = 1 if query in alias else 0
-        ratio = SequenceMatcher(None, query, alias).ratio()
-        scored.append((start, sub, ratio, cid))
-    scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
-    seen: set[str] = set()
-    for _, _, _, cid in scored:
-        if cid not in seen:
-            seen.add(cid)
-            suggestions.append(cid)
-        if len(suggestions) >= 5:
-            break
+    if dt == "rule" and not explicit_dt:
+        verb_map: dict[str, str] = {}
+        for entry in id_map.values():
+            rule = entry.get("payload") or {}
+            verb = rule.get("cli_verb")
+            if verb:
+                verb_map[verb.lower()] = verb
+                for a in rule.get("aliases", []) or []:
+                    verb_map[str(a).lower()] = verb
+        scored: List[tuple[int, int, float, str]] = []
+        for alias, canon in verb_map.items():
+            start = 1 if alias.startswith(query) else 0
+            sub = 1 if query in alias else 0
+            ratio = SequenceMatcher(None, query, alias).ratio()
+            scored.append((start, sub, ratio, canon))
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
+        seen: set[str] = set()
+        for _, _, _, canon in scored:
+            if canon not in seen:
+                seen.add(canon)
+                suggestions.append(canon)
+            if len(suggestions) >= 10:
+                break
+        print(f'Not found verb: "{did}"')
+        if suggestions:
+            print("Did you mean: " + ", ".join(suggestions))
+        return 2
+    else:
+        scored: List[tuple[int, int, float, str]] = []
+        for alias, cid in alias_map.items():
+            start = 1 if alias.startswith(query) else 0
+            sub = 1 if query in alias else 0
+            ratio = SequenceMatcher(None, query, alias).ratio()
+            scored.append((start, sub, ratio, cid))
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
+        seen: set[str] = set()
+        for _, _, _, cid in scored:
+            if cid not in seen:
+                seen.add(cid)
+                suggestions.append(cid)
+            if len(suggestions) >= 10:
+                break
 
-    print(f"Not found: {dt}/{did}")
-    if suggestions:
-        print("Did you mean: " + ", ".join(f"{dt}/{s}" for s in suggestions))
-    return 2
+        print(f"Not found: {dt}/{did}")
+        if suggestions:
+            print("Did you mean: " + ", ".join(f"{dt}/{s}" for s in suggestions))
+        return 2
 
 
 def cmd_packs(_args) -> int:

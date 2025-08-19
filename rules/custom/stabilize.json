@@ -3,6 +3,7 @@
   "id": "stabilize",
   "kind": "action",
   "cli_verb": "stabilize",
+  "aliases": ["stabilise", "stabilize", "stb"],
   "targets": ["target"],
   "effects": [
     {"op":"set_stable","target":"target"},

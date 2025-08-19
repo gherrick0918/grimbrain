@@ -15,10 +15,23 @@ from grimbrain.config import flag
 
 def _format_expr(expr: str, ctx: Dict[str, Any]) -> str:
     expr = expr.replace("{prof}", str(ctx.get("prof", 0)))
+    expr = expr.replace("{dc}", str(ctx.get("dc", 0)))
     mods = ctx.get("mods", {})
     for abil, val in mods.items():
         expr = expr.replace(f"{{mod.{abil}}}", str(val))
     return expr
+
+
+def _format_tmpl(tmpl: str, ctx: Dict[str, Any]) -> str:
+    class AttrDict(dict):
+        def __getattr__(self, item):
+            return self.get(item, "")
+
+    mapping = {k: AttrDict(v) if isinstance(v, dict) else v for k, v in ctx.items()}
+    try:
+        return tmpl.format(**mapping)
+    except Exception:
+        return tmpl
 
 
 def eval_formula(expr: str, ctx: Dict[str, Any]) -> int:
@@ -38,11 +51,21 @@ class Evaluator:
     def apply(self, rule: Dict[str, Any], ctx: Dict[str, Any]) -> List[str]:
         logs: List[str] = []
         effects = rule.get("effects", [])
+        log_tmpls = rule.get("log_templates", {})
+        if rule.get("dc") is not None:
+            ctx.setdefault("dc", rule.get("dc"))
+        check_res: Dict[str, Any] = {}
+        ctx.setdefault("check", check_res)
+        if "start" in log_tmpls:
+            logs.append(_format_tmpl(str(log_tmpls["start"]), ctx))
         touched: Set[int] = set()
         start_hp: Dict[int, int] = {}
         dmg_info: Dict[int, Tuple[int, bool]] = {}
         max_hp_map: Dict[int, int] = {}
         for eff in effects:
+            when = eff.get("when")
+            if when == "check.success" and not ctx.get("check", {}).get("success"):
+                continue
             op = eff.get("op")
             target_name = eff.get("target", "target")
             tgt = ctx.get(target_name)
@@ -61,6 +84,8 @@ class Evaluator:
             if op == "damage" and tgt is not None:
                 amount = eval_formula(str(eff.get("amount", 0)), ctx)
                 tgt["hp"] = tgt.get("hp", 0) - amount
+                ctx["last_amount"] = amount
+                ctx["damage_type"] = eff.get("damage_type", ctx.get("damage_type"))
                 logs.append(f"{tgt['name']} takes {amount} damage")
                 is_crit = "critical" in eff.get("tags", [])
                 taken, crit = dmg_info.get(tid, (0, False))
@@ -68,6 +93,7 @@ class Evaluator:
             elif op == "heal" and tgt is not None:
                 amount = eval_formula(str(eff.get("amount", 0)), ctx)
                 tgt["hp"] = tgt.get("hp", 0) + amount
+                ctx["last_amount"] = amount
                 logs.append(f"{tgt['name']} heals {amount}")
             elif op == "clear_death_saves" and tgt is not None:
                 clear_death_saves(tgt)
@@ -86,9 +112,27 @@ class Evaluator:
                 tags.discard(tag)
             elif op == "advantage_set" and tgt is not None:
                 tgt["advantage"] = bool(eff.get("value", True))
+            elif op == "check" and tgt is not None:
+                ability = eff.get("ability", "").upper()
+                dc = eval_formula(str(eff.get("dc", 0)), ctx)
+                mod = ctx.get("mods", {}).get(ability, 0)
+                prof_name = eff.get("proficiency")
+                prof_bonus = (
+                    ctx.get("prof", 0)
+                    if prof_name and prof_name in tgt.get("skills", set())
+                    else 0
+                )
+                tags = tgt.get("tags", set())
+                adv = bool(tgt.get("advantage") or ("advantage" in tags))
+                disadv = bool(tgt.get("disadvantage") or ("disadvantage" in tags))
+                roll = dice.roll("1d20", seed=ctx.get("seed"), adv=adv, disadv=disadv)
+                total = roll["total"] + mod + prof_bonus
+                ctx["check"]["success"] = total >= dc
+                ctx["check"]["total"] = total
+                ctx["check"]["dc"] = dc
             elif op == "log":
                 tmpl = eff.get("template", "")
-                logs.append(tmpl.format(**ctx))
+                logs.append(_format_tmpl(tmpl, ctx))
 
         for tid in touched:
             # find actor by id from ctx
@@ -150,4 +194,12 @@ class Evaluator:
                 logs.append(
                     f"{actor['name']} recovers to {actor.get('hp',0)} HP and is no longer dying."
                 )
+        if check_res.get("success") is not None:
+            if check_res.get("success") and log_tmpls.get("apply"):
+                logs.append(_format_tmpl(str(log_tmpls["apply"]), ctx))
+            elif not check_res.get("success") and log_tmpls.get("fail"):
+                logs.append(_format_tmpl(str(log_tmpls["fail"]), ctx))
+        else:
+            if log_tmpls.get("apply"):
+                logs.append(_format_tmpl(str(log_tmpls["apply"]), ctx))
         return logs

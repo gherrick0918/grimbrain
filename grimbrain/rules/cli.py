@@ -52,9 +52,9 @@ def main(argv: List[str] | None = None) -> int:
 
     rule, suggestions = resolver.resolve(verb)
     if not rule:
-        print("Unknown rule")
+        print(f'Not found verb: "{verb}"')
         if suggestions:
-            print("Suggestions: " + ", ".join(suggestions))
+            print("Did you mean: " + ", ".join(suggestions))
         return 1
 
     ctx = _default_context()

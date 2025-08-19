@@ -4,7 +4,7 @@
   "kind": "action",
   "subkind": "melee",
   "cli_verb": "attack",
-  "aliases": ["atk"],
+  "aliases": ["atk", "stab", "strike"],
   "targets": ["target"],
   "effects": [
     {"op": "damage", "target": "target", "amount": "1d1"}

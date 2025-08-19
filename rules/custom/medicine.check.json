@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "medicine.check",
+  "kind": "action",
+  "cli_verb": "medicine",
+  "targets": ["target"],
+  "dc": 10,
+  "effects": [
+    {"op":"check","ability":"WIS","proficiency":"medicine","dc":"{dc}","target":"actor"},
+    {"op":"set_stable","target":"target","when":"check.success"},
+    {"op":"clear_death_saves","target":"target","when":"check.success"}
+  ],
+  "log_templates": {
+    "start": "{actor.name} makes a DC {dc} Medicine check to stabilize {target.name}",
+    "apply": "{actor.name} stabilizes {target.name} at 0 HP",
+    "fail": "{actor.name} fails to stabilize {target.name}"
+  }
+}
