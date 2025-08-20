@@ -17,6 +17,26 @@ from grimbrain.rules.resolver import RuleResolver
 from grimbrain.rules.evaluator import Evaluator
 
 
+def _run_index_for_play(args, json_mode: bool) -> None:
+    """Run the indexer similarly to ``content reload``.
+
+    When ``json_mode`` is enabled, any stdout from the indexer is captured and
+    forwarded to stderr so that stdout can remain reserved exclusively for JSON
+    events.
+    """
+
+    reload_args = ["reload", "--types", "rule,monster"]
+    if getattr(args, "packs", None):
+        reload_args += ["--packs", args.packs]
+    if json_mode:
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            content_cli.main(reload_args)
+        sys.stderr.write(buf.getvalue())
+    else:
+        content_cli.main(reload_args)
+
+
 def _suggest(name: str, options: Iterable[str]) -> List[str]:
     import difflib
 
@@ -91,16 +111,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     os.environ.setdefault("GB_ENGINE", "data")
 
-    reload_args = ["reload", "--types", "rule,monster"]
-    if args.packs:
-        reload_args += ["--packs", args.packs]
-    if args.json:
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            content_cli.main(reload_args)
-        sys.stderr.write(buf.getvalue())
-    else:
-        content_cli.main(reload_args)
+    _run_index_for_play(args, args.json)
 
     chroma_dir = Path(os.getenv("GB_CHROMA_DIR", ".chroma"))
     manifest = json.loads((chroma_dir / "manifest.json").read_text()) if (chroma_dir / "manifest.json").exists() else {}
