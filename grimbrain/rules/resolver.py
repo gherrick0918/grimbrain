@@ -208,7 +208,7 @@ class RuleResolver:
             sub = 1 if query in alias else 0
             ratio = difflib.SequenceMatcher(None, query, alias).ratio()
             scored.append((start, sub, ratio, canon))
-        scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3]))
         suggestions: List[str] = []
         seen: Set[str] = set()
         for _, _, _, canon in scored:
