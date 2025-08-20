@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import sys
+import time
 import difflib
 from pathlib import Path
 from typing import Dict, Tuple, List, Optional, Set
@@ -32,8 +34,37 @@ class RuleResolver:
             Tuple[str, Optional[str], Optional[str]], Optional[dict]
         ] = OrderedDict()
         self._cache_size = 512
+        self._load_config()
         self._load_rules()
         self._init_collection()
+
+    # configuration ----------------------------------------------------
+    def _env_int(self, name: str, default: int) -> int:
+        try:
+            return int(os.getenv(name, default))
+        except Exception:
+            return default
+
+    def _env_float(self, name: str, default: float) -> float:
+        try:
+            return float(os.getenv(name, default))
+        except Exception:
+            return default
+
+    def _load_config(self) -> None:
+        self.k = self._env_int("GB_RESOLVER_K", 5)
+        self.min_score_default = self._env_float("GB_RESOLVER_MIN_SCORE", 0.45)
+        self.min_score_kind: Dict[str, float] = {}
+        for kind in ["rule", "spell", "monster"]:
+            val = os.getenv(f"GB_RESOLVER_MIN_SCORE_{kind.upper()}")
+            if val is not None:
+                try:
+                    self.min_score_kind[kind] = float(val)
+                except Exception:
+                    pass
+        self.warm_count = self._env_int("GB_RESOLVER_WARM_COUNT", 200)
+        dbg = os.getenv("GB_RESOLVER_DEBUG") or os.getenv("GB_DEBUG")
+        self.debug = str(dbg).lower() in {"1", "true", "yes"}
 
     def _init_collection(self) -> None:
         self.collection = None
@@ -75,11 +106,34 @@ class RuleResolver:
         self.verb_map.clear()
         self._load_rules()
         self._init_collection()
+        # reload uses same config
+
+    def warm(self) -> str:
+        if self.collection is None:
+            return "Warmed resolver cache for 0 docs in 0.00s."
+        start = time.time()
+        docs: List[str] = []
+        try:
+            total = self.collection.count()
+            n = min(total, self.warm_count)
+            res = self.collection.get(limit=n, include=["documents"])
+            docs = res.get("documents", [])
+            batch = 32
+            for i in range(0, len(docs), batch):
+                chunk = docs[i : i + batch]
+                try:
+                    self.collection.query(query_texts=chunk, n_results=1)
+                except Exception:
+                    break
+        except Exception:
+            docs = []
+        dur = time.time() - start
+        return f"Warmed resolver cache for {len(docs)} docs in {dur:.2f}s."
 
     # public API -------------------------------------------------------
     def resolve(
         self, text: str, kind: str | None = None, subkind: str | None = None
-    ) -> Tuple[Optional[dict], List[str]]:
+    ) -> Tuple[Optional[dict], List[Tuple[str, float]]]:
         key = (text.lower(), kind, subkind)
         if key in self._cache:
             result = self._cache[key]
@@ -94,23 +148,54 @@ class RuleResolver:
             self._cache_put(key, rule)
             return rule, []
 
+        min_score = self.min_score_kind.get(kind or "", self.min_score_default)
+
         # vector search ------------------------------------------------
-        rid, score = self._vector_lookup(text, kind, subkind)
-        suggestions: List[str] = []
+        vec_matches = self._vector_lookup(text, kind, subkind, min_score)
+        if self.debug:
+            dbg = [(r, round(s, 2), p) for r, s, p in vec_matches]
+            print(
+                f"[resolver] query=\"{text}\" kind={kind} k={self.k} -> matches={dbg}",
+                file=sys.stderr,
+            )
+
+        suggestions: List[Tuple[str, float]] = []
         rule: Optional[dict] = None
-        if rid and score >= 0.42:
-            candidate = self.rules.get(rid)
+        if vec_matches:
+            top_id, top_score, _ = vec_matches[0]
+            candidate = self.rules.get(top_id)
             if candidate is not None:
                 q_tokens = set(text.lower().split())
-                doc_tokens = {rid.lower()}
+                doc_tokens = {top_id.lower()}
                 doc_tokens.update(candidate.get("cli_verb", "").lower().split())
                 doc_tokens.update(a.lower() for a in candidate.get("aliases", []))
                 if not q_tokens.isdisjoint(doc_tokens):
                     rule = candidate
-        elif rid and 0.30 <= score < 0.42:
-            suggestions = [self.rules[rid]["id"]]
-        if rule is None and not suggestions:
-            suggestions = self.suggest_verbs(text)
+                    vec_matches = vec_matches[1:]
+        # fuzzy suggestions -------------------------------------------
+        fuzzy = self._fuzzy_lookup(text, kind, subkind, min_score)
+
+        merged: Dict[str, Tuple[float, Optional[str]]] = {}
+        for rid2, score2, pack in vec_matches:
+            merged[rid2] = (score2, pack)
+        for rid2, score2 in fuzzy:
+            if rid2 in merged:
+                if score2 > merged[rid2][0]:
+                    merged[rid2] = (score2, merged[rid2][1])
+            else:
+                merged[rid2] = (score2, None)
+        suggestions = [(rid2, sc) for rid2, (sc, _) in merged.items()]
+        suggestions.sort(key=lambda x: x[1], reverse=True)
+        suggestions = suggestions[:5]
+
+        if len(suggestions) < 5 and min_score < 0.99:
+            existing = {rid for rid, _ in suggestions}
+            for s in self.suggest_verbs(text):
+                if s not in existing:
+                    suggestions.append((s, 0.0))
+                if len(suggestions) >= 5:
+                    break
+
         self._cache_put(key, rule)
         return rule, suggestions
 
@@ -136,28 +221,34 @@ class RuleResolver:
 
     # helpers ----------------------------------------------------------
     def _vector_lookup(
-        self, text: str, kind: str | None, subkind: str | None
-    ) -> Tuple[Optional[str], float]:
+        self, text: str, kind: str | None, subkind: str | None, min_score: float
+    ) -> List[Tuple[str, float, Optional[str]]]:
+        matches: List[Tuple[str, float, Optional[str]]] = []
         if self.collection is not None:
             where = {"doc_type": "rule"}
-            if kind:
-                where["kind"] = kind
-            if subkind:
-                where["subkind"] = subkind
             try:
                 res = self.collection.query(
-                    query_texts=[text], n_results=1, where=where
+                    query_texts=[text], n_results=self.k, where=where
                 )
                 ids = res.get("ids", [[]])[0]
                 dists = res.get("distances", [[]])[0]
-                if ids:
-                    score = 1.0 - float(dists[0])
-                    return ids[0], score
+                metas = res.get("metadatas", [[]])[0]
+                for rid, dist, meta in zip(ids, dists, metas):
+                    if kind and meta.get("kind") != kind:
+                        continue
+                    if subkind and meta.get("subkind") != subkind:
+                        continue
+                    score = 1.0 - float(dist)
+                    if score >= min_score:
+                        matches.append((rid, score, meta.get("pack")))
             except Exception:
                 pass
-        # fallback difflib --------------------------------------------
-        best_id = None
-        best_score = 0.0
+        return matches
+
+    def _fuzzy_lookup(
+        self, text: str, kind: str | None, subkind: str | None, min_score: float
+    ) -> List[Tuple[str, float]]:
+        scored: List[Tuple[str, float]] = []
         for name, rid in self.name_map.items():
             rule = self.rules[rid]
             if kind and rule.get("kind") != kind:
@@ -165,7 +256,7 @@ class RuleResolver:
             if subkind and rule.get("subkind") != subkind:
                 continue
             s = difflib.SequenceMatcher(a=text.lower(), b=name).ratio()
-            if s > best_score:
-                best_score = s
-                best_id = rid
-        return best_id, best_score
+            if s >= min_score:
+                scored.append((rid, s))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored[: self.k]

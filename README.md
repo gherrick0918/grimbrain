@@ -155,3 +155,16 @@ python .\main.py rules reload --watch
 ```
 
 Press <kbd>Ctrl+C</kbd> to stop watching.
+
+## Resolver & Suggestions
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `GB_RESOLVER_K` | `5` | Number of vector matches to query |
+| `GB_RESOLVER_MIN_SCORE` | `0.45` | Base cosine similarity cutoff |
+| `GB_RESOLVER_MIN_SCORE_RULE` | – | Override min score for rules |
+| `GB_RESOLVER_MIN_SCORE_SPELL` | – | Override min score for spells |
+| `GB_RESOLVER_MIN_SCORE_MONSTER` | – | Override min score for monsters |
+| `GB_RESOLVER_WARM_COUNT` | `200` | Docs to pre-warm on reload/play |
+
+`GB_CHROMA_DIR` controls where the vector index is persisted (default `.chroma`).
