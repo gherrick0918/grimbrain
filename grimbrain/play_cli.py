@@ -6,7 +6,8 @@ import os
 import random
 import re
 import sys
-import contextlib
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -94,8 +95,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.packs:
         reload_args += ["--packs", args.packs]
     if args.json:
-        with contextlib.redirect_stdout(sys.stderr):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
             content_cli.main(reload_args)
+        sys.stderr.write(buf.getvalue())
     else:
         content_cli.main(reload_args)
 
