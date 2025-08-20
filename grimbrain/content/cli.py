@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List
 
 from grimbrain.indexing.content_index import load_sources, incremental_index, ContentDoc
+from grimbrain.rules.resolver import RuleResolver
 from .watch import Debouncer
 
 
@@ -194,36 +195,26 @@ def cmd_show(args) -> int:
 
     # Suggestions
     query = did.lower()
-    suggestions: List[str] = []
-    if dt == "rule" and not explicit_dt:
-        verb_map: dict[str, str] = {}
-        for entry in id_map.values():
-            rule = entry.get("payload") or {}
-            verb = rule.get("cli_verb")
-            if verb:
-                verb_map[verb.lower()] = verb
-                for a in rule.get("aliases", []) or []:
-                    verb_map[str(a).lower()] = verb
-        scored: List[tuple[int, int, float, str]] = []
-        for alias, canon in verb_map.items():
-            start = 1 if alias.startswith(query) else 0
-            sub = 1 if query in alias else 0
-            ratio = SequenceMatcher(None, query, alias).ratio()
-            scored.append((start, sub, ratio, canon))
-        scored.sort(key=lambda x: (-x[0], -x[1], -x[2]))
-        seen: set[str] = set()
-        for _, _, _, canon in scored:
-            if canon not in seen:
-                seen.add(canon)
-                suggestions.append(canon)
-            if len(suggestions) >= 10:
-                break
-        print(f'Not found verb: "{did}"')
+    if dt == "rule":
+        resolver = RuleResolver(
+            rules_dir=_env_path("GB_RULES_DIR", "rules"),
+            chroma_dir=_env_path("GB_CHROMA_DIR", ".chroma"),
+        )
+        _, suggestions = resolver.resolve(query)
+        msg = f'Not found verb: "{did}"' if not explicit_dt else f"Not found: {dt}/{did}"
+        print(msg)
         if suggestions:
-            print("Did you mean: " + ", ".join(suggestions))
+            if explicit_dt:
+                sug = ", ".join(
+                    f"{dt}/{s[0]} ({s[1]:.2f})" for s in suggestions
+                )
+            else:
+                sug = ", ".join(f"{s[0]} ({s[1]:.2f})" for s in suggestions)
+            print("Did you mean: " + sug)
         return 2
     else:
         scored: List[tuple[int, int, float, str]] = []
+        suggestions: List[str] = []
         for alias, cid in alias_map.items():
             start = 1 if alias.startswith(query) else 0
             sub = 1 if query in alias else 0
@@ -237,7 +228,6 @@ def cmd_show(args) -> int:
                 suggestions.append(cid)
             if len(suggestions) >= 10:
                 break
-
         print(f"Not found: {dt}/{did}")
         if suggestions:
             print("Did you mean: " + ", ".join(f"{dt}/{s}" for s in suggestions))

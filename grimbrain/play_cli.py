@@ -145,6 +145,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     rng = random.Random(args.seed)
     resolver = RuleResolver()
+    msg = resolver.warm()
+    if msg:
+        log(msg)
     evaluator = Evaluator()
 
     def state_line() -> str:
@@ -163,7 +166,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rule is None:
             log(f'Not found verb: "{verb}"')
             if suggestions:
-                log("Did you mean: " + ", ".join(suggestions))
+                log("Did you mean: " + ", ".join(f"{s[0]} ({s[1]:.2f})" for s in suggestions))
             return
         actor = party[0]
         target = name_map.get(target_name.lower()) if target_name else None

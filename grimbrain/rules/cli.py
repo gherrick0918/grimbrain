@@ -34,7 +34,12 @@ def main(argv: List[str] | None = None) -> int:
         if sub and sub[0] == "show" and len(sub) >= 2:
             return content_cli.main(["show", f"rule/{sub[1]}"])
         if sub and sub[0] == "reload":
-            return content_cli.main(["reload", "--types", "rule"] + sub[1:])
+            code = content_cli.main(["reload", "--types", "rule"] + sub[1:])
+            resolver.reload()
+            msg = resolver.warm()
+            if msg:
+                print(msg)
+            return code
         if sub and sub[0] == "packs":
             return content_cli.main(["packs"] + sub[1:])
         if sub and sub[0] == "doctor":
@@ -54,7 +59,8 @@ def main(argv: List[str] | None = None) -> int:
     if not rule:
         print(f'Not found verb: "{verb}"')
         if suggestions:
-            print("Did you mean: " + ", ".join(suggestions))
+            sug = ", ".join(f"{s[0]} ({s[1]:.2f})" for s in suggestions)
+            print("Did you mean: " + sug)
         return 1
 
     ctx = _default_context()
