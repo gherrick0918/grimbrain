@@ -80,6 +80,7 @@ class RuleResolver:
         self.rules: Dict[str, dict] = {}
         self.name_map: Dict[str, str] = {}
         self.verb_map: Dict[str, str] = {}
+        self.canonical_verbs: List[str] = []
         rule_list, _, _, _ = load_rules(self.rules_dir)
         for rule in rule_list:
             rid = rule["id"]
@@ -94,6 +95,10 @@ class RuleResolver:
                 if verb:
                     self.verb_map[alias.lower()] = verb
 
+        # Cache the sorted list of canonical verbs so suggestion ordering is
+        # stable across platforms and does not depend on dictionary ordering.
+        self.canonical_verbs = sorted(set(self.verb_map.values()))
+
     # cache management -------------------------------------------------
     def _cache_put(self, key, value):
         self._cache[key] = value
@@ -104,6 +109,7 @@ class RuleResolver:
     def reload(self) -> None:
         self._cache.clear()
         self.verb_map.clear()
+        self.canonical_verbs.clear()
         self._load_rules()
         self._init_collection()
         # reload uses same config
@@ -211,9 +217,8 @@ class RuleResolver:
         # ``stablize``).  To make suggestions stable and more semantically useful
         # we now score only the unique canonical verbs.
 
-        candidates = sorted(set(self.verb_map.values()))
         scored: List[Tuple[int, int, float, str]] = []
-        for canon in candidates:
+        for canon in self.canonical_verbs:
             start = 1 if canon.startswith(query) else 0
             sub = 1 if query in canon else 0
             ratio = difflib.SequenceMatcher(None, query, canon).ratio()
