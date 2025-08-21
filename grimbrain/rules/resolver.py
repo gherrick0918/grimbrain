@@ -115,13 +115,21 @@ class RuleResolver:
         # reload uses same config
 
     def warm(self) -> str:
+        import logging
+        from time import perf_counter
+
         if self.collection is None:
             return "Warmed resolver cache for 0 docs in 0.00s."
-        start = time.time()
+        log = logging.getLogger("resolver")
+        try:
+            n = int(os.environ.get("GB_RESOLVER_WARM_COUNT", self.warm_count))
+        except Exception:
+            n = self.warm_count
+        t0 = perf_counter()
         docs: List[str] = []
         try:
             total = self.collection.count()
-            n = min(total, self.warm_count)
+            n = min(total, n)
             res = self.collection.get(limit=n, include=["documents"])
             docs = res.get("documents", [])
             batch = 32
@@ -133,7 +141,28 @@ class RuleResolver:
                     break
         except Exception:
             docs = []
-        dur = time.time() - start
+        t1 = perf_counter()
+        try:
+            log.info("resolver.warm_start warmed=%d in %.1f ms", len(docs), (t1 - t0) * 1000)
+        except Exception:
+            pass
+        try:
+            prefetch = int(os.environ.get("GB_PREFETCH_TOPK", "0") or "0")
+            if prefetch > 0:
+                t2 = perf_counter()
+                try:
+                    self.collection.get(limit=prefetch, include=["embeddings"])
+                except Exception:
+                    pass
+                t3 = perf_counter()
+                log.info(
+                    "resolver.prefetch_embeddings top_k=%d in %.1f ms",
+                    prefetch,
+                    (t3 - t2) * 1000,
+                )
+        except Exception:
+            pass
+        dur = t1 - t0
         return f"Warmed resolver cache for {len(docs)} docs in {dur:.2f}s."
 
     # public API -------------------------------------------------------

@@ -43,9 +43,11 @@ def main(argv: List[str] | None = None) -> int:
         if sub and sub[0] == "packs":
             return content_cli.main(["packs"] + sub[1:])
         if sub and sub[0] == "doctor":
-            from .doctor import main as doctor_main
-
-            return doctor_main(sub[1:])
+            from .doctor import run_doctor
+            dparser = argparse.ArgumentParser(prog="rules doctor", add_help=False)
+            dparser.add_argument("--fail-warn", action="store_true", help="Treat warnings as errors")
+            dns, _ = dparser.parse_known_args(sub[1:])
+            return run_doctor(fail_warn=dns.fail_warn)
         parser.error("usage: rules [show|reload|list|packs|doctor] ...")
 
     if not ns.args:
