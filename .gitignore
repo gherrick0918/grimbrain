@@ -188,3 +188,6 @@ chroma_store/*
 
 saves/
 !saves/.gitkeep
+
+.chroma/*
+!.chroma/.gitkeep
