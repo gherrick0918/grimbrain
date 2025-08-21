@@ -202,22 +202,25 @@ class RuleResolver:
     # verb suggestions -------------------------------------------------
     def suggest_verbs(self, verb: str) -> List[str]:
         query = verb.lower()
+
+        # ``verb_map`` contains an entry for every alias pointing to its canonical
+        # verb.  The previous implementation scored each alias individually and
+        # then de-duplicated to canonical verbs.  On some platforms the ordering of
+        # aliases differed which meant less relevant verbs could outrank better
+        # matches (eg. ``use`` appearing before ``heal`` when suggesting fixes for
+        # ``stablize``).  To make suggestions stable and more semantically useful
+        # we now score only the unique canonical verbs.
+
+        candidates = sorted(set(self.verb_map.values()))
         scored: List[Tuple[int, int, float, str]] = []
-        for alias, canon in self.verb_map.items():
-            start = 1 if alias.startswith(query) else 0
-            sub = 1 if query in alias else 0
-            ratio = difflib.SequenceMatcher(None, query, alias).ratio()
+        for canon in candidates:
+            start = 1 if canon.startswith(query) else 0
+            sub = 1 if query in canon else 0
+            ratio = difflib.SequenceMatcher(None, query, canon).ratio()
             scored.append((start, sub, ratio, canon))
+
         scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3]))
-        suggestions: List[str] = []
-        seen: Set[str] = set()
-        for _, _, _, canon in scored:
-            if canon not in seen:
-                seen.add(canon)
-                suggestions.append(canon)
-            if len(suggestions) >= 10:
-                break
-        return suggestions
+        return [canon for _, _, _, canon in scored]
 
     # helpers ----------------------------------------------------------
     def _vector_lookup(
