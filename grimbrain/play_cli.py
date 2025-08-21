@@ -26,8 +26,12 @@ def _run_index_for_play(args, json_mode: bool) -> None:
     """
 
     reload_args = ["reload", "--types", "rule,monster"]
+    packs: List[str] = []
     if getattr(args, "packs", None):
-        reload_args += ["--packs", args.packs]
+        for entry in args.packs:
+            packs.extend([p for p in entry.split(",") if p])
+    if packs:
+        reload_args += ["--packs", ",".join(packs)]
     if json_mode:
         buf = io.StringIO()
         with redirect_stdout(buf):
@@ -100,11 +104,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--pc", required=True, help="Path to PC JSON")
     parser.add_argument("--encounter", required=True, help="Encounter spec, e.g. 'goblin x2'")
     parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--packs", default=None, help="Comma separated packs")
+    parser.add_argument(
+        "--packs",
+        action="append",
+        help="Extra rule packs to load (repeat or comma-separated)",
+    )
     parser.add_argument("--script", default=None, help="Script file with commands")
     parser.add_argument("--json", action="store_true", help="Emit JSON events")
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Emit only the final summary event",
+    )
     parser.add_argument("--quiet", action="store_true", help="Suppress step logs")
     args = parser.parse_args(argv)
+    if args.summary_only:
+        args.quiet = True
 
     def log(*a, **k):
         print(*a, file=sys.stderr if args.json else sys.stdout, **k)
@@ -191,6 +206,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             "seed": rng.randint(1, 10 ** 6),
         }
         logs = evaluator.apply(use_rule, ctx)
+        if args.summary_only:
+            return
         if args.json:
             event = {"event": "turn", "action": line, "rule": use_rule.get("id"), "logs": logs}
             print(json.dumps(event))

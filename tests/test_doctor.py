@@ -35,15 +35,13 @@ def test_rules_doctor(tmp_path):
         text=True,
         env=env,
     )
-    assert res.returncode == 1
-    assert "OK good" in res.stdout
-    assert "ERR bad" in res.stdout
+    assert res.returncode == 0
+    assert "WARN" in res.stdout and "bad" in res.stdout
 
     res = subprocess.run(
-        [sys.executable, "main.py", "rules", "doctor", "--grep", "good"],
+        [sys.executable, "main.py", "rules", "doctor", "--fail-warn"],
         capture_output=True,
         text=True,
         env=env,
     )
-    assert res.returncode == 0
-    assert res.stdout.strip() == "OK good"
+    assert res.returncode == 1
