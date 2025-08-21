@@ -222,7 +222,12 @@ class RuleResolver:
             start = 1 if canon.startswith(query) else 0
             sub = 1 if query in canon else 0
             ratio = difflib.SequenceMatcher(None, query, canon).ratio()
-            scored.append((start, sub, ratio, canon))
+            # Very short verbs tend to score disproportionately high against
+            # longer queries (eg. ``use`` vs ``stablize``).  Apply a small length
+            # based penalty so more semantically useful verbs like ``heal`` are
+            # suggested first.
+            penalty = 0.4 / max(len(canon), 1)
+            scored.append((start, sub, ratio - penalty, canon))
 
         scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3]))
         return [canon for _, _, _, canon in scored]
