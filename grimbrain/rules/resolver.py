@@ -217,7 +217,7 @@ class RuleResolver:
         # ``stablize``).  To make suggestions stable and more semantically useful
         # we now score only the unique canonical verbs.
 
-        scored: List[Tuple[int, int, float, str]] = []
+        scored: List[Tuple[int, int, float, int, str]] = []
         for canon in self.canonical_verbs:
             start = 1 if canon.startswith(query) else 0
             sub = 1 if query in canon else 0
@@ -227,10 +227,11 @@ class RuleResolver:
             # based penalty so more semantically useful verbs like ``heal`` are
             # suggested first.
             penalty = 0.4 / max(len(canon), 1)
-            scored.append((start, sub, ratio - penalty, canon))
+            first = abs(ord(query[0]) - ord(canon[0])) if query and canon else 0
+            scored.append((start, sub, ratio - penalty, first, canon))
 
-        scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3]))
-        return [canon for _, _, _, canon in scored]
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3], x[4]))
+        return [canon for _, _, _, _, canon in scored]
 
     # helpers ----------------------------------------------------------
     def _vector_lookup(
