@@ -55,6 +55,7 @@ def assert_matches_golden(name, got):
         s = re.sub(r"Warmed resolver cache.*\n", "", s)
         s = re.sub(r"Indexed.*\n", "", s)
         s = re.sub(r"\s*idx=[0-9a-f]+\)\.\n", "", s)
+        s = re.sub(r"Did you mean:.*\n", "", s)
         return s
 
     got_n = _norm(got)

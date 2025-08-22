@@ -1,9 +1,6 @@
 Conflict: rule/attack.shortbow -> keeping generated, ignoring legacy-data
 Conflict: rule/attack.shortsword -> keeping generated, ignoring legacy-data
 Not found verb: "hide"
-Did you mean: heal (0.50), medicine (0.00), stabilize (0.00), obliterate (0.00), spare (0.00)
 Not found verb: "status"
-Did you mean: attack (0.60), stabilize (0.53), obliterate (0.00), spare (0.00), heal (0.00)
 Not found verb: "end"
-Did you mean: heal (0.50), medicine (0.00), spare (0.00), stabilize (0.00), obliterate (0.00)
 Summary: rounds=4; alive=['Hero', 'Goblin']; dead=[]; stable=[]
