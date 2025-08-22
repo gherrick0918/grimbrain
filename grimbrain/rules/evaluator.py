@@ -48,7 +48,13 @@ class Evaluator:
     def __init__(self):
         pass
 
-    def apply(self, rule: Dict[str, Any], ctx: Dict[str, Any]) -> List[str]:
+    def apply(
+        self,
+        rule: Dict[str, Any],
+        ctx: Dict[str, Any],
+        engine=None,
+        events: List[Dict[str, Any]] | None = None,
+    ) -> List[str]:
         logs: List[str] = []
         effects = rule.get("effects", [])
         log_tmpls = rule.get("log_templates", {})
@@ -95,6 +101,37 @@ class Evaluator:
                 tgt["hp"] = tgt.get("hp", 0) + amount
                 ctx["last_amount"] = amount
                 logs.append(f"{tgt['name']} heals {amount}")
+            elif op is None and engine and tgt is not None and eff.get("duration_rounds"):
+                # Timed effect scheduling.  These effects have no "op" field;
+                # instead ``duration_rounds`` marks them as timed.  Additional
+                # optional keys: ``timing`` (start_of_turn/end_of_turn),
+                # ``fixed_damage`` (per-tick), ``tag_add`` and
+                # ``tag_remove_on_expire``.
+                from grimbrain.effects import TimedEffect
+
+                timing = str(eff.get("timing", "start_of_turn"))
+                tag_add = eff.get("tag_add")
+                tag_remove = eff.get("tag_remove_on_expire") or tag_add
+                fixed = eff.get("fixed_damage")
+                count = len(engine.state.get("timed_effects", {}).get(tgt.get("name", ""), []))
+                te = TimedEffect(
+                    id=f"{rule.get('id','')}:{tgt.get('name','')}:{count}",
+                    owner_id=tgt.get("name", ""),
+                    source_rule=str(rule.get("id", "")),
+                    timing=timing,
+                    duration_rounds=int(eff.get("duration_rounds", 0)),
+                    remaining_rounds=int(eff.get("duration_rounds", 0)),
+                    tag_add=tag_add,
+                    tag_remove_on_expire=tag_remove,
+                    fixed_damage=int(fixed) if fixed is not None else None,
+                    meta={"source": rule.get("id")},
+                )
+                ev = engine.add_effect(te)
+                if events is not None:
+                    events.append(ev)
+                if tag_add:
+                    tags = tgt.setdefault("tags", set())
+                    tags.add(tag_add)
             elif op == "clear_death_saves" and tgt is not None:
                 clear_death_saves(tgt)
             elif op == "set_stable" and tgt is not None:

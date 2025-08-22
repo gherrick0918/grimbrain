@@ -1,0 +1,11 @@
+{
+  "id": "quench",
+  "kind": "action",
+  "cli_verb": "quench",
+  "targets": ["ally_or_self"],
+  "effects": [
+    { "op": "tag_remove", "target": "target", "tag": "burning" }
+  ],
+  "log_templates": { "start": "{actor.name} quenches {target.name}", "apply": "{target.name} is no longer burning" }
+}
+
