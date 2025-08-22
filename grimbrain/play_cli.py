@@ -10,6 +10,7 @@ import io
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+import subprocess
 
 from grimbrain.content import cli as content_cli
 from grimbrain.content.ids import canonicalize_id
@@ -104,22 +105,35 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--pc", required=True, help="Path to PC JSON")
     parser.add_argument("--encounter", required=True, help="Encounter spec, e.g. 'goblin x2'")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--script", default=None, help="Script file with commands")
+    parser.add_argument("--json", action="store_true", help="Emit JSON events")
     parser.add_argument(
         "--packs",
         action="append",
         help="Extra rule packs to load (repeat or comma-separated)",
     )
-    parser.add_argument("--script", default=None, help="Script file with commands")
-    parser.add_argument("--json", action="store_true", help="Emit JSON events")
-    parser.add_argument(
-        "--summary-only",
-        action="store_true",
-        help="Emit only the final summary event",
-    )
+    parser.add_argument("--summary-only", action="store_true", help="Emit only the final summary event")
     parser.add_argument("--quiet", action="store_true", help="Suppress step logs")
     args = parser.parse_args(argv)
     if args.summary_only:
         args.quiet = True
+
+    # If packs were requested, index them and reload rules *before* starting play.
+    # Route all chatter to STDERR to keep STDOUT pure when --json is used.
+    if args.packs:
+        packs = []
+        for entry in args.packs:
+            packs.extend([s for s in entry.split(",") if s.strip()])
+        rules_dir = os.environ.get("GB_RULES_DIR", "rules")
+        chroma_dir = os.environ.get("GB_CHROMA_DIR", ".chroma")
+        idx = [sys.executable, "-m", "grimbrain.rules.index",
+               "--rules", rules_dir, "--out", chroma_dir]
+        for pth in packs:
+            idx.extend(["--packs", pth])
+        subprocess.run(idx, check=True, stdout=sys.stderr, stderr=sys.stderr)
+        # Reload via module so we don't depend on repo layout
+        subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "reload"],
+                       check=True, stdout=sys.stderr, stderr=sys.stderr)
 
     def log(*a, **k):
         print(*a, file=sys.stderr if args.json else sys.stdout, **k)
