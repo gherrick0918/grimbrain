@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 import subprocess
 
+from grimbrain.effects import EffectEngine
+
 from grimbrain.content import cli as content_cli
 from grimbrain.content.ids import canonicalize_id
 from grimbrain.rules.resolver import RuleResolver
@@ -67,6 +69,7 @@ def _load_party(path: Path) -> List[Dict[str, object]]:
         pc.setdefault("skills", [])
         pc.setdefault("prof", pc.get("prof_bonus", pc.get("prof", 0)))
         pc.setdefault("side", "party")
+        pc.setdefault("tags", set())
         res.append(pc)
     return res
 
@@ -167,6 +170,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "skills": [],
             "prof": 0,
             "side": "monsters",
+            "tags": set(),
         })
 
     combatants = party + monsters
@@ -178,6 +182,39 @@ def main(argv: Optional[List[str]] = None) -> int:
     if msg:
         log(msg)
     evaluator = Evaluator()
+
+    effects_state: Dict[str, object] = {}
+    effects = EffectEngine(effects_state)
+
+    def apply_fixed_damage(actor_id: str, amount: int) -> None:
+        tgt = name_map.get(actor_id.lower())
+        if not tgt:
+            return
+        tgt.setdefault("hp", 0)
+        tgt["hp"] = tgt.get("hp", 0) - amount
+
+    def add_tag(actor_id: str, tag: str) -> None:
+        tgt = name_map.get(actor_id.lower())
+        if tgt is not None:
+            tgt.setdefault("tags", set()).add(tag)
+
+    def remove_tag(actor_id: str, tag: str) -> None:
+        tgt = name_map.get(actor_id.lower())
+        if tgt is not None:
+            tgt.setdefault("tags", set()).discard(tag)
+
+    def emit_events(ev_list: List[Dict[str, object]]) -> None:
+        for ev in ev_list:
+            if args.json:
+                print(json.dumps(ev))
+            else:
+                kind = ev.get("kind")
+                if kind == "effect_tick":
+                    log(f"{ev['owner']} takes {-ev.get('delta_hp',0)} ongoing damage")
+                elif kind == "effect_expired":
+                    log(f"Effect on {ev['owner']} ends")
+                elif kind == "effect_started":
+                    log(f"Effect on {ev['owner']} begins")
 
     def state_line() -> str:
         hero = party[0] if party else {"name": "hero", "hp": 0}
@@ -219,7 +256,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             "prof": actor.get("prof", 0),
             "seed": rng.randint(1, 10 ** 6),
         }
-        logs = evaluator.apply(use_rule, ctx)
+        events: List[Dict[str, object]] = []
+        logs = evaluator.apply(use_rule, ctx, engine=effects, events=events)
+        emit_events(events)
         if args.summary_only:
             return
         if args.json:
@@ -259,8 +298,27 @@ def main(argv: Optional[List[str]] = None) -> int:
             lines = _iter()
 
     rounds = 0
+    actor_name = party[0]["name"] if party else ""
     for cmd in lines:
+        emit_events(
+            effects.on_turn_hook(
+                actor_name,
+                "start_of_turn",
+                apply_fixed_damage,
+                add_tag,
+                remove_tag,
+            )
+        )
         run_command(cmd)
+        emit_events(
+            effects.on_turn_hook(
+                actor_name,
+                "end_of_turn",
+                apply_fixed_damage,
+                add_tag,
+                remove_tag,
+            )
+        )
         rounds += 1
 
     alive = [c["name"] for c in combatants if c.get("hp", 0) > 0 and not c.get("dead")]
