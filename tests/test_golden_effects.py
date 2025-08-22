@@ -27,7 +27,7 @@ def test_burning_pretty_golden():
         "packs/test_effects",
     ]
     subprocess.run(idx, cwd=str(ROOT), check=True, env=env, capture_output=True, text=True)
-    subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "reload"], cwd=str(ROOT), check=True, env=env, capture_output=True, text=True)
+    subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "rules", "reload", "--packs", "packs/test_effects"], cwd=str(ROOT), check=True, env=env, capture_output=True, text=True)
     cmd = [
         sys.executable,
         str(MAIN),

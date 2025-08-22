@@ -135,7 +135,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             idx.extend(["--packs", pth])
         subprocess.run(idx, check=True, stdout=sys.stderr, stderr=sys.stderr)
         # Reload via module so we don't depend on repo layout
-        subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "reload"],
+        subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "rules", "reload", "--packs", ",".join(packs)],
                        check=True, stdout=sys.stderr, stderr=sys.stderr)
 
     def log(*a, **k):

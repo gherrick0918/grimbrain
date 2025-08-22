@@ -23,7 +23,7 @@ def run_play(script, seed=7, json_mode=True, packs="packs/test_effects"):
             packs,
         ]
         subprocess.run(idx, cwd=str(ROOT), check=True, capture_output=True, text=True, env=env)
-        subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "reload"], cwd=str(ROOT), check=True, capture_output=True, text=True, env=env)
+        subprocess.run([sys.executable, "-m", "grimbrain.rules.cli", "rules", "reload", "--packs", packs], cwd=str(ROOT), check=True, capture_output=True, text=True, env=env)
     cmd = [
         sys.executable,
         str(MAIN),
