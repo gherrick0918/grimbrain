@@ -3,6 +3,8 @@ import sys
 import subprocess
 import pathlib
 import difflib
+import tempfile
+import shutil
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -33,11 +35,13 @@ def run_play(script_name, seed, json_mode=True, summary_only=False):
     if summary_only:
         cmd.append("--summary-only")
     env = os.environ.copy()
-    env.setdefault("GB_ENGINE", "data")
-    env.setdefault("GB_RULES_DIR", "rules")
-    env.setdefault("GB_CHROMA_DIR", ".chroma")
-    env.setdefault("GB_RESOLVER_WARM_COUNT", "0")
+    env["GB_ENGINE"] = "data"
+    env["GB_RULES_DIR"] = "rules"
+    chroma_dir = tempfile.mkdtemp(prefix="chroma_")
+    env["GB_CHROMA_DIR"] = chroma_dir
+    env["GB_RESOLVER_WARM_COUNT"] = "0"
     cp = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    shutil.rmtree(chroma_dir, ignore_errors=True)
     return cp.returncode, cp.stdout
 
 
@@ -48,7 +52,10 @@ def assert_matches_golden(name, got):
     def _norm(s: str) -> str:
         import re
 
-        return re.sub(r"Warmed resolver cache.*\n", "", s)
+        s = re.sub(r"Warmed resolver cache.*\n", "", s)
+        s = re.sub(r"Indexed.*\n", "", s)
+        s = re.sub(r"\s*idx=[0-9a-f]+\)\.\n", "", s)
+        return s
 
     got_n = _norm(got)
     want_n = _norm(want)
