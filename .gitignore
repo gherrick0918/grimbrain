@@ -16,6 +16,7 @@ venv*/
 
 # Local data / indexes / logs / outputs
 .chroma/
+chroma_store/
 storage/
 logs/
 outputs/
