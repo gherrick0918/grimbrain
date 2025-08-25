@@ -1,0 +1,11 @@
+{
+  "id": "ignite",
+  "kind": "action",
+  "cli_verb": "ignite",
+  "targets": ["ally_or_self"],
+  "effects": [
+    { "duration_rounds": 3, "timing": "start_of_turn", "fixed_damage": 2, "tag_add": "burning" }
+  ],
+  "log_templates": { "start": "{actor.name} ignites {target.name} (burning)", "apply": "{target.name} starts burning" }
+}
+
