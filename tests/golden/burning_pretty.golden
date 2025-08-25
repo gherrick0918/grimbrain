@@ -1,7 +1,5 @@
 Conflict: rule/attack.shortbow -> keeping generated, ignoring legacy-data
 Conflict: rule/attack.shortsword -> keeping generated, ignoring legacy-data
-Indexed 14 docs (+1 / ~0 / -0) (by_type={'rule': 13, 'monster': 1}, packs={'generated': 5, 'legacy-data': 1, 'custom': 8}, idx=d019e2b).
-Warmed resolver cache for 0 docs in 0.23s.
 Effect on Hero begins
 Hero ignites Hero (burning)
 Hero starts burning
@@ -10,4 +8,4 @@ Hero takes 2 ongoing damage
 Hero takes 2 ongoing damage
 Hero takes 2 ongoing damage
 Effect on Hero ends
-Summary: rounds=4; alive=['Hero', 'Goblin']; dead=[]; stable[]
+Summary: rounds=4; alive=['Hero', 'Goblin']; dead=[]; stable=[]
