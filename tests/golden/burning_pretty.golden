@@ -10,4 +10,5 @@ Hero takes 2 ongoing damage
 Hero takes 2 ongoing damage
 Hero takes 2 ongoing damage
 Effect on Hero ends
-Summary: rounds=4; alive=['Hero', 'Goblin']; dead=[]; stable=[]
+Summary: rounds=5; alive=['Hero', 'Goblin']; dead=[]; stable=[]
+
