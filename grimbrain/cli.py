@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import os
+from functools import partial
 from pathlib import Path
 
+from rich import box
 import typer
+import typer.rich_utils as tru
+
+tru.Panel = partial(tru.Panel, box=box.ASCII)
 
 app = typer.Typer(no_args_is_help=True)
 
-
 @app.callback()
 def main() -> None:
-    """Grimbrain — solo D&D 5e engine (local-first)."""
-
-
+    """Grimbrain - solo D&D 5e engine (local-first)."""
+    
 @app.command()
 def play(
     pc: Path = typer.Option(..., exists=True, help="PC file (json)"),
