@@ -3,6 +3,7 @@ import sys
 import subprocess
 import pathlib
 import difflib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAIN = ROOT / "main.py"
@@ -45,10 +46,24 @@ def test_burning_pretty_golden():
     assert cp.returncode == 0
     got = cp.stdout
     want = (GOLDEN / "burning_pretty.golden").read_text(encoding="utf-8")
-    if got != want:
+
+    def _norm(s: str) -> str:
+        """Strip volatile indexing and cache-warm lines from CLI output."""
+        lines = []
+        for line in s.splitlines():
+            if line.startswith("Indexed"):
+                continue
+            if line.startswith("Warmed resolver cache"):
+                continue
+            lines.append(line)
+        return "\n".join(lines)
+
+    got_n = _norm(got)
+    want_n = _norm(want)
+    if got_n != want_n:
         diff = "\n".join(
             difflib.unified_diff(
-                want.splitlines(), got.splitlines(),
+                want_n.splitlines(), got_n.splitlines(),
                 fromfile="burning_pretty.golden", tofile="got", lineterm="",
             )
         )

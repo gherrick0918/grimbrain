@@ -125,6 +125,8 @@ class RuleResolver:
             n = int(os.environ.get("GB_RESOLVER_WARM_COUNT", self.warm_count))
         except Exception:
             n = self.warm_count
+        if n <= 0:
+            return "Warmed resolver cache for 0 docs in 0.00s."
         t0 = perf_counter()
         docs: List[str] = []
         try:
