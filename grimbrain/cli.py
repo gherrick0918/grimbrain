@@ -1,61 +1,48 @@
-"""Dev-friendly launcher for grimbrain.
-
-- If you later move the CLI into the package (e.g., grimbrain/main.py),
-  we call that first.
-- Otherwise we execute the repo-root main.py, making sure the repo root
-  is on sys.path and the CWD matches ``python main.py``.
-"""
+from __future__ import annotations
 
 from pathlib import Path
-import os
-import runpy
-import sys
-import re  # <-- Added
 
-# Added regex patterns
-REST_RE = re.compile(r'^rest\s+(short|long)\s+([A-Za-z][\w\s\'"-]+)(?:\s+(\d+))?$', re.I)
-CAST_RE = re.compile(r'^cast\s+"([^"]+)"(?:\s+"([^"]+)")?(?:\s+--level\s+(\d+))?$', re.I)
-REACTION_RE = re.compile(r'^reaction\s+"([^"]+)"\s+([A-Za-z][\w\s\'"-]+)$', re.I)
+import typer
+
+app = typer.Typer(no_args_is_help=True)
 
 
-def main(argv: list[str] | None = None) -> int:
-    if argv is None:
-        argv = sys.argv[1:]
+@app.callback()
+def main() -> None:
+    """Grimbrain — solo D&D 5e engine (local-first)."""
 
-    # A) Prefer in-package CLI if it ever exists
-    try:
-        from .main import main as run  # optional future path
-    except Exception:
-        run = None
-    if run:
-        return int(run() or 0)
 
-    # B) Dev path: locate repo root from this file (editable install)
-    pkg_dir = Path(__file__).resolve().parent          # .../grimbrain
-    repo_root = pkg_dir.parent                         # repo root
-    root_main = repo_root / "main.py"
-    if root_main.exists():
-        # Ensure `import content`, `import engine`, etc. resolve
-        sys.path.insert(0, str(repo_root))
+@app.command()
+def play(
+    pc: Path = typer.Option(..., exists=True, help="PC file (json)"),
+    encounter: str = typer.Option(..., help="Encounter id (e.g., 'goblin')"),
+    packs: str = typer.Option("srd", help="Comma-separated pack ids"),
+    seed: int = typer.Option(1, help="Deterministic RNG seed"),
+    md_out: Path | None = typer.Option(None, help="Markdown log output"),
+    json_out: Path | None = typer.Option(None, help="NDJSON sidecar output"),
+    autosave: bool = typer.Option(False, help="Append turn summaries"),
+    debug: bool = typer.Option(False, help="Verbose resolver logs"),
+) -> None:
+    """Run a single encounter using the engine."""
+    # TODO: import and call your existing engine runner here.
+    # Example:
+    # from grimbrain.engine import run_encounter
+    # result = run_encounter(pc, encounter, packs.split(','), seed, md_out, json_out, autosave, debug)
+    # typer.Exit(code=result.returncode)
+    typer.echo(f"[grimbrain] seed={seed} packs={packs} encounter={encounter}")
 
-        # Make relative paths/logging match `python main.py`
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(repo_root)
-            # Keep CLI args intact for main.py
-            runpy.run_path(str(root_main), run_name="__main__")
-        finally:
-            os.chdir(old_cwd)
-        return 0
 
-    # C) Friendly error if neither path exists
-    print(
-        "grimbrain: could not locate CLI. Run from the repo root, "
-        "or move the CLI into the package (grimbrain/main.py).",
-        file=sys.stderr,
-    )
-    return 2
+@app.command()
+def content(
+    reload: bool = typer.Option(
+        False, "--reload", help="Rebuild content/rules indexes"
+    ),
+) -> None:
+    if reload:
+        # from grimbrain.content import rebuild_indexes
+        # rebuild_indexes()
+        typer.echo("Rebuilt content/rules indexes (stub)")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    app()
