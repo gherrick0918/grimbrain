@@ -7,10 +7,12 @@ from pathlib import Path
 from rich import box
 import typer
 import typer.rich_utils as tru
+from grimbrain.cli_validate import validate_app
 
 tru.Panel = partial(tru.Panel, box=box.ASCII)
 
 app = typer.Typer(no_args_is_help=True)
+app.add_typer(validate_app, name="validate")
 
 @app.callback()
 def main() -> None:

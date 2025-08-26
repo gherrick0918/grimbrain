@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List
 
+
 class NamedText(BaseModel):
     name: str
     text: str
@@ -17,6 +18,7 @@ class ActionStruct(BaseModel):
     hit_text: str
     damage_dice: str
     damage_type: str
+
 
 class MonsterSidecar(BaseModel):
     name: str
@@ -35,6 +37,7 @@ class MonsterSidecar(BaseModel):
     actions_struct: List[ActionStruct] = Field(default_factory=list)
     reactions: List[NamedText]
     provenance: List[str]
+
 
 class SpellSidecar(BaseModel):
     name: str
@@ -118,3 +121,15 @@ def dump_model(m: BaseModel) -> Dict[str, Any]:
     if hasattr(m, "model_dump"):
         return m.model_dump()
     return m.dict()
+
+
+__all__ = [
+    "NamedText",
+    "ActionStruct",
+    "MonsterSidecar",
+    "SpellSidecar",
+    "Attack",
+    "PC",
+    "dump_model",
+]
+
