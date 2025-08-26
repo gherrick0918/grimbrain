@@ -42,7 +42,21 @@
       }
     },
     "spells": {"type": "array", "items": {"type": "string"}},
-    "notes": {"type": "string"}
+    "spell_slots": {
+      "type": "object",
+      "properties": {
+        "l1": {"type": "integer"},
+        "l2": {"type": "integer"},
+        "l3": {"type": "integer"},
+        "l4": {"type": "integer"},
+        "l5": {"type": "integer"},
+        "l6": {"type": "integer"},
+        "l7": {"type": "integer"},
+        "l8": {"type": "integer"},
+        "l9": {"type": "integer"}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }
