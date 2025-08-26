@@ -17,3 +17,6 @@ dependencies = [
 [project.scripts]
 grimbrain = "grimbrain.cli:app"
 
+[tool.setuptools.packages.find]
+include = ["grimbrain*"]
+
