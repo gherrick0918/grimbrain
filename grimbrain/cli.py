@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-import os
 from functools import partial
 from pathlib import Path
 
-from rich import box
 import typer
 import typer.rich_utils as tru
+from rich import box
+
+from grimbrain.cli_character import char_app
 from grimbrain.cli_validate import validate_app
 
 tru.Panel = partial(tru.Panel, box=box.ASCII)
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(validate_app, name="validate")
+app.add_typer(char_app, name="character")
+
 
 @app.callback()
 def main() -> None:
     """Grimbrain - solo D&D 5e engine (local-first)."""
-    
+
+
 @app.command()
 def play(
     pc: Path = typer.Option(..., exists=True, help="PC file (json)"),

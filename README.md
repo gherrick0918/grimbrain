@@ -53,6 +53,19 @@ quests:
 }
 ```
 
+### Character quickstart
+
+Create a level‑1 Wizard:
+```bash
+grimbrain character create --name Elora --klass Wizard --race "High Elf" \
+  --background Sage --ac 12 --str 8 --dex 14 --con 12 --int 16 --wis 10 --cha 12 \
+  --out pc_wizard.json
+```
+Level to 3:
+```bash
+grimbrain character level pc_wizard.json --to 3
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query
