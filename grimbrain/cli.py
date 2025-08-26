@@ -34,8 +34,9 @@ def play(
     # Example:
     # from grimbrain.engine import run_encounter
     # result = run_encounter(pc, encounter, packs.split(','), seed, md_out, json_out, autosave, debug)
-    # typer.Exit(code=result.returncode)
-    typer.echo(f"[grimbrain] seed={seed} packs={packs} encounter={encounter}")
+    # raise typer.Exit(code=result.returncode)
+    typer.echo("play command not implemented", err=True)
+    raise typer.Exit(code=1)
 
 
 @app.command()
