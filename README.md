@@ -1,5 +1,7 @@
 # Grimbrain
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+
+![CI](https://img.shields.io/github/actions/workflow/status/gherrick0918/grimbrain/ci.yml?branch=main)
+![coverage](https://img.shields.io/badge/coverage-local-informational)
 
 ## Quickstart (90 seconds)
 

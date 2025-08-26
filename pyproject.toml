@@ -20,6 +20,13 @@ dependencies = [
 [project.scripts]
 grimbrain = "grimbrain.cli:app"
 
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-cov",
+  "coverage",
+]
+
 [tool.setuptools.packages.find]
 include = ["grimbrain*"]
 

@@ -1,0 +1,9 @@
+[run]
+branch = True
+source = grimbrain
+omit =
+    grimbrain/__main__.py
+
+[report]
+show_missing = True
+skip_covered = True
