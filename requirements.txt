@@ -10,4 +10,5 @@ uvicorn
 psutil
 pydantic
 pytest
+pytest-cov
 jsonschema
