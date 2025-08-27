@@ -14,6 +14,7 @@ char_app = typer.Typer(help="Character creation and management")
 def create(
     name: str = typer.Option(...),
     klass: str = typer.Option(..., help="Class, e.g. Wizard"),
+    subclass: str = typer.Option(None, help="Subclass (for EK/AT etc.)"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
     ac: int = typer.Option(12),
@@ -28,6 +29,7 @@ def create(
     opts = PCOptions(
         name=name,
         klass=klass,
+        subclass=subclass,
         race=race,
         background=background,
         ac=ac,
@@ -49,6 +51,7 @@ def create(
 def make_from_array(
     name: str = typer.Option(...),
     klass: str = typer.Option(...),
+    subclass: str = typer.Option(None, help="Subclass"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
     ac: int = typer.Option(12),
@@ -64,6 +67,7 @@ def make_from_array(
     opts = PCOptions(
         name=name,
         klass=klass,
+        subclass=subclass,
         race=race,
         background=background,
         ac=ac,
@@ -78,6 +82,7 @@ def make_from_array(
 def make_from_pointbuy(
     name: str = typer.Option(...),
     klass: str = typer.Option(...),
+    subclass: str = typer.Option(None, help="Subclass"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
     ac: int = typer.Option(12),
@@ -94,6 +99,7 @@ def make_from_pointbuy(
     opts = PCOptions(
         name=name,
         klass=klass,
+        subclass=subclass,
         race=race,
         background=background,
         ac=ac,

@@ -76,6 +76,21 @@ Create via point‑buy (27‑point):
 grimbrain character pointbuy --name Nox --klass Warlock --stats 15,14,13,10,10,8
 ```
 
+Supports full casters (Wizard, Cleric, Druid, Sorcerer, Bard), half‑casters
+(Paladin, Ranger), third‑casters (Eldritch Knight, Arcane Trickster), and
+Warlock pact magic slot rules.
+
+Create an Eldritch Knight:
+```bash
+grimbrain character create --name Tharn --klass Fighter --subclass "Eldritch Knight" --ac 17 \
+  --str 16 --dex 12 --con 14 --int 10 --wis 10 --cha 8 --out pc_tharn.json
+```
+Create an Arcane Trickster:
+```bash
+grimbrain character create --name Sable --klass Rogue --subclass "Arcane Trickster" --ac 15 \
+  --str 10 --dex 16 --con 12 --int 14 --wis 10 --cha 8 --out pc_sable.json
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query
