@@ -1,0 +1,43 @@
+{
+  "name": "Elora",
+  "class": "Wizard",
+  "subclass": null,
+  "background": "Sage",
+  "race": "High Elf",
+  "level": 1,
+  "proficiency_bonus": null,
+  "abilities": {
+    "str": 8,
+    "dex": 14,
+    "con": 12,
+    "int": 16,
+    "wis": 10,
+    "cha": 12
+  },
+  "ac": 12,
+  "max_hp": 7,
+  "current_hp": 7,
+  "inventory": [],
+  "spells": [],
+  "spell_slots": {
+    "l1": 2,
+    "l2": 0,
+    "l3": 0,
+    "l4": 0,
+    "l5": 0,
+    "l6": 0,
+    "l7": 0,
+    "l8": 0,
+    "l9": 0
+  },
+  "save_proficiencies": [
+    "int",
+    "wis"
+  ],
+  "skill_proficiencies": [
+    "arcana",
+    "history"
+  ],
+  "armor_proficiencies": [],
+  "weapon_proficiencies": []
+}
