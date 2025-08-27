@@ -5,6 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from grimbrain.models.pc import Abilities, PlayerCharacter, SpellSlots
+from grimbrain.rules_equipment import (
+    BACKGROUND_KITS,
+    BACKGROUND_LANGUAGES,
+    BACKGROUND_TOOLS,
+    CLASS_KITS,
+    KitItem,
+)
 from grimbrain.rules_core import (
     BACKGROUND_SKILLS,
     CLASS_SAVE_PROFS,
@@ -102,6 +109,26 @@ def add_item(pc: PlayerCharacter, name: str, qty: int = 1, **props) -> None:
     from grimbrain.models.pc import Item
 
     pc.inventory.append(Item(name=name, qty=qty, props=props or None))
+
+
+def apply_items(pc: PlayerCharacter, kit: list[KitItem]) -> None:
+    for it in kit:
+        add_item(pc, it.name, it.qty, **(it.props or {}))
+
+
+def apply_starter_kits(pc: PlayerCharacter) -> None:
+    kit = CLASS_KITS.get(pc.class_, [])
+    apply_items(pc, kit)
+    if pc.background:
+        apply_items(pc, BACKGROUND_KITS.get(pc.background, []))
+        langs = BACKGROUND_LANGUAGES.get(pc.background, [])
+        for l in langs:
+            if l not in pc.languages:
+                pc.languages.append(l)
+        tools = BACKGROUND_TOOLS.get(pc.background, [])
+        for t in tools:
+            if t not in pc.tool_proficiencies:
+                pc.tool_proficiencies.append(t)
 
 
 # --- Spells ---

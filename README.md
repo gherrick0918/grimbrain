@@ -115,6 +115,23 @@ grimbrain character sheet pc_elora.json --fmt pdf --logo assets/grimbrain_logo.p
   --meta campaign=Starter --meta seed=1 --out outputs/elora_sheet.pdf
 ```
 
+### Starter equipment
+
+Create a PC with class/background starter packs:
+```bash
+grimbrain character create --name Elora --klass Wizard --background Sage --ac 12 \
+  --str 8 --dex 14 --con 12 --int 16 --wis 10 --cha 12 --starter --out pc_elora.json
+```
+
+Apply a kit to an existing PC:
+
+```bash
+grimbrain character equip pc_elora.json --preset Wizard
+grimbrain character equip pc_elora.json --preset Sage
+```
+
+Sheets will now list Languages and Tools under Proficiencies.
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query

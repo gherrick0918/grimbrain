@@ -47,6 +47,10 @@ def prof_block(pc: PlayerCharacter) -> Table:
     t.add_row("Prof.", f"+{pc.prof}")
     t.add_row("Saves", _caps_csv(pc.save_proficiencies))
     t.add_row("Skills", _caps_csv(pc.skill_proficiencies))
+    langs = ", ".join(pc.languages) if pc.languages else "—"
+    tools = ", ".join(pc.tool_proficiencies) if pc.tool_proficiencies else "—"
+    t.add_row("Languages", langs)
+    t.add_row("Tools", tools)
     return t
 
 
@@ -154,7 +158,9 @@ def to_markdown(
     out += (
         f"- **Proficiency Bonus**: +{pc.prof}\n"
         f"- **Saving Throws**: {_caps_csv(pc.save_proficiencies)}\n"
-        f"- **Skills**: {_caps_csv(pc.skill_proficiencies)}\n\n"
+        f"- **Skills**: {_caps_csv(pc.skill_proficiencies)}\n"
+        f"- **Languages**: {', '.join(pc.languages) if pc.languages else '—'}\n"
+        f"- **Tools**: {', '.join(pc.tool_proficiencies) if pc.tool_proficiencies else '—'}\n\n"
     )
     out += "## Derived\n\n"
     out += (

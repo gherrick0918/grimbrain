@@ -81,6 +81,8 @@ class PlayerCharacter(BaseModel):
     skill_proficiencies: Set[str] = set()
     armor_proficiencies: Set[str] = set()
     weapon_proficiencies: Set[str] = set()
+    languages: List[str] = []
+    tool_proficiencies: List[str] = []
 
     class Config:
         populate_by_name = True
