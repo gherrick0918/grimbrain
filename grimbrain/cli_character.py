@@ -6,6 +6,7 @@ import typer
 
 from grimbrain.characters import PCOptions, create_pc, level_up, save_pc
 from grimbrain.sheet import render_console, save_markdown
+from grimbrain.sheet_pdf import save_pdf
 from grimbrain.validation import PrettyError, load_pc
 
 char_app = typer.Typer(help="Character creation and management")
@@ -133,8 +134,8 @@ def level(
 @char_app.command("sheet")
 def sheet(
     file: Path = typer.Argument(..., exists=True),
-    fmt: str = typer.Option("tty", help="tty|md"),
-    out: Path | None = typer.Option(None, help="Output path for md format"),
+    fmt: str = typer.Option("tty", help="tty|md|pdf"),
+    out: Path | None = typer.Option(None, help="Output path for md/pdf"),
 ):
     try:
         pc = load_pc(file)
@@ -155,5 +156,9 @@ def sheet(
         target = out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
         save_markdown(pc, target)
         typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
+    elif fmt == "pdf":
+        target = out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.pdf"
+        save_pdf(pc, target)
+        typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
     else:
-        raise typer.BadParameter("Unknown format (use 'tty' or 'md')")
+        raise typer.BadParameter("Unknown format (use 'tty' or 'md' or 'pdf')")
