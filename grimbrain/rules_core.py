@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from math import ceil
 
 # Saving throw proficiencies by class (SRD baseline)
 CLASS_SAVE_PROFS = {
@@ -48,7 +49,44 @@ FULL_CASTER_SLOTS = {
     20: (4, 3, 3, 3, 3, 2, 2, 1, 1),
 }
 
-# Half-caster / third-caster progression can be added later when needed.
+# --- Caster progressions ---------------------------------------------------
+
+HALF_CASTERS = {"Paladin", "Ranger"}
+THIRD_CASTERS = {
+    ("Fighter", "Eldritch Knight"),
+    ("Rogue", "Arcane Trickster"),
+}
+
+
+def is_third_caster(klass: str, subclass: str | None) -> bool:
+    if not subclass:
+        return False
+    return (klass, subclass) in THIRD_CASTERS
+
+
+# Map a *caster level* (1..20) onto the full-caster slot table. Consumers must
+# translate a character's class/subclass/level into a caster level first.
+def full_slots_for_caster_level(caster_level: int) -> tuple[int, ...] | None:
+    if caster_level <= 0:
+        return None
+    return FULL_CASTER_SLOTS.get(min(caster_level, 20))
+
+
+# Half-caster single-class heuristic (SRD): L1 no slots, L2 -> CL1, L3 -> CL2,
+# L4 -> CL2, L5 -> CL3, ... which is approximated by ceil(level/2) with level 1
+# producing 0.
+def half_caster_level(level: int) -> int:
+    if level <= 1:
+        return 0
+    return ceil(level / 2)
+
+
+# Third-caster (subclass casters) progression: no slots until subclass at L3
+# (CL1) then roughly ceil(level/3).
+def third_caster_level(level: int) -> int:
+    if level < 3:
+        return 0
+    return max(1, ceil(level / 3))
 
 # Pact magic (Warlock) – slots per level (level, #slots, slot level)
 PACT_MAGIC = {

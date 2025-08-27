@@ -10,6 +10,10 @@ from grimbrain.rules_core import (
     CLASS_SAVE_PROFS,
     FULL_CASTER_SLOTS,
     PACT_MAGIC,
+    HALF_CASTERS,
+    is_third_caster,
+    half_caster_level,
+    third_caster_level,
 )
 
 # Simple SRD baseline hit-die map
@@ -36,6 +40,7 @@ class PCOptions:
     background: str | None
     abilities: dict  # {str,dex,con,int,wis,cha}
     ac: int
+    subclass: str | None = None
 
 
 # --- Creation ---
@@ -51,12 +56,13 @@ def create_pc(opts: PCOptions) -> PlayerCharacter:
         **{"class": opts.klass},
         race=opts.race,
         background=opts.background,
+        subclass=opts.subclass,
         level=1,
         abilities=abilities,
         ac=opts.ac,
         max_hp=max_hp,
         current_hp=max_hp,
-        spell_slots=_spell_slots_for(opts.klass, 1),
+        spell_slots=_spell_slots_for(opts.klass, 1, opts.subclass),
     )
     pc.save_proficiencies = CLASS_SAVE_PROFS.get(opts.klass, set())
     if opts.background:
@@ -79,7 +85,7 @@ def level_up(pc: PlayerCharacter, new_level: int) -> PlayerCharacter:
     pc.level = new_level
     pc.max_hp += max(1, gained)
     pc.current_hp = pc.max_hp
-    pc.spell_slots = _spell_slots_for(klass, new_level)
+    pc.spell_slots = _spell_slots_for(klass, new_level, pc.subclass)
     return pc
 
 
@@ -109,8 +115,10 @@ def learn_spell(pc: PlayerCharacter, spell_name: str) -> None:
 # --- Slots helper ---
 
 
-def _spell_slots_for(klass: str, lvl: int) -> SpellSlots | None:
-    # Full casters: Bard, Cleric, Druid, Sorcerer, Wizard
+def _spell_slots_for(
+    klass: str, lvl: int, subclass: str | None = None
+) -> SpellSlots | None:
+    # Full casters
     if klass in {"Bard", "Cleric", "Druid", "Sorcerer", "Wizard"}:
         t = FULL_CASTER_SLOTS.get(lvl)
         if t:
@@ -125,13 +133,52 @@ def _spell_slots_for(klass: str, lvl: int) -> SpellSlots | None:
                 l8=t[7],
                 l9=t[8],
             )
-    # Pact magic: Warlock (handled separately)
+        return None
+
+    # Pact magic: Warlock
     if klass == "Warlock":
         slots, slot_level = PACT_MAGIC[lvl]
         sp = SpellSlots()
         setattr(sp, f"l{slot_level}", slots)
         return sp
-    # Non-casters default to None
+
+    # Half-casters
+    if klass in HALF_CASTERS:
+        cl = half_caster_level(lvl)
+        t = FULL_CASTER_SLOTS.get(cl)
+        if t:
+            return SpellSlots(
+                l1=t[0],
+                l2=t[1],
+                l3=t[2],
+                l4=t[3],
+                l5=t[4],
+                l6=t[5],
+                l7=t[6],
+                l8=t[7],
+                l9=t[8],
+            )
+        return None
+
+    # Third-casters
+    if is_third_caster(klass, subclass):
+        cl = third_caster_level(lvl)
+        t = FULL_CASTER_SLOTS.get(cl)
+        if t:
+            return SpellSlots(
+                l1=t[0],
+                l2=t[1],
+                l3=t[2],
+                l4=t[3],
+                l5=t[4],
+                l6=t[5],
+                l7=t[6],
+                l8=t[7],
+                l9=t[8],
+            )
+        return None
+
+    # Non-casters
     return None
 
 
