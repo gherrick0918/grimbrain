@@ -66,6 +66,16 @@ Level to 3:
 grimbrain character level pc_wizard.json --to 3
 ```
 
+Create with standard array assigned to INT, DEX, CON, STR, WIS, CHA:
+```bash
+grimbrain character array --name Elora --klass Wizard \
+  --assign int,dex,con,str,wis,cha --out pc_wizard.json
+```
+Create via point‑buy (27‑point):
+```bash
+grimbrain character pointbuy --name Nox --klass Warlock --stats 15,14,13,10,10,8
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query

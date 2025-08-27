@@ -1,10 +1,31 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field, PositiveInt
 
 ABILITY_ORDER = ("str", "dex", "con", "int", "wis", "cha")
+
+SKILLS: Tuple[str, ...] = (
+    "acrobatics",
+    "animal_handling",
+    "arcana",
+    "athletics",
+    "deception",
+    "history",
+    "insight",
+    "intimidation",
+    "investigation",
+    "medicine",
+    "nature",
+    "perception",
+    "performance",
+    "persuasion",
+    "religion",
+    "sleight_of_hand",
+    "stealth",
+    "survival",
+)
 
 
 class Abilities(BaseModel):
@@ -55,6 +76,12 @@ class PlayerCharacter(BaseModel):
     spells: List[str] = []
     spell_slots: SpellSlots | None = None
 
+    # Proficiencies
+    save_proficiencies: Set[str] = set()
+    skill_proficiencies: Set[str] = set()
+    armor_proficiencies: Set[str] = set()
+    weapon_proficiencies: Set[str] = set()
+
     class Config:
         populate_by_name = True
 
@@ -70,5 +97,55 @@ class PlayerCharacter(BaseModel):
     def ability_mod(self, name: str) -> int:
         return self.abilities.modifier(name)
 
+    def skill_mod(self, skill: str) -> int:
+        key = {
+            "athletics": "str",
+            "acrobatics": "dex",
+            "sleight_of_hand": "dex",
+            "stealth": "dex",
+            "arcana": "int",
+            "history": "int",
+            "investigation": "int",
+            "nature": "int",
+            "religion": "int",
+            "animal_handling": "wis",
+            "insight": "wis",
+            "medicine": "wis",
+            "perception": "wis",
+            "survival": "wis",
+            "deception": "cha",
+            "intimidation": "cha",
+            "performance": "cha",
+            "persuasion": "cha",
+        }[skill]
+        mod = self.ability_mod(key)
+        if skill in self.skill_proficiencies:
+            mod += self.prof
+        return mod
 
-__all__ = ["PlayerCharacter", "Abilities", "Item", "SpellSlots", "ABILITY_ORDER"]
+    def save_mod(self, ability: str) -> int:
+        mod = self.ability_mod(ability)
+        if ability in self.save_proficiencies:
+            mod += self.prof
+        return mod
+
+    @property
+    def initiative(self) -> int:
+        return self.ability_mod("dex")
+
+    @property
+    def passive_perception(self) -> int:
+        return 10 + self.skill_mod("perception")
+
+    def attack_bonus(self, ability: str, proficient: bool) -> int:
+        return self.ability_mod(ability) + (self.prof if proficient else 0)
+
+
+__all__ = [
+    "PlayerCharacter",
+    "Abilities",
+    "Item",
+    "SpellSlots",
+    "ABILITY_ORDER",
+    "SKILLS",
+]

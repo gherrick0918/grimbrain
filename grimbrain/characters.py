@@ -5,6 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from grimbrain.models.pc import Abilities, PlayerCharacter, SpellSlots
+from grimbrain.rules_core import (
+    BACKGROUND_SKILLS,
+    CLASS_SAVE_PROFS,
+    FULL_CASTER_SLOTS,
+    PACT_MAGIC,
+)
 
 # Simple SRD baseline hit-die map
 HIT_DIE = {
@@ -21,16 +27,6 @@ HIT_DIE = {
     "Sorcerer": 6,
     "Wizard": 6,
 }
-
-# Wizard slots quick table (L1–L5 for example). Extend for full SRD later.
-WIZARD_SLOTS = {
-    1: (2, 0, 0, 0, 0, 0, 0, 0, 0),
-    2: (3, 0, 0, 0, 0, 0, 0, 0, 0),
-    3: (4, 2, 0, 0, 0, 0, 0, 0, 0),
-    4: (4, 3, 0, 0, 0, 0, 0, 0, 0),
-    5: (4, 3, 2, 0, 0, 0, 0, 0, 0),
-}
-
 
 @dataclass
 class PCOptions:
@@ -62,6 +58,9 @@ def create_pc(opts: PCOptions) -> PlayerCharacter:
         current_hp=max_hp,
         spell_slots=_spell_slots_for(opts.klass, 1),
     )
+    pc.save_proficiencies = CLASS_SAVE_PROFS.get(opts.klass, set())
+    if opts.background:
+        pc.skill_proficiencies = BACKGROUND_SKILLS.get(opts.background, set())
     return pc
 
 
@@ -111,8 +110,9 @@ def learn_spell(pc: PlayerCharacter, spell_name: str) -> None:
 
 
 def _spell_slots_for(klass: str, lvl: int) -> SpellSlots | None:
-    if klass == "Wizard":
-        t = WIZARD_SLOTS.get(lvl)
+    # Full casters: Bard, Cleric, Druid, Sorcerer, Wizard
+    if klass in {"Bard", "Cleric", "Druid", "Sorcerer", "Wizard"}:
+        t = FULL_CASTER_SLOTS.get(lvl)
         if t:
             return SpellSlots(
                 l1=t[0],
@@ -125,6 +125,13 @@ def _spell_slots_for(klass: str, lvl: int) -> SpellSlots | None:
                 l8=t[7],
                 l9=t[8],
             )
+    # Pact magic: Warlock (handled separately)
+    if klass == "Warlock":
+        slots, slot_level = PACT_MAGIC[lvl]
+        sp = SpellSlots()
+        setattr(sp, f"l{slot_level}", slots)
+        return sp
+    # Non-casters default to None
     return None
 
 
