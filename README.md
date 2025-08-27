@@ -104,6 +104,17 @@ Export to PDF:
 grimbrain character sheet pc_wizard.json --fmt pdf --out outputs/elora_sheet.pdf
 ```
 
+Include metadata footer and show zero slots:
+```bash
+grimbrain character sheet pc_elora.json --fmt md --meta campaign=Starter --meta seed=1 --show-zero-slots
+```
+
+PDF with logo and metadata:
+```bash
+grimbrain character sheet pc_elora.json --fmt pdf --logo assets/grimbrain_logo.png \
+  --meta campaign=Starter --meta seed=1 --out outputs/elora_sheet.pdf
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query

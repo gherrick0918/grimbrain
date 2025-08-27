@@ -136,6 +136,11 @@ def sheet(
     file: Path = typer.Argument(..., exists=True),
     fmt: str = typer.Option("tty", help="tty|md|pdf"),
     out: Path | None = typer.Option(None, help="Output path for md/pdf"),
+    meta: list[str] = typer.Option([], help="Metadata key=value (repeatable)"),
+    logo: Path | None = typer.Option(None, help="PDF logo image (png/jpg)"),
+    show_zero_slots: bool = typer.Option(
+        False, help="Show slot levels with 0 available"
+    ),
 ):
     try:
         pc = load_pc(file)
@@ -150,15 +155,25 @@ def sheet(
         typer.secho(f"Validation failed for {file}:\n{e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
+    meta_dict: dict[str, str] = {}
+    for kv in meta:
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            meta_dict[k.strip()] = v.strip()
+
     if fmt == "tty":
-        render_console(pc)
+        render_console(pc, meta=meta_dict, show_zero_slots=show_zero_slots)
     elif fmt == "md":
-        target = out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
-        save_markdown(pc, target)
+        target = (
+            out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
+        )
+        save_markdown(pc, target, meta=meta_dict, show_zero_slots=show_zero_slots)
         typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
     elif fmt == "pdf":
-        target = out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.pdf"
-        save_pdf(pc, target)
+        target = (
+            out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.pdf"
+        )
+        save_pdf(pc, target, meta=meta_dict, logo=logo, show_zero_slots=show_zero_slots)
         typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
     else:
         raise typer.BadParameter("Unknown format (use 'tty' or 'md' or 'pdf')")
