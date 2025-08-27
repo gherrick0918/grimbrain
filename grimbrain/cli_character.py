@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from grimbrain.characters import PCOptions, create_pc, level_up, save_pc
+from grimbrain.sheet import render_console, save_markdown
 from grimbrain.validation import PrettyError, load_pc
 
 char_app = typer.Typer(help="Character creation and management")
@@ -55,7 +56,9 @@ def make_from_array(
     race: str = typer.Option(None),
     background: str = typer.Option(None),
     ac: int = typer.Option(12),
-    arr: str = typer.Option("15,14,13,12,10,8", help="Comma-sep standard array (high->low)"),
+    arr: str = typer.Option(
+        "15,14,13,12,10,8", help="Comma-sep standard array (high->low)"
+    ),
     assign: str = typer.Option(
         "int,dex,con,str,wis,cha", help="Order to assign stats (comma sep)"
     ),
@@ -125,3 +128,22 @@ def level(
     pc = level_up(pc, to)
     save_pc(pc, file)
     typer.secho(f"Leveled {pc.name} to {pc.level}", fg=typer.colors.GREEN)
+
+
+@char_app.command("sheet")
+def sheet(
+    file: Path = typer.Argument(..., exists=True),
+    fmt: str = typer.Option("tty", help="tty|md"),
+    out: Path | None = typer.Option(None, help="Output path for md format"),
+):
+    pc = load_pc(file)
+    if fmt == "tty":
+        render_console(pc)
+    elif fmt == "md":
+        target = (
+            out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
+        )
+        save_markdown(pc, target)
+        typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
+    else:
+        raise typer.BadParameter("Unknown format (use 'tty' or 'md')")
