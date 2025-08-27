@@ -70,10 +70,16 @@ def _pkg_version() -> str:
 
 
 def _profs_table(pc: PlayerCharacter) -> Table:
+    saves = _caps_csv(pc.save_proficiencies)
+    skills = _caps_csv(pc.skill_proficiencies)
+    langs = ", ".join(pc.languages) if pc.languages else "—"
+    tools = ", ".join(pc.tool_proficiencies) if pc.tool_proficiencies else "—"
     data = [
         ["Prof. Bonus", f"+{pc.prof}"],
-        ["Saves", _caps_csv(pc.save_proficiencies)],
-        ["Skills", _caps_csv(pc.skill_proficiencies)],
+        ["Saves", saves],
+        ["Skills", skills],
+        ["Languages", langs],
+        ["Tools", tools],
     ]
     t = Table(data, hAlign="LEFT")
     t.setStyle(
