@@ -186,9 +186,15 @@ def _spell_slots_for(
 
 
 def save_pc(pc: PlayerCharacter, path: Path) -> None:
-    data = pc.model_dump(by_alias=True)
-    # fix: turn sets into sorted lists
-    for k in ("save_proficiencies","skill_proficiencies","armor_proficiencies","weapon_proficiencies"):
+    # Omit None fields so we don't write e.g. {"subclass": null}
+    data = pc.model_dump(by_alias=True, exclude_none=True)
+    # Ensure JSON-friendly collections for prof fields
+    for k in (
+        "save_proficiencies",
+        "skill_proficiencies",
+        "armor_proficiencies",
+        "weapon_proficiencies",
+    ):
         if isinstance(data.get(k), set):
             data[k] = sorted(list(data[k]))
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")

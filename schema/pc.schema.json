@@ -56,7 +56,11 @@
         "l9": {"type": "integer"}
       },
       "additionalProperties": false
-    }
+    },
+    "save_proficiencies": {"type": "array", "items": {"type": "string"}},
+    "skill_proficiencies": {"type": "array", "items": {"type": "string"}},
+    "armor_proficiencies": {"type": "array", "items": {"type": "string"}},
+    "weapon_proficiencies": {"type": "array", "items": {"type": "string"}}
   },
   "additionalProperties": false
 }

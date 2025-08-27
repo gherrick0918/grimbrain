@@ -136,13 +136,23 @@ def sheet(
     fmt: str = typer.Option("tty", help="tty|md"),
     out: Path | None = typer.Option(None, help="Output path for md format"),
 ):
-    pc = load_pc(file)
+    try:
+        pc = load_pc(file)
+    except PrettyError as e:
+        # Common pitfalls: campaign/party files, stale schema
+        if "Additional properties" in str(e):
+            typer.secho(
+                "This file has fields the schema doesn't know about. "
+                "Try upgrading schema (PR 9) or re-saving the PC via 'grimbrain character create'.",
+                fg=typer.colors.YELLOW,
+            )
+        typer.secho(f"Validation failed for {file}:\n{e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
     if fmt == "tty":
         render_console(pc)
     elif fmt == "md":
-        target = (
-            out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
-        )
+        target = out or Path("outputs") / f"{pc.name.replace(' ', '_').lower()}_sheet.md"
         save_markdown(pc, target)
         typer.secho(f"Wrote {target}", fg=typer.colors.GREEN)
     else:
