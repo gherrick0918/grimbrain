@@ -1,11 +1,9 @@
 {
   "name": "Elora",
   "class": "Wizard",
-  "subclass": null,
   "background": "Sage",
   "race": "High Elf",
   "level": 1,
-  "proficiency_bonus": null,
   "abilities": {
     "str": 8,
     "dex": 14,
