@@ -91,6 +91,15 @@ grimbrain character create --name Sable --klass Rogue --subclass "Arcane Trickst
   --str 10 --dex 16 --con 12 --int 14 --wis 10 --cha 8 --out pc_sable.json
 ```
 
+Render to terminal:
+```bash
+grimbrain character sheet pc_wizard.json --fmt tty
+```
+Export to Markdown:
+```bash
+grimbrain character sheet pc_wizard.json --fmt md --out outputs/elora_sheet.md
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query
