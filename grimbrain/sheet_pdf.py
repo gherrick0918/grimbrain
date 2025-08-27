@@ -11,6 +11,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
+    KeepInFrame,
     Image,
     Paragraph,
     SimpleDocTemplate,
@@ -32,7 +33,7 @@ def _abilities_table(pc: PlayerCharacter) -> Table:
         score = getattr(pc.abilities, a)
         mod = pc.ability_mod(a)
         data.append([a.upper(), str(score), f"{mod:+d}"])
-    t = Table(data, hAlign="LEFT", colWidths=[1.0 * inch, 0.7 * inch, 0.7 * inch])
+    t = Table(data, hAlign="LEFT")
     t.setStyle(
         TableStyle(
             [
@@ -74,7 +75,7 @@ def _profs_table(pc: PlayerCharacter) -> Table:
         ["Saves", _caps_csv(pc.save_proficiencies)],
         ["Skills", _caps_csv(pc.skill_proficiencies)],
     ]
-    t = Table(data, hAlign="LEFT", colWidths=[1.2 * inch, 4.3 * inch])
+    t = Table(data, hAlign="LEFT")
     t.setStyle(
         TableStyle(
             [
@@ -89,49 +90,21 @@ def _profs_table(pc: PlayerCharacter) -> Table:
 
 
 def _defense_table(pc: PlayerCharacter) -> Table:
-    data = [
-        [
-            "AC",
-            str(pc.ac),
-            "HP",
-            f"{pc.current_hp}/{pc.max_hp}",
-            "Init.",
-            f"{pc.initiative:+d}",
-            "Passive Perception",
-            str(pc.passive_perception),
-        ],
-    ]
-    t = Table(
-        data,
-        hAlign="LEFT",
-        colWidths=[
-            0.5 * inch,
-            0.6 * inch,
-            0.5 * inch,
-            1.0 * inch,
-            0.6 * inch,
-            0.7 * inch,
-            1.6 * inch,
-            0.7 * inch,
-        ],
-    )
-    t.setStyle(
-        TableStyle(
-            [
-                ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-                ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
-                ("FONT", (0, 0), (-1, 0), "Helvetica", NORMAL),
-            ]
-        )
-    )
+    data = [[
+        "AC", str(pc.ac), "HP", f"{pc.current_hp}/{pc.max_hp}",
+        "Init.", f"{pc.initiative:+d}", "Passive Perception", str(pc.passive_perception)
+    ]]
+    t = Table(data, hAlign="LEFT")
+    t.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+    ]))
     return t
 
 
 def _slots_table(pc: PlayerCharacter, show_zero: bool) -> Table:
     data = [["Slots", _slots_line(pc, show_zero)]]
-    t = Table(data, hAlign="LEFT", colWidths=[0.7 * inch, 5.0 * inch])
+    t = Table(data, hAlign="LEFT")
     t.setStyle(
         TableStyle(
             [
@@ -151,13 +124,9 @@ def _inventory_table(pc: PlayerCharacter) -> Table:
         rows.append(["—", "—", "—"])
     else:
         for it in pc.inventory:
-            props = (
-                ", ".join(f"{k}={v}" for k, v in (it.props or {}).items())
-                if it.props
-                else ""
-            )
+            props = ", ".join(f"{k}={v}" for k, v in (it.props or {}).items()) if it.props else ""
             rows.append([it.name, str(it.qty or 1), props])
-    t = Table(rows, hAlign="LEFT", colWidths=[3.0 * inch, 0.5 * inch, 2.2 * inch])
+    t = Table(rows, hAlign="LEFT")
     t.setStyle(
         TableStyle(
             [
@@ -182,8 +151,8 @@ def save_pdf(
     doc = SimpleDocTemplate(
         str(path),
         pagesize=letter,
-        leftMargin=36,
-        rightMargin=36,
+        leftMargin=44,
+        rightMargin=44,
         topMargin=36,
         bottomMargin=36,
     )
@@ -216,10 +185,14 @@ def save_pdf(
         _inventory_table(pc),
     ]
 
+    col_width = 3.4 * inch
     left_tbl = Table([[x] for x in left], hAlign="LEFT")
     right_tbl = Table([[x] for x in right], hAlign="LEFT")
 
-    body = Table([[left_tbl, right_tbl]], colWidths=[3.4 * inch, 3.4 * inch])
+    left_fit = KeepInFrame(col_width, 9 * inch, [left_tbl], mode="shrink")
+    right_fit = KeepInFrame(col_width, 9 * inch, [right_tbl], mode="shrink")
+
+    body = Table([[left_fit, right_fit]], colWidths=[col_width, col_width])
     body.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
 
     meta = meta or {}
