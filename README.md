@@ -99,6 +99,10 @@ Export to Markdown:
 ```bash
 grimbrain character sheet pc_wizard.json --fmt md --out outputs/elora_sheet.md
 ```
+Export to PDF:
+```bash
+grimbrain character sheet pc_wizard.json --fmt pdf --out outputs/elora_sheet.pdf
+```
 
 ## Python API
 ```python
