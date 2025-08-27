@@ -45,6 +45,68 @@ def create(
     typer.secho(f"Created PC → {out}", fg=typer.colors.GREEN)
 
 
+@char_app.command("array")
+def make_from_array(
+    name: str = typer.Option(...),
+    klass: str = typer.Option(...),
+    race: str = typer.Option(None),
+    background: str = typer.Option(None),
+    ac: int = typer.Option(12),
+    arr: str = typer.Option("15,14,13,12,10,8", help="Comma-sep standard array (high->low)"),
+    assign: str = typer.Option(
+        "int,dex,con,str,wis,cha", help="Order to assign stats (comma sep)"
+    ),
+    out: Path = typer.Option(Path("pc.json")),
+):
+    vals = [int(x) for x in arr.split(",")]
+    keys = assign.split(",")
+    abilities = dict(zip(keys, vals))
+    opts = PCOptions(
+        name=name,
+        klass=klass,
+        race=race,
+        background=background,
+        ac=ac,
+        abilities=abilities,
+    )
+    pc = create_pc(opts)
+    save_pc(pc, out)
+    typer.secho(f"Created PC from array → {out}", fg=typer.colors.GREEN)
+
+
+@char_app.command("pointbuy")
+def make_from_pointbuy(
+    name: str = typer.Option(...),
+    klass: str = typer.Option(...),
+    race: str = typer.Option(None),
+    background: str = typer.Option(None),
+    ac: int = typer.Option(12),
+    stats: str = typer.Option("15,14,13,12,10,8"),
+    out: Path = typer.Option(Path("pc.json")),
+):
+    vals = [int(x) for x in stats.split(",")]
+    abilities = {k: v for k, v in zip(["str", "dex", "con", "int", "wis", "cha"], vals)}
+    from grimbrain.pointbuy import PointBuy
+
+    pb = PointBuy(**abilities)
+    if pb.cost > 27:
+        raise typer.BadParameter(f"Point-buy total {pb.cost} exceeds 27")
+    opts = PCOptions(
+        name=name,
+        klass=klass,
+        race=race,
+        background=background,
+        ac=ac,
+        abilities=pb.as_dict(),
+    )
+    pc = create_pc(opts)
+    save_pc(pc, out)
+    typer.secho(
+        f"Created PC via point-buy (cost={pb.cost}) → {out}",
+        fg=typer.colors.GREEN,
+    )
+
+
 @char_app.command("level")
 def level(
     file: Path = typer.Argument(..., exists=True),
