@@ -2,20 +2,56 @@
   "name": "Elora",
   "class": "Wizard",
   "background": "Sage",
-  "race": "High Elf",
   "level": 1,
   "abilities": {
     "str": 8,
-    "dex": 14,
-    "con": 12,
-    "int": 16,
-    "wis": 10,
-    "cha": 12
+    "dex": 8,
+    "con": 8,
+    "int": 8,
+    "wis": 8,
+    "cha": 8
   },
   "ac": 12,
-  "max_hp": 7,
-  "current_hp": 7,
-  "inventory": [],
+  "max_hp": 5,
+  "current_hp": 5,
+  "inventory": [
+    {
+      "name": "Quarterstaff",
+      "qty": 1
+    },
+    {
+      "name": "Arcane Focus (Wand)",
+      "qty": 1
+    },
+    {
+      "name": "Component Pouch",
+      "qty": 1
+    },
+    {
+      "name": "Scholar's Pack",
+      "qty": 1
+    },
+    {
+      "name": "Spellbook",
+      "qty": 1
+    },
+    {
+      "name": "Ink (1 oz bottle)",
+      "qty": 1
+    },
+    {
+      "name": "Quill",
+      "qty": 1
+    },
+    {
+      "name": "Parchment",
+      "qty": 10
+    },
+    {
+      "name": "Small Knife",
+      "qty": 1
+    }
+  ],
   "spells": [],
   "spell_slots": {
     "l1": 2,
@@ -37,5 +73,9 @@
     "history"
   ],
   "armor_proficiencies": [],
-  "weapon_proficiencies": []
+  "weapon_proficiencies": [],
+  "languages": [
+    "Any"
+  ],
+  "tool_proficiencies": []
 }
