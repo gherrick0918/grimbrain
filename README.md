@@ -154,6 +154,13 @@ grimbrain character spellstats pc_elora.json
 # → Spell Save DC: 13 | Spell Attack: +5
 ```
 
+### Weapons & Attacks
+
+Weapons are defined in `data/weapons.json`. Equip a weapon by adding its
+name to a character's `equipped_weapons` list and ensuring the matching
+proficiency is present. Equipped weapons appear under **Attacks &
+Spellcasting** on rendered sheets.
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query
