@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from grimbrain.models.pc import Abilities, PlayerCharacter, SpellSlots
 from grimbrain.rules_equipment import (
@@ -22,6 +23,13 @@ from grimbrain.rules_core import (
     half_caster_level,
     third_caster_level,
 )
+from grimbrain.rules_spells import (
+    CASTING_ABILITY,
+    PREPARED_CASTER,
+    KNOWN_CASTER,
+    SPELLS_BY_CLASS,
+)
+from grimbrain.validation import load_pc, PrettyError
 
 # Simple SRD baseline hit-die map
 HIT_DIE = {
@@ -131,12 +139,76 @@ def apply_starter_kits(pc: PlayerCharacter) -> None:
                 pc.tool_proficiencies.append(t)
 
 
-# --- Spells ---
+# --- Spellcasting stats ---
+
+
+def spellcasting_ability(pc: PlayerCharacter) -> str | None:
+    return CASTING_ABILITY.get(pc.class_)
+
+
+def spell_save_dc(pc: PlayerCharacter) -> int | None:
+    ab = spellcasting_ability(pc)
+    if not ab:
+        return None
+    return 8 + pc.prof + pc.ability_mod(ab)
+
+
+def spell_attack_bonus(pc: PlayerCharacter) -> int | None:
+    ab = spellcasting_ability(pc)
+    if not ab:
+        return None
+    return pc.prof + pc.ability_mod(ab)
+
+
+# --- Spellbook operations ---
 
 
 def learn_spell(pc: PlayerCharacter, spell_name: str) -> None:
-    if spell_name not in pc.spells:
-        pc.spells.append(spell_name)
+    if spell_name not in pc.known_spells:
+        pc.known_spells.append(spell_name)
+
+
+def prepare_spell(pc: PlayerCharacter, spell_name: str) -> None:
+    if pc.class_ not in PREPARED_CASTER:
+        return
+    if spell_name not in pc.known_spells:
+        raise ValueError(f"Cannot prepare unknown spell: {spell_name}")
+    if spell_name not in pc.prepared_spells:
+        pc.prepared_spells.append(spell_name)
+
+
+def unprepare_spell(pc: PlayerCharacter, spell_name: str) -> None:
+    if spell_name in pc.prepared_spells:
+        pc.prepared_spells.remove(spell_name)
+
+
+# --- Casting & rests ---
+
+
+def _get_slots(pc: PlayerCharacter):
+    return pc.spell_slots
+
+
+def cast_slot(pc: PlayerCharacter, level: int) -> None:
+    """Consume one slot at the given level (1..9)."""
+    if not pc.spell_slots:
+        raise ValueError("No spell slots available.")
+    if level < 1 or level > 9:
+        raise ValueError("Slot level must be 1..9.")
+    key = f"l{level}"
+    cur = getattr(pc.spell_slots, key)
+    if cur <= 0:
+        raise ValueError(f"No slots available at level {level}.")
+    setattr(pc.spell_slots, key, cur - 1)
+
+
+def long_rest(pc: PlayerCharacter) -> None:
+    pc.spell_slots = _spell_slots_for(pc.class_, pc.level, pc.subclass)
+    pc.current_hp = pc.max_hp
+
+
+def short_rest(pc: PlayerCharacter) -> None:
+    pass
 
 
 # --- Slots helper ---

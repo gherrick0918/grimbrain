@@ -132,6 +132,28 @@ grimbrain character equip pc_elora.json --preset Sage
 
 Sheets will now list Languages and Tools under Proficiencies.
 
+### Spells & Casting
+
+Learn and prepare:
+```bash
+grimbrain character learn pc_elora.json --spell "Magic Missile"
+grimbrain character prepare pc_elora.json --spell "Magic Missile"
+```
+
+Casting & rest:
+
+```bash
+grimbrain character cast pc_elora.json --level 1
+grimbrain character rest pc_elora.json --type long
+```
+
+Get spell stats:
+
+```bash
+grimbrain character spellstats pc_elora.json
+# → Spell Save DC: 13 | Spell Attack: +5
+```
+
 ## Python API
 ```python
 from grimbrain.retrieval.query_router import run_query

@@ -45,11 +45,20 @@ def _validate_jsonschema(obj: Any, schema_path: Path) -> None:
         raise PrettyError("JSON Schema validation failed:\n" + "\n".join(lines) + more)
 
 
+def _migrate_spells_legacy(data: dict) -> dict:
+    if "spells" in data and "known_spells" not in data:
+        if isinstance(data["spells"], list):
+            data["known_spells"] = list(dict.fromkeys(data["spells"]))
+        del data["spells"]
+    return data
+
+
 # Public API
 
 
 def load_pc(path: Path) -> PlayerCharacter:
     data = _read_json(path)
+    data = _migrate_spells_legacy(data)
     _validate_jsonschema(data, _def_schemas["pc"])
     try:
         return PlayerCharacter.model_validate(data)

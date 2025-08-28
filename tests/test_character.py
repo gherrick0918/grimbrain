@@ -21,4 +21,4 @@ def test_create_and_level():
     add_item(pc2, "Potion of Healing", 1)
     learn_spell(pc2, "Magic Missile")
     assert any(i.name == "Potion of Healing" for i in pc2.inventory)
-    assert "Magic Missile" in pc2.spells
+    assert "Magic Missile" in pc2.known_spells

@@ -108,6 +108,27 @@ def _defense_table(pc: PlayerCharacter) -> Table:
     return t
 
 
+def _spell_stats_table(pc: PlayerCharacter) -> Table:
+    from grimbrain.characters import spell_save_dc, spell_attack_bonus
+
+    dc = spell_save_dc(pc)
+    atk = spell_attack_bonus(pc)
+    rows = []
+    if dc is not None and atk is not None:
+        rows.append(["Spell Save DC", str(dc)])
+        rows.append(["Spell Attack", f"+{atk}"])
+    else:
+        rows.append(["Spellcasting", "—"])
+    t = Table(rows, hAlign='LEFT')
+    t.setStyle(TableStyle([
+        ('FONT', (0,0), (-1,-1), 'Helvetica', NORMAL),
+        ('GRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ('BACKGROUND', (0,0), (-1,0), colors.whitesmoke),
+        ('FONT', (0,0), (-1,0), 'Helvetica-Bold', NORMAL),
+    ]))
+    return t
+
+
 def _slots_table(pc: PlayerCharacter, show_zero: bool) -> Table:
     data = [["Slots", _slots_line(pc, show_zero)]]
     t = Table(data, hAlign="LEFT")
@@ -121,6 +142,18 @@ def _slots_table(pc: PlayerCharacter, show_zero: bool) -> Table:
             ]
         )
     )
+    return t
+
+
+def _prepared_table(pc: PlayerCharacter) -> Table:
+    items = ", ".join(pc.prepared_spells) if pc.prepared_spells else "—"
+    t = Table([["Prepared", items]], hAlign='LEFT')
+    t.setStyle(TableStyle([
+        ('FONT', (0,0), (-1,-1), 'Helvetica', NORMAL),
+        ('GRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ('BACKGROUND', (0,0), (-1,0), colors.whitesmoke),
+        ('FONT', (0,0), (-1,0), 'Helvetica-Bold', NORMAL),
+    ]))
     return t
 
 
@@ -185,10 +218,10 @@ def save_pdf(
     ]
     right = [
         Paragraph("<b>Spellcasting</b>", styles["Heading3"]),
-        _slots_table(pc, show_zero_slots),
-        Spacer(1, 0.12 * inch),
-        Paragraph("<b>Inventory</b>", styles["Heading3"]),
-        _inventory_table(pc),
+        _spell_stats_table(pc), Spacer(1, 0.08 * inch),
+        _slots_table(pc, show_zero_slots), Spacer(1, 0.08 * inch),
+        _prepared_table(pc), Spacer(1, 0.12 * inch),
+        Paragraph("<b>Inventory</b>", styles["Heading3"]), _inventory_table(pc)
     ]
 
     col_width = 3.4 * inch
