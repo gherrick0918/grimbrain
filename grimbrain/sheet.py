@@ -13,6 +13,7 @@ from rich.table import Table
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
 from grimbrain.characters import spell_save_dc, spell_attack_bonus
 from grimbrain.codex.weapons import WeaponIndex
+from grimbrain.rules.attacks import format_mod
 
 ABIL_NAMES = {
     "str": "STR",
@@ -23,7 +24,9 @@ ABIL_NAMES = {
     "cha": "CHA",
 }
 
-WEAPON_INDEX = WeaponIndex.load(Path(__file__).resolve().parent.parent / "data" / "weapons.json")
+WEAPON_INDEX = WeaponIndex.load(
+    Path(__file__).resolve().parent.parent / "data" / "weapons.json"
+)
 
 
 def _caps_csv(items: Iterable[str]) -> str:
@@ -42,13 +45,13 @@ def ability_block(pc: PlayerCharacter) -> Table:
     for a in ABILITY_ORDER:
         score = getattr(pc.abilities, a)
         mod = pc.ability_mod(a)
-        t.add_row(f"[bold]{ABIL_NAMES[a]}[/]", f"{score:>2} ({mod:+d})")
+        t.add_row(f"[bold]{ABIL_NAMES[a]}[/]", f"{score:>2} ({format_mod(mod)})")
     return t
 
 
 def prof_block(pc: PlayerCharacter) -> Table:
     t = Table(box=None, show_header=False, expand=False)
-    t.add_row("Prof.", f"+{pc.prof}")
+    t.add_row("Prof.", format_mod(pc.prof))
     t.add_row("Saves", _caps_csv(pc.save_proficiencies))
     t.add_row("Skills", _caps_csv(pc.skill_proficiencies))
     langs = ", ".join(pc.languages) if pc.languages else "—"
@@ -62,7 +65,7 @@ def defense_block(pc: PlayerCharacter) -> Table:
     t = Table(box=None, show_header=False, expand=False)
     t.add_row("AC", str(pc.ac))
     t.add_row("HP", f"{pc.current_hp}/{pc.max_hp}")
-    t.add_row("Init.", f"{pc.initiative:+d}")
+    t.add_row("Init.", format_mod(pc.initiative))
     t.add_row("Passive Perception", str(pc.passive_perception))
     return t
 
@@ -84,7 +87,7 @@ def spellcasting_block(pc: PlayerCharacter, show_zero: bool) -> Table:
     atk = spell_attack_bonus(pc)
     if dc is not None and atk is not None:
         t.add_row("Spell Save DC", str(dc))
-        t.add_row("Spell Attack", f"+{atk}")
+        t.add_row("Spell Attack", format_mod(atk))
     parts = slots_list(pc, show_zero)
     t.add_row("Slots", ", ".join(parts) if parts else "—")
     if pc.prepared_spells:
@@ -103,7 +106,7 @@ def attacks_block(pc: PlayerCharacter) -> Table:
         t.add_row("—", "—", "—", "")
         return t
     for a in attacks:
-        atk = f"{a['attack_bonus']:+d}"
+        atk = format_mod(a["attack_bonus"])
         t.add_row(a["name"], atk, a["damage"], a["properties"])
     return t
 
@@ -187,10 +190,10 @@ def to_markdown(
     for a in ABILITY_ORDER:
         score = getattr(pc.abilities, a)
         mod = pc.ability_mod(a)
-        out += f"- **{ABIL_NAMES[a]}**: {score} ({mod:+d})\n"
+        out += f"- **{ABIL_NAMES[a]}**: {score} ({format_mod(mod)})\n"
     out += "\n## Proficiencies\n\n"
     out += (
-        f"- **Proficiency Bonus**: +{pc.prof}\n"
+        f"- **Proficiency Bonus**: {format_mod(pc.prof)}\n"
         f"- **Saving Throws**: {_caps_csv(pc.save_proficiencies)}\n"
         f"- **Skills**: {_caps_csv(pc.skill_proficiencies)}\n"
         f"- **Languages**: {', '.join(pc.languages) if pc.languages else '—'}\n"
@@ -198,7 +201,7 @@ def to_markdown(
     )
     out += "## Derived\n\n"
     out += (
-        f"- **Initiative**: {pc.initiative:+d}\n"
+        f"- **Initiative**: {format_mod(pc.initiative)}\n"
         f"- **Passive Perception**: {pc.passive_perception}\n\n"
     )
     out += "## Attacks & Spellcasting\n\n"
@@ -208,13 +211,13 @@ def to_markdown(
     else:
         for a in attacks:
             props = f" ({a['properties']})" if a["properties"] else ""
-            out += f"- {a['name']}: {a['attack_bonus']:+d} to hit, {a['damage']}{props}\n"
+            out += f"- {a['name']}: {format_mod(a['attack_bonus'])} to hit, {a['damage']}{props}\n"
         out += "\n"
     out += "## Spellcasting\n\n"
     dc = spell_save_dc(pc)
     atk = spell_attack_bonus(pc)
     if dc is not None and atk is not None:
-        out += f"- **Spell Save DC**: {dc}\n- **Spell Attack**: +{atk}\n"
+        out += f"- **Spell Save DC**: {dc}\n- **Spell Attack**: {format_mod(atk)}\n"
     parts = slots_list(pc, show_zero_slots)
     out += f"- **Slots**: {', '.join(parts) if parts else '—'}\n"
     if pc.prepared_spells:

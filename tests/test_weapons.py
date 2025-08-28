@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from grimbrain.codex.weapons import WeaponIndex
 from grimbrain.rules.attacks import attack_bonus, damage_string, choose_attack_ability
@@ -71,8 +70,27 @@ def test_martial_no_proficiency():
 def test_versatile_two_handed_flag():
     idx = load_idx()
     from grimbrain.rules.attacks import damage_string as dmg, damage_die
+
     c = DummyChar(str_score=16, dex_score=10, profs={"longsword", "martial weapons"})
     w = idx.get("longsword")
     assert damage_die(c, w, two_handed=False) == "1d8"
     assert damage_die(c, w, two_handed=True) == "1d10"
     assert dmg(c, w, two_handed=True) == "1d10 +3 slashing"
+
+
+def test_martial_finesse_no_proficiency():
+    idx = load_idx()
+    c = DummyChar(str_score=12, dex_score=16, profs={"simple weapons"})
+    w = idx.get("rapier")
+    assert choose_attack_ability(c, w) == "DEX"
+    assert attack_bonus(c, w) == 3
+    assert damage_string(c, w) == "1d8 +3 piercing"
+
+
+def test_ranged_negative_dex_penalty():
+    idx = load_idx()
+    c = DummyChar(str_score=10, dex_score=8, profs=set())
+    w = idx.get("shortbow")
+    assert choose_attack_ability(c, w) == "DEX"
+    assert attack_bonus(c, w) == -1
+    assert damage_string(c, w) == "1d6 -1 piercing"

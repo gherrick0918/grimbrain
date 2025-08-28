@@ -21,6 +21,7 @@ from reportlab.platypus import (
 )
 
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
+from grimbrain.rules.attacks import format_mod
 
 SMALL = 9
 NORMAL = 10
@@ -32,7 +33,7 @@ def _abilities_table(pc: PlayerCharacter) -> Table:
     for a in ABILITY_ORDER:
         score = getattr(pc.abilities, a)
         mod = pc.ability_mod(a)
-        data.append([a.upper(), str(score), f"{mod:+d}"])
+        data.append([a.upper(), str(score), format_mod(mod)])
     t = Table(data, hAlign="LEFT")
     t.setStyle(
         TableStyle(
@@ -75,7 +76,7 @@ def _profs_table(pc: PlayerCharacter) -> Table:
     langs = ", ".join(pc.languages) if pc.languages else "—"
     tools = ", ".join(pc.tool_proficiencies) if pc.tool_proficiencies else "—"
     data = [
-        ["Prof. Bonus", f"+{pc.prof}"],
+        ["Prof. Bonus", format_mod(pc.prof)],
         ["Saves", saves],
         ["Skills", skills],
         ["Languages", langs],
@@ -96,15 +97,27 @@ def _profs_table(pc: PlayerCharacter) -> Table:
 
 
 def _defense_table(pc: PlayerCharacter) -> Table:
-    data = [[
-        "AC", str(pc.ac), "HP", f"{pc.current_hp}/{pc.max_hp}",
-        "Init.", f"{pc.initiative:+d}", "Passive Perception", str(pc.passive_perception)
-    ]]
+    data = [
+        [
+            "AC",
+            str(pc.ac),
+            "HP",
+            f"{pc.current_hp}/{pc.max_hp}",
+            "Init.",
+            format_mod(pc.initiative),
+            "Passive Perception",
+            str(pc.passive_perception),
+        ]
+    ]
     t = Table(data, hAlign="LEFT")
-    t.setStyle(TableStyle([
-        ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ]
+        )
+    )
     return t
 
 
@@ -116,16 +129,20 @@ def _spell_stats_table(pc: PlayerCharacter) -> Table:
     rows = []
     if dc is not None and atk is not None:
         rows.append(["Spell Save DC", str(dc)])
-        rows.append(["Spell Attack", f"+{atk}"])
+        rows.append(["Spell Attack", format_mod(atk)])
     else:
         rows.append(["Spellcasting", "—"])
-    t = Table(rows, hAlign='LEFT')
-    t.setStyle(TableStyle([
-        ('FONT', (0,0), (-1,-1), 'Helvetica', NORMAL),
-        ('GRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
-        ('BACKGROUND', (0,0), (-1,0), colors.whitesmoke),
-        ('FONT', (0,0), (-1,0), 'Helvetica-Bold', NORMAL),
-    ]))
+    t = Table(rows, hAlign="LEFT")
+    t.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", NORMAL),
+            ]
+        )
+    )
     return t
 
 
@@ -147,13 +164,17 @@ def _slots_table(pc: PlayerCharacter, show_zero: bool) -> Table:
 
 def _prepared_table(pc: PlayerCharacter) -> Table:
     items = ", ".join(pc.prepared_spells) if pc.prepared_spells else "—"
-    t = Table([["Prepared", items]], hAlign='LEFT')
-    t.setStyle(TableStyle([
-        ('FONT', (0,0), (-1,-1), 'Helvetica', NORMAL),
-        ('GRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
-        ('BACKGROUND', (0,0), (-1,0), colors.whitesmoke),
-        ('FONT', (0,0), (-1,0), 'Helvetica-Bold', NORMAL),
-    ]))
+    t = Table([["Prepared", items]], hAlign="LEFT")
+    t.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, -1), "Helvetica", NORMAL),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", NORMAL),
+            ]
+        )
+    )
     return t
 
 
@@ -163,7 +184,11 @@ def _inventory_table(pc: PlayerCharacter) -> Table:
         rows.append(["—", "—", "—"])
     else:
         for it in pc.inventory:
-            props = ", ".join(f"{k}={v}" for k, v in (it.props or {}).items()) if it.props else ""
+            props = (
+                ", ".join(f"{k}={v}" for k, v in (it.props or {}).items())
+                if it.props
+                else ""
+            )
             rows.append([it.name, str(it.qty or 1), props])
     t = Table(rows, hAlign="LEFT")
     t.setStyle(
@@ -218,10 +243,14 @@ def save_pdf(
     ]
     right = [
         Paragraph("<b>Spellcasting</b>", styles["Heading3"]),
-        _spell_stats_table(pc), Spacer(1, 0.08 * inch),
-        _slots_table(pc, show_zero_slots), Spacer(1, 0.08 * inch),
-        _prepared_table(pc), Spacer(1, 0.12 * inch),
-        Paragraph("<b>Inventory</b>", styles["Heading3"]), _inventory_table(pc)
+        _spell_stats_table(pc),
+        Spacer(1, 0.08 * inch),
+        _slots_table(pc, show_zero_slots),
+        Spacer(1, 0.08 * inch),
+        _prepared_table(pc),
+        Spacer(1, 0.12 * inch),
+        Paragraph("<b>Inventory</b>", styles["Heading3"]),
+        _inventory_table(pc),
     ]
 
     col_width = 3.4 * inch
