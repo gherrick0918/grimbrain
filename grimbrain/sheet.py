@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
+from grimbrain.characters import spell_save_dc, spell_attack_bonus
 
 ABIL_NAMES = {
     "str": "STR",
@@ -74,10 +75,17 @@ def slots_list(pc: PlayerCharacter, show_zero: bool) -> list[str]:
     return out
 
 
-def slots_block(pc: PlayerCharacter, show_zero: bool) -> Table:
+def spellcasting_block(pc: PlayerCharacter, show_zero: bool) -> Table:
     t = Table(box=None, show_header=False, expand=False)
+    dc = spell_save_dc(pc)
+    atk = spell_attack_bonus(pc)
+    if dc is not None and atk is not None:
+        t.add_row("Spell Save DC", str(dc))
+        t.add_row("Spell Attack", f"+{atk}")
     parts = slots_list(pc, show_zero)
     t.add_row("Slots", ", ".join(parts) if parts else "—")
+    if pc.prepared_spells:
+        t.add_row("Prepared", ", ".join(pc.prepared_spells))
     return t
 
 
@@ -115,7 +123,7 @@ def render_console(
     c.print(Panel(defense_block(pc), title="Defense", border_style="green"))
     c.print(
         Panel(
-            slots_block(pc, show_zero_slots),
+            spellcasting_block(pc, show_zero_slots),
             title="Spellcasting",
             border_style="yellow",
         )
@@ -168,8 +176,15 @@ def to_markdown(
         f"- **Passive Perception**: {pc.passive_perception}\n\n"
     )
     out += "## Spellcasting\n\n"
+    dc = spell_save_dc(pc)
+    atk = spell_attack_bonus(pc)
+    if dc is not None and atk is not None:
+        out += f"- **Spell Save DC**: {dc}\n- **Spell Attack**: +{atk}\n"
     parts = slots_list(pc, show_zero_slots)
-    out += f"- **Slots**: {', '.join(parts) if parts else '—'}\n\n"
+    out += f"- **Slots**: {', '.join(parts) if parts else '—'}\n"
+    if pc.prepared_spells:
+        out += f"- **Prepared**: {', '.join(pc.prepared_spells)}\n"
+    out += "\n"
     out += "## Inventory\n\n"
     if not pc.inventory:
         out += "- —\n"

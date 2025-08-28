@@ -41,7 +41,8 @@
         "additionalProperties": false
       }
     },
-    "spells": {"type": "array", "items": {"type": "string"}},
+    "known_spells": {"type": "array", "items": {"type": "string"}},
+    "prepared_spells": {"type": "array", "items": {"type": "string"}},
     "spell_slots": {
       "type": "object",
       "properties": {

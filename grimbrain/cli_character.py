@@ -11,10 +11,19 @@ from grimbrain.characters import (
     create_pc,
     level_up,
     save_pc,
+    load_pc,
+    PrettyError,
+    learn_spell,
+    prepare_spell,
+    unprepare_spell,
+    spell_save_dc,
+    spell_attack_bonus,
+    cast_slot,
+    long_rest,
+    short_rest,
 )
 from grimbrain.sheet import render_console, save_markdown
 from grimbrain.sheet_pdf import save_pdf
-from grimbrain.validation import PrettyError, load_pc
 from grimbrain.rules_equipment import CLASS_KITS, BACKGROUND_KITS
 
 char_app = typer.Typer(help="Character creation and management")
@@ -152,6 +161,83 @@ def level(
     pc = level_up(pc, to)
     save_pc(pc, file)
     typer.secho(f"Leveled {pc.name} to {pc.level}", fg=typer.colors.GREEN)
+
+
+@char_app.command("learn")
+def learn(
+    file: Path = typer.Argument(..., exists=True),
+    spell: str = typer.Option(..., help="Spell name to learn"),
+):
+    pc = load_pc(file)
+    learn_spell(pc, spell)
+    save_pc(pc, file)
+    typer.secho(f"Learned spell: {spell}", fg=typer.colors.GREEN)
+
+
+@char_app.command("prepare")
+def prepare(
+    file: Path = typer.Argument(..., exists=True),
+    spell: str = typer.Option(..., help="Spell name to prepare"),
+):
+    pc = load_pc(file)
+    try:
+        prepare_spell(pc, spell)
+    except ValueError as e:
+        raise typer.BadParameter(str(e))
+    save_pc(pc, file)
+    typer.secho(f"Prepared: {spell}", fg=typer.colors.GREEN)
+
+
+@char_app.command("unprepare")
+def unprepare(
+    file: Path = typer.Argument(..., exists=True),
+    spell: str = typer.Option(...),
+):
+    pc = load_pc(file)
+    unprepare_spell(pc, spell)
+    save_pc(pc, file)
+    typer.secho(f"Unprepared: {spell}", fg=typer.colors.GREEN)
+
+
+@char_app.command("cast")
+def cast(
+    file: Path = typer.Argument(..., exists=True),
+    level: int = typer.Option(..., help="Spell slot level to consume (1..9)"),
+):
+    pc = load_pc(file)
+    try:
+        cast_slot(pc, level)
+    except ValueError as e:
+        raise typer.BadParameter(str(e))
+    save_pc(pc, file)
+    typer.secho(f"Cast: consumed a level {level} slot", fg=typer.colors.GREEN)
+
+
+@char_app.command("rest")
+def rest(
+    file: Path = typer.Argument(..., exists=True),
+    type: str = typer.Option("long", help="long|short"),
+):
+    pc = load_pc(file)
+    if type == "long":
+        long_rest(pc)
+    elif type == "short":
+        short_rest(pc)
+    else:
+        raise typer.BadParameter("type must be 'long' or 'short'")
+    save_pc(pc, file)
+    typer.secho(f"{type.title()} rest complete", fg=typer.colors.GREEN)
+
+
+@char_app.command("spellstats")
+def spellstats(file: Path = typer.Argument(..., exists=True)):
+    pc = load_pc(file)
+    dc = spell_save_dc(pc)
+    atk = spell_attack_bonus(pc)
+    if dc is None or atk is None:
+        typer.secho("This class has no spellcasting ability defined.", fg=typer.colors.YELLOW)
+    else:
+        typer.secho(f"Spell Save DC: {dc}  |  Spell Attack: +{atk}", fg=typer.colors.GREEN)
 
 
 @char_app.command("sheet")

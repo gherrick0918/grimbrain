@@ -73,7 +73,8 @@ class PlayerCharacter(BaseModel):
     max_hp: PositiveInt
     current_hp: Optional[int] = None
     inventory: List[Item] = []
-    spells: List[str] = []
+    known_spells: List[str] = []       # stable storage for “you know these”
+    prepared_spells: List[str] = []    # subset eligible to cast (for prepared casters)
     spell_slots: SpellSlots | None = None
 
     # Proficiencies
