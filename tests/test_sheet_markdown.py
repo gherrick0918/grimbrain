@@ -8,7 +8,7 @@ def test_sheet_md_contains_core_fields(tmp_path: Path):
     pc = create_pc(
         PCOptions(
             name="Elora",
-            klass="Wizard",
+            class_="Wizard",
             race="High Elf",
             background="Sage",
             ac=12,

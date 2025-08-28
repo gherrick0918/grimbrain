@@ -8,7 +8,7 @@ def test_pdf_written(tmp_path: Path):
     pc = create_pc(
         PCOptions(
             name="Elora",
-            klass="Wizard",
+            class_="Wizard",
             race="High Elf",
             background="Sage",
             ac=12,

@@ -42,7 +42,7 @@ HIT_DIE = {
 @dataclass
 class PCOptions:
     name: str
-    klass: str  # e.g., 'Wizard'
+    class_: str  # e.g., 'Wizard'
     race: str | None
     background: str | None
     abilities: dict  # {str,dex,con,int,wis,cha}
@@ -55,12 +55,12 @@ class PCOptions:
 
 def create_pc(opts: PCOptions) -> PlayerCharacter:
     abilities = Abilities(**opts.abilities)
-    hd = HIT_DIE.get(opts.klass, 8)
+    hd = HIT_DIE.get(opts.class_, 8)
     con_mod = abilities.modifier("con")
     max_hp = hd + con_mod  # L1 max per 5e baseline
     pc = PlayerCharacter(
         name=opts.name,
-        **{"class": opts.klass},
+        **{"class": opts.class_},
         race=opts.race,
         background=opts.background,
         subclass=opts.subclass,
@@ -69,9 +69,9 @@ def create_pc(opts: PCOptions) -> PlayerCharacter:
         ac=opts.ac,
         max_hp=max_hp,
         current_hp=max_hp,
-        spell_slots=_spell_slots_for(opts.klass, 1, opts.subclass),
+        spell_slots=_spell_slots_for(opts.class_, 1, opts.subclass),
     )
-    pc.save_proficiencies = CLASS_SAVE_PROFS.get(opts.klass, set())
+    pc.save_proficiencies = CLASS_SAVE_PROFS.get(opts.class_, set())
     if opts.background:
         pc.skill_proficiencies = BACKGROUND_SKILLS.get(opts.background, set())
     return pc

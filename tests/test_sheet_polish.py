@@ -15,7 +15,7 @@ def _pc():
     return create_pc(
         PCOptions(
             name="Elora",
-            klass="Wizard",
+            class_="Wizard",
             race="High Elf",
             background="Sage",
             ac=12,

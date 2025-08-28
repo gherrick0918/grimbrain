@@ -57,7 +57,7 @@ quests:
 
 Create a level‑1 Wizard:
 ```bash
-grimbrain character create --name Elora --klass Wizard --race "High Elf" \
+grimbrain character create --name Elora --class Wizard --race "High Elf" \
   --background Sage --ac 12 --str 8 --dex 14 --con 12 --int 16 --wis 10 --cha 12 \
   --out pc_wizard.json
 ```
@@ -68,12 +68,12 @@ grimbrain character level pc_wizard.json --to 3
 
 Create with standard array assigned to INT, DEX, CON, STR, WIS, CHA:
 ```bash
-grimbrain character array --name Elora --klass Wizard \
+grimbrain character array --name Elora --class Wizard \
   --assign int,dex,con,str,wis,cha --out pc_wizard.json
 ```
 Create via point‑buy (27‑point):
 ```bash
-grimbrain character pointbuy --name Nox --klass Warlock --stats 15,14,13,10,10,8
+grimbrain character pointbuy --name Nox --class Warlock --stats 15,14,13,10,10,8
 ```
 
 Supports full casters (Wizard, Cleric, Druid, Sorcerer, Bard), half‑casters
@@ -82,12 +82,12 @@ Warlock pact magic slot rules.
 
 Create an Eldritch Knight:
 ```bash
-grimbrain character create --name Tharn --klass Fighter --subclass "Eldritch Knight" --ac 17 \
+grimbrain character create --name Tharn --class Fighter --subclass "Eldritch Knight" --ac 17 \
   --str 16 --dex 12 --con 14 --int 10 --wis 10 --cha 8 --out pc_tharn.json
 ```
 Create an Arcane Trickster:
 ```bash
-grimbrain character create --name Sable --klass Rogue --subclass "Arcane Trickster" --ac 15 \
+grimbrain character create --name Sable --class Rogue --subclass "Arcane Trickster" --ac 15 \
   --str 10 --dex 16 --con 12 --int 14 --wis 10 --cha 8 --out pc_sable.json
 ```
 
@@ -119,7 +119,7 @@ grimbrain character sheet pc_elora.json --fmt pdf --logo assets/grimbrain_logo.p
 
 Create a PC with class/background starter packs:
 ```bash
-grimbrain character create --name Elora --klass Wizard --background Sage --ac 12 \
+grimbrain character create --name Elora --class Wizard --background Sage --ac 12 \
   --str 8 --dex 14 --con 12 --int 16 --wis 10 --cha 12 --starter --out pc_elora.json
 ```
 
