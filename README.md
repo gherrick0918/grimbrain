@@ -156,10 +156,16 @@ grimbrain character spellstats pc_elora.json
 
 ### Weapons & Attacks
 
-Weapons are defined in `data/weapons.json`. Equip a weapon by adding its
-name to a character's `equipped_weapons` list and ensuring the matching
-proficiency is present. Equipped weapons appear under **Attacks &
-Spellcasting** on rendered sheets.
+Weapons are defined in `data/weapons.json` (an SRD subset). Equip a weapon by
+adding its name to a character's `equipped_weapons` list and ensuring the
+matching proficiency is present. Proficiency is granted by entries in the
+character's `proficiencies`/`weapon_proficiencies` set such as "simple weapons",
+"martial weapons", or a specific weapon name.
+
+Weapon properties encode special rules: versatile weapons use
+`"versatile:1d10"`, thrown weapons list `"thrown"`, and ranged options encode
+normal/long ranges as `"range:20/60"`. Equipped weapons appear under **Attacks
+& Spellcasting** on rendered sheets.
 
 ## Python API
 ```python

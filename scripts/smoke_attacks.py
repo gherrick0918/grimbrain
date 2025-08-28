@@ -9,9 +9,8 @@ from pathlib import Path
 
 from grimbrain.codex.weapons import WeaponIndex
 from grimbrain.models.pc import PlayerCharacter
+from grimbrain.rules.attacks import format_mod
 
-def fmt_sign(n: int) -> str:
-    return f"+{n}" if n >= 0 else f"{n}"
 
 def main():
     idx = WeaponIndex.load(Path("data/weapons.json"))
@@ -42,10 +41,11 @@ def main():
     print("-" * 64)
     for e in entries:
         name = e["name"]
-        atk = fmt_sign(e["attack_bonus"])
+        atk = format_mod(e["attack_bonus"])
         dmg = e["damage"]
-        props = e["properties"].replace("range:", "") if e["properties"] else ""
+        props = e["properties"]
         print(f"{name:<16} {atk:>4}  {dmg}  {f'({props})' if props else ''}")
+
 
 if __name__ == "__main__":
     main()
