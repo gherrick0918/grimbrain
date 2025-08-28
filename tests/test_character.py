@@ -4,7 +4,7 @@ from grimbrain.characters import PCOptions, add_item, create_pc, learn_spell, le
 def test_create_and_level():
     opts = PCOptions(
         name="Elora",
-        klass="Wizard",
+        class_="Wizard",
         race="High Elf",
         background="Sage",
         ac=12,

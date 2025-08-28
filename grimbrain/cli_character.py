@@ -23,7 +23,7 @@ char_app = typer.Typer(help="Character creation and management")
 @char_app.command("create")
 def create(
     name: str = typer.Option(...),
-    klass: str = typer.Option(..., help="Class, e.g. Wizard"),
+    class_: str = typer.Option(..., "--class", help="Class, e.g. Wizard"),
     subclass: str = typer.Option(None, help="Subclass (for EK/AT etc.)"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
@@ -41,7 +41,7 @@ def create(
 ):
     opts = PCOptions(
         name=name,
-        klass=klass,
+        class_=class_,
         subclass=subclass,
         race=race,
         background=background,
@@ -65,7 +65,7 @@ def create(
 @char_app.command("array")
 def make_from_array(
     name: str = typer.Option(...),
-    klass: str = typer.Option(...),
+    class_: str = typer.Option(..., "--class"),
     subclass: str = typer.Option(None, help="Subclass"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
@@ -86,7 +86,7 @@ def make_from_array(
     abilities = dict(zip(keys, vals))
     opts = PCOptions(
         name=name,
-        klass=klass,
+        class_=class_,
         subclass=subclass,
         race=race,
         background=background,
@@ -103,7 +103,7 @@ def make_from_array(
 @char_app.command("pointbuy")
 def make_from_pointbuy(
     name: str = typer.Option(...),
-    klass: str = typer.Option(...),
+    class_: str = typer.Option(..., "--class"),
     subclass: str = typer.Option(None, help="Subclass"),
     race: str = typer.Option(None),
     background: str = typer.Option(None),
@@ -123,7 +123,7 @@ def make_from_pointbuy(
         raise typer.BadParameter(f"Point-buy total {pb.cost} exceeds 27")
     opts = PCOptions(
         name=name,
-        klass=klass,
+        class_=class_,
         subclass=subclass,
         race=race,
         background=background,

@@ -9,7 +9,7 @@ def test_roundtrip_pc_json(tmp_path: Path) -> None:
     pc = create_pc(
         PCOptions(
             name="Elora",
-            klass="Wizard",
+            class_="Wizard",
             race="High Elf",
             background="Sage",
             ac=12,

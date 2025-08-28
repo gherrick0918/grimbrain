@@ -4,7 +4,7 @@ from grimbrain.characters import PCOptions, create_pc
 def _wiz():
     return PCOptions(
         name="Elora",
-        klass="Wizard",
+        class_="Wizard",
         race="High Elf",
         background="Sage",
         ac=12,

@@ -1,9 +1,9 @@
 from grimbrain.characters import PCOptions, create_pc, level_up
 
 
-def _opts(klass, subclass=None):
+def _opts(class_, subclass=None):
     return PCOptions(
-        name="Test", klass=klass, subclass=subclass, race=None, background=None, ac=12,
+        name="Test", class_=class_, subclass=subclass, race=None, background=None, ac=12,
         abilities={"str":10,"dex":10,"con":10,"int":10,"wis":10,"cha":10}
     )
 
