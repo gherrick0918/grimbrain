@@ -1,16 +1,66 @@
 [
   {
-    "name": "Shortsword",
-    "range": "melee",
-    "properties": ["finesse"],
-    "damage_dice": "1d6",
-    "damage_type": "slashing"
+    "name": "Dagger",
+    "category": "simple",
+    "kind": "melee",
+    "damage": "1d4",
+    "damage_type": "piercing",
+    "properties": ["finesse", "light", "thrown", "range:20/60"]
+  },
+  {
+    "name": "Rapier",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d8",
+    "damage_type": "piercing",
+    "properties": ["finesse"]
+  },
+  {
+    "name": "Longsword",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d8",
+    "damage_type": "slashing",
+    "properties": ["versatile:1d10"]
+  },
+  {
+    "name": "Greatsword",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "2d6",
+    "damage_type": "slashing",
+    "properties": ["heavy", "two-handed"]
   },
   {
     "name": "Shortbow",
-    "range": "ranged",
-    "properties": [],
-    "damage_dice": "1d6",
-    "damage_type": "piercing"
+    "category": "simple",
+    "kind": "ranged",
+    "damage": "1d6",
+    "damage_type": "piercing",
+    "properties": ["ammunition", "two-handed", "range:80/320"]
+  },
+  {
+    "name": "Longbow",
+    "category": "martial",
+    "kind": "ranged",
+    "damage": "1d8",
+    "damage_type": "piercing",
+    "properties": ["ammunition", "heavy", "two-handed", "range:150/600"]
+  },
+  {
+    "name": "Handaxe",
+    "category": "simple",
+    "kind": "melee",
+    "damage": "1d6",
+    "damage_type": "slashing",
+    "properties": ["light", "thrown", "range:20/60"]
+  },
+  {
+    "name": "Mace",
+    "category": "simple",
+    "kind": "melee",
+    "damage": "1d6",
+    "damage_type": "bludgeoning",
+    "properties": []
   }
 ]

@@ -84,6 +84,7 @@ class PlayerCharacter(BaseModel):
     weapon_proficiencies: Set[str] = set()
     languages: List[str] = []
     tool_proficiencies: List[str] = []
+    equipped_weapons: List[str] = []
 
     class Config:
         populate_by_name = True
@@ -98,7 +99,7 @@ class PlayerCharacter(BaseModel):
         return 2 + ((lvl - 1) // 4)
 
     def ability_mod(self, name: str) -> int:
-        return self.abilities.modifier(name)
+        return self.abilities.modifier(name.lower())
 
     def skill_mod(self, skill: str) -> int:
         key = {
@@ -139,6 +140,12 @@ class PlayerCharacter(BaseModel):
     @property
     def passive_perception(self) -> int:
         return 10 + self.skill_mod("perception")
+
+    # --- Attacks ---
+    def attacks(self, weapon_index) -> List[dict]:
+        from grimbrain.rules.attacks import build_attacks_block
+
+        return build_attacks_block(self, weapon_index)
 
     def attack_bonus(self, ability: str, proficient: bool) -> int:
         return self.ability_mod(ability) + (self.prof if proficient else 0)

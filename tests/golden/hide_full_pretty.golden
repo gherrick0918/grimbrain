@@ -1,5 +1,4 @@
 Conflict: rule/attack.shortbow -> keeping generated, ignoring legacy-data
-Conflict: rule/attack.shortsword -> keeping generated, ignoring legacy-data
 Not found verb: "hide"
 Not found verb: "status"
 Not found verb: "end"

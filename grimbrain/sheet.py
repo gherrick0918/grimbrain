@@ -12,6 +12,7 @@ from rich.table import Table
 
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
 from grimbrain.characters import spell_save_dc, spell_attack_bonus
+from grimbrain.codex.weapons import WeaponIndex
 
 ABIL_NAMES = {
     "str": "STR",
@@ -21,6 +22,8 @@ ABIL_NAMES = {
     "wis": "WIS",
     "cha": "CHA",
 }
+
+WEAPON_INDEX = WeaponIndex.load(Path(__file__).resolve().parent.parent / "data" / "weapons.json")
 
 
 def _caps_csv(items: Iterable[str]) -> str:
@@ -89,6 +92,22 @@ def spellcasting_block(pc: PlayerCharacter, show_zero: bool) -> Table:
     return t
 
 
+def attacks_block(pc: PlayerCharacter) -> Table:
+    t = Table(box=None, show_header=True, expand=False)
+    t.add_column("Name")
+    t.add_column("Atk")
+    t.add_column("Damage")
+    t.add_column("Props")
+    attacks = pc.attacks(WEAPON_INDEX)
+    if not attacks:
+        t.add_row("—", "—", "—", "")
+        return t
+    for a in attacks:
+        atk = f"{a['attack_bonus']:+d}"
+        t.add_row(a["name"], atk, a["damage"], a["properties"])
+    return t
+
+
 def inventory_block(pc: PlayerCharacter) -> Table:
     t = Table(box=None, show_header=True, expand=False)
     t.add_column("Item")
@@ -121,6 +140,13 @@ def render_console(
     c.print(Panel(ability_block(pc), title="Abilities", border_style="cyan"))
     c.print(Panel(prof_block(pc), title="Proficiencies", border_style="magenta"))
     c.print(Panel(defense_block(pc), title="Defense", border_style="green"))
+    c.print(
+        Panel(
+            attacks_block(pc),
+            title="Attacks & Spellcasting",
+            border_style="red",
+        )
+    )
     c.print(
         Panel(
             spellcasting_block(pc, show_zero_slots),
@@ -175,6 +201,15 @@ def to_markdown(
         f"- **Initiative**: {pc.initiative:+d}\n"
         f"- **Passive Perception**: {pc.passive_perception}\n\n"
     )
+    out += "## Attacks & Spellcasting\n\n"
+    attacks = pc.attacks(WEAPON_INDEX)
+    if not attacks:
+        out += "- —\n\n"
+    else:
+        for a in attacks:
+            props = f" ({a['properties']})" if a["properties"] else ""
+            out += f"- {a['name']}: {a['attack_bonus']:+d} to hit, {a['damage']}{props}\n"
+        out += "\n"
     out += "## Spellcasting\n\n"
     dc = spell_save_dc(pc)
     atk = spell_attack_bonus(pc)
