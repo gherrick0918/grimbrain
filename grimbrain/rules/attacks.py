@@ -105,6 +105,17 @@ def damage_string(
     return f"{die}{(' ' + mod_str) if mod_str else ''} {weapon.damage_type}"
 
 
+def damage_display(character, weapon: Weapon) -> str:
+    base = damage_string(character, weapon, two_handed=False)
+    v = weapon.versatile_die()
+    if not v:
+        return base
+    two_h = damage_string(character, weapon, two_handed=True)
+    if two_h != base:
+        return f"{base} ({two_h} two-handed)"
+    return base
+
+
 def can_two_weapon(weapon: Weapon) -> bool:
     return weapon.kind == "melee" and ("light" in weapon.properties)
 
@@ -117,7 +128,7 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
         except KeyError:
             continue
         ab = attack_bonus(character, w)
-        dmg = damage_string(character, w, two_handed=False)
+        dmg = damage_display(character, w)
         props = (
             ", ".join(p.replace("range:", "").replace("/", "/") for p in w.properties)
             if w.properties
