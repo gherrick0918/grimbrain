@@ -85,6 +85,8 @@ class PlayerCharacter(BaseModel):
     languages: List[str] = []
     tool_proficiencies: List[str] = []
     equipped_weapons: List[str] = []
+    fighting_styles: Set[str] = set()
+    equipped_offhand: Optional[str] = None
 
     class Config:
         populate_by_name = True

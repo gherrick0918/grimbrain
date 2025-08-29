@@ -17,6 +17,10 @@ def format_mod(n: int) -> str:
     return f"+{n}" if n >= 0 else str(n)
 
 
+def has_style(character, style_name: str) -> bool:
+    return style_name in getattr(character, "fighting_styles", set())
+
+
 def choose_attack_ability(character, weapon: Weapon) -> str:
     # Ranged weapons use DEX
     if weapon.kind == "ranged":
@@ -68,16 +72,41 @@ def damage_die(character, weapon: Weapon, *, two_handed: bool = False) -> str:
     return die
 
 
-def damage_modifier(character, weapon: Weapon, *, two_handed: bool = False) -> int:
+def damage_modifier(
+    character,
+    weapon: Weapon,
+    *,
+    two_handed: bool = False,
+    offhand: bool = False,
+) -> int:
     ability = choose_attack_ability(character, weapon)
+
+    # Off-hand attacks don't add ability mod to damage unless style present.
+    if offhand and not has_style(character, "Two-Weapon Fighting"):
+        return 0
+
     return character.ability_mod(ability)
 
 
-def damage_string(character, weapon: Weapon, *, two_handed: bool = False) -> str:
+def damage_string(
+    character,
+    weapon: Weapon,
+    *,
+    two_handed: bool = False,
+    offhand: bool = False,
+) -> str:
     die = damage_die(character, weapon, two_handed=two_handed)
-    mod = damage_modifier(character, weapon, two_handed=two_handed)
+    if die in {"—", "-"}:
+        return "— special"
+    mod = damage_modifier(
+        character, weapon, two_handed=two_handed, offhand=offhand
+    )
     mod_str = format_mod(mod) if mod != 0 else ""
     return f"{die}{(' ' + mod_str) if mod_str else ''} {weapon.damage_type}"
+
+
+def can_two_weapon(weapon: Weapon) -> bool:
+    return weapon.kind == "melee" and ("light" in weapon.properties)
 
 
 def build_attacks_block(character, weapon_index) -> List[dict]:
@@ -102,4 +131,27 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
                 "properties": props,
             }
         )
+
+    off = getattr(character, "equipped_offhand", None)
+    if off:
+        try:
+            w = weapon_index.get(off)
+        except KeyError:
+            w = None
+        if w and can_two_weapon(w):
+            ab = attack_bonus(character, w)
+            dmg = damage_string(character, w, offhand=True)
+            props = (
+                ", ".join(p.replace("range:", "").replace("/", "/") for p in w.properties)
+                if w.properties
+                else ""
+            )
+            out.append(
+                {
+                    "name": f"{w.name} (off-hand)",
+                    "attack_bonus": ab,
+                    "damage": dmg,
+                    "properties": props,
+                }
+            )
     return out
