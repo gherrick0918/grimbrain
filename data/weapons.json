@@ -78,5 +78,13 @@
     "damage": "1d6",
     "damage_type": "bludgeoning",
     "properties": []
+  },
+  {
+    "name": "Quarterstaff",
+    "category": "simple",
+    "kind": "melee",
+    "damage": "1d6",
+    "damage_type": "bludgeoning",
+    "properties": ["versatile:1d8"]
   }
 ]
