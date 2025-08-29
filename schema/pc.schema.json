@@ -64,7 +64,9 @@
     "weapon_proficiencies": {"type": "array", "items": {"type": "string"}},
     "languages": {"type": "array", "items": {"type": "string"}},
     "tool_proficiencies": {"type": "array", "items": {"type": "string"}},
-    "equipped_weapons": {"type": "array", "items": {"type": "string"}}
+    "equipped_weapons": {"type": "array", "items": {"type": "string"}},
+    "equipped_offhand": {"type": "string"},
+    "fighting_styles": {"type": "array", "items": {"type": "string"}}
   },
   "additionalProperties": false
 }

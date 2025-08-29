@@ -293,6 +293,7 @@ def save_pc(pc: PlayerCharacter, path: Path) -> None:
         "skill_proficiencies",
         "armor_proficiencies",
         "weapon_proficiencies",
+        "fighting_styles",
     ):
         if isinstance(data.get(k), set):
             data[k] = sorted(list(data[k]))
