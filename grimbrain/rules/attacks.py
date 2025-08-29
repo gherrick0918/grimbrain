@@ -1,5 +1,6 @@
 from typing import List
 from ..codex.weapons import Weapon
+from .attack_math import double_die_text
 
 # Expect character to expose:
 #   ability_mod("STR"/"DEX"), prof or proficiency_bonus, weapon_proficiencies or proficiencies
@@ -103,6 +104,22 @@ def damage_string(
     )
     mod_str = format_mod(mod) if mod != 0 else ""
     return f"{die}{(' ' + mod_str) if mod_str else ''} {weapon.damage_type}"
+
+
+# NEW: crit damage string (doubles dice only)
+def crit_damage_string(
+    character, weapon, *, two_handed: bool = False, offhand: bool = False
+) -> str:
+    die = damage_die(character, weapon, two_handed=two_handed)
+    # If weapon has no dice (e.g., "1" Blowgun) or is "—" Net, leave die as-is / unchanged.
+    if die in {"—", "-"}:
+        return "— special"
+    die_crit = double_die_text(die)
+    mod = damage_modifier(
+        character, weapon, two_handed=two_handed, offhand=offhand
+    )
+    mod_str = format_mod(mod) if mod != 0 else ""
+    return f"{die_crit}{(' ' + mod_str) if mod_str else ''} {weapon.damage_type}"
 
 
 def damage_display(character, weapon: Weapon) -> str:
