@@ -123,12 +123,21 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
             if w.properties
             else ""
         )
+
+        ammo_note = ""
+        at = w.ammo_type()
+        if at:
+            count = character.ammo_count(at)
+            ammo_note = f"{at}: {count}"
+
+        notes = ", ".join(x for x in [props, ammo_note] if x)
+
         out.append(
             {
                 "name": w.name,
                 "attack_bonus": ab,
                 "damage": dmg,
-                "properties": props,
+                "properties": notes,
             }
         )
 
@@ -146,12 +155,20 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
                 if w.properties
                 else ""
             )
+
+            ammo_note = ""
+            at = w.ammo_type()
+            if at:
+                count = character.ammo_count(at)
+                ammo_note = f"{at}: {count}"
+            notes = ", ".join(x for x in [props, ammo_note] if x)
+
             out.append(
                 {
                     "name": f"{w.name} (off-hand)",
                     "attack_bonus": ab,
                     "damage": dmg,
-                    "properties": props,
+                    "properties": notes,
                 }
             )
     return out

@@ -48,6 +48,22 @@
     "properties": ["ammunition", "heavy", "two-handed", "range:150/600"]
   },
   {
+    "name": "Hand Crossbow",
+    "category": "martial",
+    "kind": "ranged",
+    "damage": "1d6",
+    "damage_type": "piercing",
+    "properties": ["ammunition", "light", "loading", "range:30/120"]
+  },
+  {
+    "name": "Blowgun",
+    "category": "martial",
+    "kind": "ranged",
+    "damage": "1",
+    "damage_type": "piercing",
+    "properties": ["ammunition", "loading", "range:25/100"]
+  },
+  {
     "name": "Handaxe",
     "category": "simple",
     "kind": "melee",
