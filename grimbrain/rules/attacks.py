@@ -1,6 +1,7 @@
 from typing import List
 from ..codex.weapons import Weapon
 from .attack_math import double_die_text, hit_probabilities
+from .weapon_notes import weapon_notes
 
 # Expect character to expose:
 #   ability_mod("STR"/"DEX"), prof or proficiency_bonus, weapon_proficiencies or proficiencies
@@ -168,7 +169,7 @@ def build_attacks_block(
             count = character.ammo_count(at)
             ammo_note = f"{at}: {count}"
 
-        notes = ", ".join(x for x in [props, ammo_note] if x)
+        properties = ", ".join(x for x in [props, ammo_note] if x)
 
         odds = ""
         if target_ac is not None:
@@ -177,13 +178,16 @@ def build_attacks_block(
                 f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {target_ac}"
             )
 
+        notes = weapon_notes(w)
+
         out.append(
             {
                 "name": w.name,
                 "attack_bonus": ab,
                 "damage": dmg,
-                "properties": notes,
+                "properties": properties,
                 **({"odds": odds} if odds else {}),
+                **({"notes": notes} if notes else {}),
             }
         )
 
@@ -207,7 +211,7 @@ def build_attacks_block(
             if at:
                 count = character.ammo_count(at)
                 ammo_note = f"{at}: {count}"
-            notes = ", ".join(x for x in [props, ammo_note] if x)
+            properties = ", ".join(x for x in [props, ammo_note] if x)
 
             odds = ""
             if target_ac is not None:
@@ -221,7 +225,7 @@ def build_attacks_block(
                     "name": f"{w.name} (off-hand)",
                     "attack_bonus": ab,
                     "damage": dmg,
-                    "properties": notes,
+                    "properties": properties,
                     **({"odds": odds} if odds else {}),
                 }
             )

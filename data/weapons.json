@@ -86,5 +86,29 @@
     "damage": "1d6",
     "damage_type": "bludgeoning",
     "properties": ["versatile:1d8"]
+  },
+  {
+    "name": "Light Crossbow",
+    "category": "simple",
+    "kind": "ranged",
+    "damage": "1d8",
+    "damage_type": "piercing",
+    "properties": ["ammunition", "loading", "two-handed", "range:80/320"]
+  },
+  {
+    "name": "Lance",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d12",
+    "damage_type": "piercing",
+    "properties": ["reach", "special"]
+  },
+  {
+    "name": "Net",
+    "category": "martial",
+    "kind": "ranged",
+    "damage": "—",
+    "damage_type": "—",
+    "properties": ["special", "thrown", "range:5/15"]
   }
 ]
