@@ -27,6 +27,28 @@ def has_style(character, style_name: str) -> bool:
     return style_name in getattr(character, "fighting_styles", set())
 
 
+def has_feat(character, feat_name: str) -> bool:
+    return feat_name in getattr(character, "feats", set())
+
+
+def _ss_eligible(weapon: Weapon) -> bool:
+    # Sharpshooter: ranged weapons only (not thrown melee)
+    return weapon.kind == "ranged"
+
+
+def _gwm_eligible(weapon: Weapon) -> bool:
+    # Great Weapon Master: heavy melee weapons
+    return (weapon.kind == "melee") and ("heavy" in weapon.properties)
+
+
+def power_feat_for(character, weapon: Weapon) -> str | None:
+    if has_feat(character, "Sharpshooter") and _ss_eligible(weapon):
+        return "Sharpshooter"
+    if has_feat(character, "Great Weapon Master") and _gwm_eligible(weapon):
+        return "Great Weapon Master"
+    return None
+
+
 def choose_attack_ability(character, weapon: Weapon) -> str:
     # Ranged weapons use DEX
     if weapon.kind == "ranged":
@@ -62,7 +84,7 @@ def is_proficient(character, weapon: Weapon) -> bool:
     return f"{weapon.category} weapons" in profs or weapon.name.lower() in profs
 
 
-def attack_bonus(character, weapon: Weapon) -> int:
+def attack_bonus(character, weapon: Weapon, *, power: bool = False) -> int:
     ability = choose_attack_ability(character, weapon)
     bonus = character.ability_mod(ability)
     if is_proficient(character, weapon):
@@ -70,6 +92,8 @@ def attack_bonus(character, weapon: Weapon) -> int:
     # Archery applies to ranged WEAPONS (not thrown melee)
     if weapon.kind == "ranged" and has_style(character, "Archery"):
         bonus += 2
+    if power and power_feat_for(character, weapon):
+        bonus -= 5
     return bonus
 
 
@@ -100,6 +124,7 @@ def damage_modifier(
     *,
     two_handed: bool = False,
     offhand: bool = False,
+    power: bool = False,
 ) -> int:
     # Off-hand: no mod unless Two-Weapon Fighting style
     if offhand and not has_style(character, "Two-Weapon Fighting"):
@@ -114,6 +139,8 @@ def damage_modifier(
         and has_style(character, "Dueling")
     ):
         mod += 2
+    if power and power_feat_for(character, weapon):
+        mod += 10
     return mod
 
 
@@ -123,12 +150,17 @@ def damage_string(
     *,
     two_handed: bool = False,
     offhand: bool = False,
+    power: bool = False,
 ) -> str:
     die = damage_die(character, weapon, two_handed=two_handed)
     if die in {"—", "-"}:
         return "— special"
     mod = damage_modifier(
-        character, weapon, two_handed=two_handed, offhand=offhand
+        character,
+        weapon,
+        two_handed=two_handed,
+        offhand=offhand,
+        power=power,
     )
     mod_str = format_mod(mod) if mod != 0 else ""
     return f"{die}{(' ' + mod_str) if mod_str else ''} {weapon.damage_type}"
@@ -171,6 +203,7 @@ def build_attacks_block(
     *,
     target_ac: int | None = None,
     mode: str = "none",
+    show_power_variant: bool = True,
 ) -> List[dict]:
     out = []
     for name in getattr(character, "equipped_weapons", []):
@@ -203,16 +236,36 @@ def build_attacks_block(
 
         notes = weapon_notes(w)
 
-        out.append(
-            {
-                "name": w.name,
-                "attack_bonus": ab,
-                "damage": dmg,
+        entry = {
+            "name": w.name,
+            "attack_bonus": ab,
+            "damage": dmg,
+            "properties": properties,
+            **({"odds": odds} if odds else {}),
+            **({"notes": notes} if notes else {}),
+        }
+        out.append(entry)
+
+        pf = power_feat_for(character, w)
+        if show_power_variant and pf:
+            ab_p = attack_bonus(character, w, power=True)
+            dmg_p = damage_display(character, w).replace(
+                damage_string(character, w, two_handed=False),
+                damage_string(character, w, two_handed=False, power=True),
+            )
+            label = "SS -5/+10" if pf == "Sharpshooter" else "GWM -5/+10"
+            e2 = {
+                "name": f"{w.name} ({label})",
+                "attack_bonus": ab_p,
+                "damage": dmg_p,
                 "properties": properties,
-                **({"odds": odds} if odds else {}),
-                **({"notes": notes} if notes else {}),
             }
-        )
+            if target_ac is not None:
+                p2 = hit_probabilities(ab_p, target_ac, mode)
+                e2["odds"] = (
+                    f"hit {_fmt_pct(p2['hit'])} • crit {_fmt_pct(p2['crit'])} vs AC {target_ac}"
+                )
+            out.append(e2)
 
     off = getattr(character, "equipped_offhand", None)
     if off:
