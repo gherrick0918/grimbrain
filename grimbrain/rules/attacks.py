@@ -67,7 +67,23 @@ def attack_bonus(character, weapon: Weapon) -> int:
     bonus = character.ability_mod(ability)
     if is_proficient(character, weapon):
         bonus += _pb(character)
+    # Archery applies to ranged WEAPONS (not thrown melee)
+    if weapon.kind == "ranged" and has_style(character, "Archery"):
+        bonus += 2
     return bonus
+
+
+def _dueling_applies(character, weapon: Weapon, *, two_handed: bool, offhand: bool) -> bool:
+    # Dueling: melee weapon, wielded in one hand, and no other weapons.
+    if weapon.kind != "melee":
+        return False
+    if two_handed or weapon.has_prop("two-handed"):
+        return False
+    # If we're computing an explicit off-hand strike, Dueling never applies.
+    if offhand:
+        return False
+    # No other weapons equipped in the other hand.
+    return getattr(character, "equipped_offhand", None) is None
 
 
 def damage_die(character, weapon: Weapon, *, two_handed: bool = False) -> str:
@@ -85,13 +101,20 @@ def damage_modifier(
     two_handed: bool = False,
     offhand: bool = False,
 ) -> int:
-    ability = choose_attack_ability(character, weapon)
-
-    # Off-hand attacks don't add ability mod to damage unless style present.
+    # Off-hand: no mod unless Two-Weapon Fighting style
     if offhand and not has_style(character, "Two-Weapon Fighting"):
         return 0
-
-    return character.ability_mod(ability)
+    ability = choose_attack_ability(character, weapon)
+    mod = character.ability_mod(ability)
+    # Dueling: +2 to damage (one-handed melee, no other weapons)
+    if (
+        _dueling_applies(
+            character, weapon, two_handed=two_handed, offhand=offhand
+        )
+        and has_style(character, "Dueling")
+    ):
+        mod += 2
+    return mod
 
 
 def damage_string(
