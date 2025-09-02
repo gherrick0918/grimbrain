@@ -95,19 +95,27 @@ def spellcasting_block(pc: PlayerCharacter, show_zero: bool) -> Table:
     return t
 
 
-def attacks_block(pc: PlayerCharacter) -> Table:
+def attacks_block(
+    pc: PlayerCharacter,
+    *,
+    target_ac: int | None = None,
+    mode: str = "none",
+) -> Table:
     t = Table(box=None, show_header=True, expand=False)
     t.add_column("Name")
     t.add_column("Atk")
     t.add_column("Damage")
     t.add_column("Props")
-    attacks = pc.attacks(WEAPON_INDEX)
+    attacks = pc.attacks(WEAPON_INDEX, target_ac=target_ac, mode=mode)
     if not attacks:
         t.add_row("—", "—", "—", "")
         return t
     for a in attacks:
         atk = format_mod(a["attack_bonus"])
-        t.add_row(a["name"], atk, a["damage"], a["properties"])
+        dmg = a["damage"]
+        if a.get("odds"):
+            dmg += f" [{a['odds']}]"
+        t.add_row(a["name"], atk, dmg, a["properties"])
     return t
 
 
@@ -136,6 +144,9 @@ def render_console(
     pc: PlayerCharacter,
     meta: dict[str, str] | None = None,
     show_zero_slots: bool = False,
+    *,
+    target_ac: int | None = None,
+    mode: str = "none",
 ) -> None:
     c = Console()
     header = f"[bold]{pc.name}[/] — {pc.class_}{f' ({pc.subclass})' if pc.subclass else ''}  L{pc.level}"
@@ -145,7 +156,7 @@ def render_console(
     c.print(Panel(defense_block(pc), title="Defense", border_style="green"))
     c.print(
         Panel(
-            attacks_block(pc),
+            attacks_block(pc, target_ac=target_ac, mode=mode),
             title="Attacks & Spellcasting",
             border_style="red",
         )
@@ -176,6 +187,9 @@ def to_markdown(
     pc: PlayerCharacter,
     meta: dict[str, str] | None = None,
     show_zero_slots: bool = False,
+    *,
+    target_ac: int | None = None,
+    mode: str = "none",
 ) -> str:
     sub = f" ({pc.subclass})" if pc.subclass else ""
     out = MD_HEADER.format(
@@ -205,13 +219,16 @@ def to_markdown(
         f"- **Passive Perception**: {pc.passive_perception}\n\n"
     )
     out += "## Attacks & Spellcasting\n\n"
-    attacks = pc.attacks(WEAPON_INDEX)
+    attacks = pc.attacks(WEAPON_INDEX, target_ac=target_ac, mode=mode)
     if not attacks:
         out += "- —\n\n"
     else:
         for a in attacks:
             props = f" ({a['properties']})" if a["properties"] else ""
-            out += f"- {a['name']}: {format_mod(a['attack_bonus'])} to hit, {a['damage']}{props}\n"
+            odds = f" [{a['odds']}]" if a.get("odds") else ""
+            out += (
+                f"- {a['name']}: {format_mod(a['attack_bonus'])} to hit, {a['damage']}{odds}{props}\n"
+            )
         out += "\n"
     out += "## Spellcasting\n\n"
     dc = spell_save_dc(pc)
@@ -247,9 +264,18 @@ def save_markdown(
     path: Path,
     meta: dict[str, str] | None = None,
     show_zero_slots: bool = False,
+    *,
+    target_ac: int | None = None,
+    mode: str = "none",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        to_markdown(pc, meta=meta, show_zero_slots=show_zero_slots),
+        to_markdown(
+            pc,
+            meta=meta,
+            show_zero_slots=show_zero_slots,
+            target_ac=target_ac,
+            mode=mode,
+        ),
         encoding="utf-8",
     )

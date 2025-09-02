@@ -33,8 +33,16 @@ class Character:
         self.ammo[ammo_type] = have - amount
         return True
 
-    def attacks_and_spellcasting(self, weapon_index) -> List[dict]:
+    def attacks_and_spellcasting(
+        self,
+        weapon_index,
+        *,
+        target_ac: int | None = None,
+        mode: str = "none",
+    ) -> List[dict]:
         from .rules.attacks import build_attacks_block
 
-        return build_attacks_block(self, weapon_index)
+        return build_attacks_block(
+            self, weapon_index, target_ac=target_ac, mode=mode
+        )
 
