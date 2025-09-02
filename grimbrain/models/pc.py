@@ -144,10 +144,18 @@ class PlayerCharacter(BaseModel):
         return 10 + self.skill_mod("perception")
 
     # --- Attacks ---
-    def attacks(self, weapon_index) -> List[dict]:
+    def attacks(
+        self,
+        weapon_index,
+        *,
+        target_ac: int | None = None,
+        mode: str = "none",
+    ) -> List[dict]:
         from grimbrain.rules.attacks import build_attacks_block
 
-        return build_attacks_block(self, weapon_index)
+        return build_attacks_block(
+            self, weapon_index, target_ac=target_ac, mode=mode
+        )
 
     def attack_bonus(self, ability: str, proficient: bool) -> int:
         return self.ability_mod(ability) + (self.prof if proficient else 0)

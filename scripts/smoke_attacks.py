@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 from pathlib import Path
 
 # If you're running this from repo root, imports should work as-is.
@@ -13,6 +14,15 @@ from grimbrain.rules.attacks import format_mod
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--target-ac", type=int, default=None)
+    ap.add_argument(
+        "--odds-mode",
+        choices=["none", "advantage", "disadvantage"],
+        default="none",
+    )
+    args = ap.parse_args()
+
     idx = WeaponIndex.load(Path("data/weapons.json"))
 
     c = PlayerCharacter(
@@ -34,7 +44,7 @@ def main():
         weapon_proficiencies={"simple weapons", "martial weapons"},
     )
 
-    entries = c.attacks(idx)
+    entries = c.attacks(idx, target_ac=args.target_ac, mode=args.odds_mode)
 
     print("=== Attacks & Spellcasting ===")
     print(f"{'Name':<16} {'Atk':>4}  Damage / Type (props)")
@@ -42,9 +52,13 @@ def main():
     for e in entries:
         name = e["name"]
         atk = format_mod(e["attack_bonus"])
-        dmg = e["damage"]
+        line = f"{name:<16} {atk:>4}  {e['damage']}"
+        if e.get("odds"):
+            line += f"  [{e['odds']}]"
         props = e["properties"]
-        print(f"{name:<16} {atk:>4}  {dmg}  {f'({props})' if props else ''}")
+        if props:
+            line += f"  ({props})"
+        print(line)
 
 
 if __name__ == "__main__":

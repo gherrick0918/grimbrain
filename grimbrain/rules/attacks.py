@@ -1,6 +1,6 @@
 from typing import List
 from ..codex.weapons import Weapon
-from .attack_math import double_die_text
+from .attack_math import double_die_text, hit_probabilities
 
 # Expect character to expose:
 #   ability_mod("STR"/"DEX"), prof or proficiency_bonus, weapon_proficiencies or proficiencies
@@ -16,6 +16,10 @@ def _pb(character) -> int:
 
 def format_mod(n: int) -> str:
     return f"+{n}" if n >= 0 else str(n)
+
+
+def _fmt_pct(x: float) -> str:
+    return f"{x * 100:.1f}%"
 
 
 def has_style(character, style_name: str) -> bool:
@@ -137,7 +141,13 @@ def can_two_weapon(weapon: Weapon) -> bool:
     return weapon.kind == "melee" and ("light" in weapon.properties)
 
 
-def build_attacks_block(character, weapon_index) -> List[dict]:
+def build_attacks_block(
+    character,
+    weapon_index,
+    *,
+    target_ac: int | None = None,
+    mode: str = "none",
+) -> List[dict]:
     out = []
     for name in getattr(character, "equipped_weapons", []):
         try:
@@ -160,12 +170,20 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
 
         notes = ", ".join(x for x in [props, ammo_note] if x)
 
+        odds = ""
+        if target_ac is not None:
+            p = hit_probabilities(ab, target_ac, mode)
+            odds = (
+                f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {target_ac}"
+            )
+
         out.append(
             {
                 "name": w.name,
                 "attack_bonus": ab,
                 "damage": dmg,
                 "properties": notes,
+                **({"odds": odds} if odds else {}),
             }
         )
 
@@ -191,12 +209,20 @@ def build_attacks_block(character, weapon_index) -> List[dict]:
                 ammo_note = f"{at}: {count}"
             notes = ", ".join(x for x in [props, ammo_note] if x)
 
+            odds = ""
+            if target_ac is not None:
+                p = hit_probabilities(ab, target_ac, mode)
+                odds = (
+                    f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {target_ac}"
+                )
+
             out.append(
                 {
                     "name": f"{w.name} (off-hand)",
                     "attack_bonus": ab,
                     "damage": dmg,
                     "properties": notes,
+                    **({"odds": odds} if odds else {}),
                 }
             )
     return out
