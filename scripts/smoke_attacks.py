@@ -59,6 +59,9 @@ def main():
         if props:
             line += f"  ({props})"
         print(line)
+        if e.get("notes"):
+            for n in e["notes"]:
+                print(f"  · {n}")
 
 
 if __name__ == "__main__":

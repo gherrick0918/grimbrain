@@ -116,6 +116,9 @@ def attacks_block(
         if a.get("odds"):
             dmg += f" [{a['odds']}]"
         t.add_row(a["name"], atk, dmg, a["properties"])
+        if a.get("notes"):
+            for n in a["notes"]:
+                t.add_row(f"  · {n}", "", "", "")
     return t
 
 
@@ -229,6 +232,9 @@ def to_markdown(
             out += (
                 f"- {a['name']}: {format_mod(a['attack_bonus'])} to hit, {a['damage']}{odds}{props}\n"
             )
+            if a.get("notes"):
+                for n in a["notes"]:
+                    out += f"  · {n}\n"
         out += "\n"
     out += "## Spellcasting\n\n"
     dc = spell_save_dc(pc)
