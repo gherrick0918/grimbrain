@@ -8,6 +8,10 @@ class Character:
 
     str_score: int = 10
     dex_score: int = 10
+    con_score: int = 10
+    int_score: int = 10
+    wis_score: int = 10
+    cha_score: int = 10
     proficiencies: Set[str] = field(default_factory=set)
     proficiency_bonus: int = 2
     fighting_styles: Set[str] = field(default_factory=set)
@@ -21,7 +25,14 @@ class Character:
     ammo: Dict[str, int] = field(default_factory=dict)
 
     def ability_mod(self, key: str) -> int:
-        score = {"STR": self.str_score, "DEX": self.dex_score}[key]
+        score = {
+            "STR": self.str_score,
+            "DEX": self.dex_score,
+            "CON": self.con_score,
+            "INT": self.int_score,
+            "WIS": self.wis_score,
+            "CHA": self.cha_score,
+        }[key]
         return (score - 10) // 2
 
     # Ammo helpers
