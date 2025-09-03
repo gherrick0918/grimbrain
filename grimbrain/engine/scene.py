@@ -62,10 +62,20 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     # Simple policies
     if w_main.kind == "melee":
         if new_dist > reach:
-            step = min(speed, new_dist - reach)
-            new_dist2 = _move_toward(new_dist, step)
-            log.append(f"{attacker.name} moves: {new_dist}ft -> {new_dist2}ft")
-            new_dist = new_dist2
+            gap = new_dist - reach
+            if gap > speed:
+                # Dash to reach if possible this turn, otherwise dash full 2*speed
+                dash_step = min(speed * 2, gap)
+                new_dist2 = _move_toward(new_dist, dash_step)
+                log.append(f"{attacker.name} dashes: {new_dist}ft -> {new_dist2}ft")
+                new_dist = new_dist2
+                # dashed: no attack this turn
+                return (log, new_dist, False)
+            else:
+                step = min(speed, gap)
+                new_dist2 = _move_toward(new_dist, step)
+                log.append(f"{attacker.name} moves: {new_dist}ft -> {new_dist2}ft")
+                new_dist = new_dist2
         # Attack if in reach
         if new_dist <= reach:
             res = resolve_attack(
@@ -151,10 +161,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     else:
         # Step back toward kite distance (free move), then shoot
         if new_dist < KITE:
-            step = min(speed, KITE - new_dist)
-            new_dist2 = _move_away(new_dist, step)
-            log.append(f"{attacker.name} moves: {new_dist}ft -> {new_dist2}ft")
-            new_dist = new_dist2
+            gap = KITE - new_dist
+            if gap > speed:
+                dash_step = min(speed * 2, gap)
+                new_dist2 = _move_away(new_dist, dash_step)
+                log.append(f"{attacker.name} dashes: {new_dist}ft -> {new_dist2}ft")
+                new_dist = new_dist2
+                # dashed: no attack this turn
+                return (log, new_dist, False)
+            else:
+                step = min(speed, gap)
+                new_dist2 = _move_away(new_dist, step)
+                log.append(f"{attacker.name} moves: {new_dist}ft -> {new_dist2}ft")
+                new_dist = new_dist2
         res = resolve_attack(
             attacker.actor, attacker.weapon,
             Target(ac=_ac_for(defender, armor_idx), hp=defender.hp, cover=defender.cover, distance_ft=new_dist),
