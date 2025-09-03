@@ -13,6 +13,7 @@ class Character:
     fighting_styles: Set[str] = field(default_factory=set)
     feats: Set[str] = field(default_factory=set)
     speed_ft: int = 30
+    attacks_per_action: int = 1
     equipped_weapons: List[str] = field(default_factory=list)
     equipped_offhand: Optional[str] = None
     equipped_armor: Optional[str] = None   # e.g., "Chain Mail"
