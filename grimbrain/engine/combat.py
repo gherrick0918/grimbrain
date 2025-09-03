@@ -2,13 +2,28 @@
 from __future__ import annotations
 
 import random
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional, Any, Tuple
 from copy import deepcopy
 
 from .checks import attack_roll, damage_roll, saving_throw
 from .dice import roll
 from ..models import MonsterSidecar, PC, SpellSidecar, dump_model
 from .encounter import compute_encounter
+
+# Imports for the single-attack resolution helper
+from ..codex.weapons import Weapon, WeaponIndex
+from ..rules.attacks import (
+    attack_bonus,
+    damage_die,
+    damage_modifier,
+    choose_attack_ability,
+    power_feat_for,
+    damage_string,
+    has_style,
+    has_feat,
+)
+from ..rules.attack_math import roll_outcome, combine_modes
+from .types import Target, Cover
 
 
 class Combatant:
@@ -298,3 +313,206 @@ def parse_monster_spec(spec: str, lookup: Callable[[str], MonsterSidecar]) -> Li
         for _ in range(count):
             monsters.append(deepcopy(base))
     return monsters
+
+
+# ---------------------------------------------------------------------------
+# Single attack resolution helpers
+# ---------------------------------------------------------------------------
+
+
+def _roll_d20(rng: random.Random) -> int:
+    """Roll a single d20 using ``rng``."""
+    return rng.randint(1, 20)
+
+
+def _parse_die(die: str) -> Tuple[int, int] | None:
+    """Parse a dice expression like ``"1d8"`` into ``(1, 8)``.
+
+    Pure integers (``"1"``) and em dashes are handled by the caller and
+    return ``None`` here.
+    """
+    if "d" not in die:
+        return None
+    n, f = die.lower().split("d", 1)
+    return (int(n.strip()), int(f.strip()))
+
+
+def _roll_damage(die: str, mod: int, *, crit: bool, rng: random.Random) -> Dict[str, Any]:
+    """Roll damage dice and apply modifiers.
+
+    ``die`` may be an ``XdY`` expression, a pure integer, or an em dash.
+    When ``crit`` is True the dice portion is doubled.
+    """
+    if die in {"—", "-"}:
+        return {"rolls": [], "sum_dice": 0, "mod": 0, "total": 0}
+    if die.isdigit():
+        base = int(die)
+        total = base + mod
+        return {"rolls": [base], "sum_dice": base, "mod": mod, "total": total}
+    parsed = _parse_die(die)
+    assert parsed, f"Bad die string: {die}"
+    n, f = parsed
+    n = n * 2 if crit else n
+    rolls = [rng.randint(1, f) for _ in range(n)]
+    s = sum(rolls)
+    return {"rolls": rolls, "sum_dice": s, "mod": mod, "total": s + mod}
+
+
+_COVER_TO_AC = {"none": 0, "half": 2, "three-quarters": 5, "total": 10**9}
+
+
+def _weapon_has_ranged_profile(w: Weapon) -> bool:
+    return w.kind == "ranged" or w.has_prop("thrown") or w.has_prop("range")
+
+
+def _range_tuple(w: Weapon) -> Tuple[Optional[int], Optional[int]]:
+    t = w.range_tuple()
+    return (t[0], t[1]) if t else (None, None)
+
+
+def _long_range_applies(w: Weapon, dist: Optional[int]) -> bool:
+    if dist is None or not _weapon_has_ranged_profile(w):
+        return False
+    n, L = _range_tuple(w)
+    return bool(n and L and (n < dist <= L))
+
+
+def _out_of_range(w: Weapon, dist: Optional[int]) -> bool:
+    if dist is None or not _weapon_has_ranged_profile(w):
+        return False
+    _, L = _range_tuple(w)
+    return bool(L and dist > L)
+
+
+def _effective_ac(ac: int, cover: Cover, has_sharp: bool) -> int:
+    if cover == "total":
+        return 10**9
+    bump = 0 if (has_sharp and cover in {"half", "three-quarters"}) else _COVER_TO_AC.get(cover, 0)
+    return ac + bump
+
+
+def resolve_attack(
+    attacker,
+    weapon_name: str,
+    target: Target,
+    weapon_index: WeaponIndex,
+    *,
+    base_mode: str = "none",  # "none" | "advantage" | "disadvantage"
+    power: bool = False,  # SS/GWM power attack toggle
+    offhand: bool = False,
+    two_handed: bool = False,
+    has_fired_loading_weapon_this_turn: bool = False,
+    rng: Optional[random.Random] = None,
+    forced_d20: Tuple[int, int] | None = None,  # (d1, d2) for tests
+) -> Dict[str, Any]:
+    """Resolve a single weapon attack.
+
+    Returns a dictionary with roll breakdown and outcome. The attacker's
+    ammo is reduced when appropriate, but no other character state is
+    mutated.
+    """
+
+    rng = rng or random.Random()
+    w = weapon_index.get(weapon_name)
+    notes: List[str] = []
+
+    # Loading gate
+    if w.has_prop("loading") and has_fired_loading_weapon_this_turn:
+        return {
+            "ok": False,
+            "reason": "loading (already fired this turn)",
+            "notes": ["loading"],
+            "spent_ammo": False,
+        }
+
+    # Range/cover adjustments
+    mode = base_mode
+    has_ss = has_feat(attacker, "Sharpshooter")
+    dist = target.distance_ft
+    if _out_of_range(w, dist):
+        return {
+            "ok": False,
+            "reason": "out of range",
+            "notes": ["out of range"],
+            "spent_ammo": False,
+        }
+
+    if _long_range_applies(w, dist):
+        if has_ss:
+            notes.append("long range (Sharpshooter: no disadvantage)")
+        else:
+            mode = combine_modes(mode, "disadvantage")
+            notes.append("long range (disadvantage)")
+
+    eff_ac = _effective_ac(target.ac, target.cover, has_ss)
+    if eff_ac >= 10**9:
+        return {
+            "ok": False,
+            "reason": "total cover",
+            "notes": ["total cover"],
+            "spent_ammo": False,
+        }
+
+    # Attack bonus and d20 roll
+    ab = attack_bonus(attacker, w, power=power)
+
+    if forced_d20:
+        candidates = forced_d20
+    else:
+        d1 = _roll_d20(rng)
+        d2 = _roll_d20(rng)
+        candidates = (d1, d2)
+
+    if mode == "advantage":
+        d = max(candidates)
+    elif mode == "disadvantage":
+        d = min(candidates)
+    else:
+        d = candidates[0]
+
+    is_hit, is_crit = roll_outcome(d, ab, eff_ac)
+
+    # Ammo spend (only if we attempted a legal attack; spend regardless of hit)
+    spent_ammo = False
+    ammo_type = w.ammo_type()
+    if ammo_type:
+        have = attacker.ammo_count(ammo_type) if hasattr(attacker, "ammo_count") else 0
+        if have <= 0:
+            return {
+                "ok": False,
+                "reason": f"no {ammo_type}",
+                "notes": [f"out of {ammo_type}"],
+                "spent_ammo": False,
+            }
+        if hasattr(attacker, "spend_ammo"):
+            spent_ammo = attacker.spend_ammo(ammo_type, 1)
+
+    # Damage roll
+    dmg_die = damage_die(attacker, w, two_handed=two_handed)
+    dmg_mod = damage_modifier(
+        attacker, w, two_handed=two_handed, offhand=offhand, power=power
+    )
+    dmg_roll = (
+        _roll_damage(dmg_die, dmg_mod, crit=is_crit, rng=rng)
+        if is_hit
+        else {"rolls": [], "sum_dice": 0, "mod": 0, "total": 0}
+    )
+
+    return {
+        "ok": True,
+        "weapon": w.name,
+        "attack_bonus": ab,
+        "mode": mode,
+        "candidates": candidates,
+        "d20": d,
+        "is_hit": is_hit,
+        "is_crit": is_crit,
+        "effective_ac": eff_ac,
+        "damage_string": damage_string(
+            attacker, w, two_handed=two_handed, offhand=offhand, power=power
+        ),
+        "damage": dmg_roll,
+        "spent_ammo": spent_ammo,
+        "notes": notes,
+    }
+
