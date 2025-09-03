@@ -48,6 +48,14 @@
     "properties": ["heavy", "two-handed"]
   },
   {
+    "name": "Glaive",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d10",
+    "damage_type": "slashing",
+    "properties": ["heavy", "reach", "two-handed"]
+  },
+  {
     "name": "Shortbow",
     "category": "simple",
     "kind": "ranged",
