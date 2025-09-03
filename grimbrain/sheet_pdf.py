@@ -22,10 +22,14 @@ from reportlab.platypus import (
 
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
 from grimbrain.rules.attacks import format_mod
-
+from grimbrain.rules.defense import compute_ac
+from grimbrain.codex.armor import ArmorIndex
 SMALL = 9
 NORMAL = 10
 HEADER = 14
+
+BASE_PATH = Path(__file__).resolve().parent.parent
+ARMOR_INDEX = ArmorIndex.load(BASE_PATH / "data" / "armor.json")
 
 
 def _abilities_table(pc: PlayerCharacter) -> Table:
@@ -224,6 +228,13 @@ def save_pdf(
 
     title_text = f"<b>{pc.name}</b> — {pc.class_}{f' ({pc.subclass})' if pc.subclass else ''}  L{pc.level}"
     title_para = Paragraph(title_text, styles["Title"])
+    ac_info = compute_ac(pc, ARMOR_INDEX)
+    parts = ", ".join(ac_info["components"])
+    notes = "; ".join(ac_info["notes"]) if ac_info["notes"] else ""
+    ac_line = f"AC {ac_info['ac']} — {parts}"
+    if notes:
+        ac_line += f"; {notes}"
+    ac_para = Paragraph(ac_line, styles["Normal"])
     if logo and logo.exists():
         img = Image(str(logo))
         img._restrictSize(1.2 * inch, 1.2 * inch)
@@ -271,4 +282,4 @@ def save_pdf(
         f"<font size=9 color=grey>{footer_text}</font>", styles["Normal"]
     )
 
-    doc.build([header, Spacer(1, 0.15 * inch), body, Spacer(1, 0.2 * inch), footer])
+    doc.build([header, ac_para, Spacer(1, 0.15 * inch), body, Spacer(1, 0.2 * inch), footer])

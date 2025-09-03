@@ -14,6 +14,8 @@ class Character:
     feats: Set[str] = field(default_factory=set)
     equipped_weapons: List[str] = field(default_factory=list)
     equipped_offhand: Optional[str] = None
+    equipped_armor: Optional[str] = None   # e.g., "Chain Mail"
+    equipped_shield: bool = False
     ammo: Dict[str, int] = field(default_factory=dict)
 
     def ability_mod(self, key: str) -> int:
