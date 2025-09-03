@@ -7,6 +7,7 @@ from pathlib import Path
 from .types import Combatant, Target
 from .round import roll_initiative   # reuse your initiative helper
 from .death import roll_death_save, apply_damage_while_down
+from .damage import apply_defenses
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
@@ -119,7 +120,12 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 )
                 if res["spent_ammo"]:
                     log.append("  ammo: spent 1")
-                defender.hp -= int(res["damage"]["total"])
+                dtype = w_main.damage_type
+                raw = int(res["damage"]["total"])
+                final, notes2, _ = apply_defenses(raw, dtype, defender)
+                for n in notes2:
+                    log.append(f"  {n}")
+                defender.hp -= final
                 performed_action = True
                 if w_main.has_prop("loading"):
                     used_loading_this_turn = True  # one shot per action
@@ -143,7 +149,12 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                     tag = "CRIT" if res["is_crit"] else ("HIT" if res["is_hit"] else "MISS")
                     log.append(f"  Off-hand {res['weapon']} => {tag}")
                     log.append(f"    damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
-                    defender.hp -= int(res["damage"]["total"])
+                    dtype = w_off.damage_type
+                    raw = int(res["damage"]["total"])
+                    final, notes2, _ = apply_defenses(raw, dtype, defender)
+                    for n in notes2:
+                        log.append(f"    {n}")
+                    defender.hp -= final
                     if defender.hp <= 0 and res["is_hit"]:
                         apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_off.kind == "melee"))
                         log.append(f"{defender.name} drops to 0 HP!")
@@ -186,7 +197,12 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         )
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
-        defender.hp -= int(res["damage"]["total"])
+        dtype = w_main.damage_type
+        raw = int(res["damage"]["total"])
+        final, notes2, _ = apply_defenses(raw, dtype, defender)
+        for n in notes2:
+            log.append(f"  {n}")
+        defender.hp -= final
         if defender.hp <= 0 and res["is_hit"]:
             apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")
@@ -224,7 +240,12 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         log.append(f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
-        defender.hp -= int(res["damage"]["total"])
+        dtype = w_main.damage_type
+        raw = int(res["damage"]["total"])
+        final, notes2, _ = apply_defenses(raw, dtype, defender)
+        for n in notes2:
+            log.append(f"  {n}")
+        defender.hp -= final
         if defender.hp <= 0 and res["is_hit"]:
             apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")

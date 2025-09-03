@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Optional, Literal, Set
 
 Cover = Literal["none", "half", "three-quarters", "total"]
 
@@ -32,3 +32,7 @@ class Combatant:
     distance_ft: Optional[int] = None
     cover: Cover = "none"
     death: DeathState = field(default_factory=DeathState)  # per-combat state
+    resist: Set[str] = field(default_factory=set)
+    vulnerable: Set[str] = field(default_factory=set)
+    immune: Set[str] = field(default_factory=set)
+    temp_hp: int = 0

@@ -5,6 +5,7 @@ from grimbrain.codex.weapons import WeaponIndex
 from grimbrain.character import Character
 from grimbrain.engine.types import Target
 from grimbrain.engine.combat import resolve_attack
+from grimbrain.engine.damage import apply_defenses
 
 
 def main():
@@ -24,6 +25,10 @@ def main():
     ap.add_argument("--styles", nargs="*", default=[], help='e.g. Archery Dueling "Two-Weapon Fighting"')
     ap.add_argument("--feats", nargs="*", default=[], help="e.g. Sharpshooter 'Great Weapon Master'")
     ap.add_argument("--ammo", nargs="*", default=[], help="pairs like arrows:20 bolts:10")
+    ap.add_argument("--target-resist", nargs="*", default=[], help="damage types")
+    ap.add_argument("--target-vulnerable", nargs="*", default=[], help="damage types")
+    ap.add_argument("--target-immune", nargs="*", default=[], help="damage types")
+    ap.add_argument("--target-thp", type=int, default=0)
     args = ap.parse_args()
 
     # quick character stub
@@ -50,6 +55,17 @@ def main():
     print(f"  damage ({res['damage_string']}): rolls={res['damage']['rolls']} sum={res['damage']['sum_dice']} mod={res['damage']['mod']}  TOTAL={res['damage']['total']}")
     if res['spent_ammo']:
         print("  ammo: spent 1")
+
+    class _Def:
+        def __init__(self):
+            self.resist = set(args.target_resist)
+            self.vulnerable = set(args.target_vulnerable)
+            self.immune = set(args.target_immune)
+            self.temp_hp = args.target_thp
+
+    w = idx.get(args.weapon)
+    final, notes2, _ = apply_defenses(res["damage"]["total"], w.damage_type, _Def())
+    print(f"  effective after defenses: {final}  ({'; '.join(notes2) if notes2 else 'no defenses'})")
 
 
 if __name__ == "__main__":
