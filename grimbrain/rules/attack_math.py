@@ -5,6 +5,21 @@ import re
 Die = Tuple[int, int]  # (count, faces)
 _MODE = Literal["none", "advantage", "disadvantage"]
 
+def combine_modes(a: _MODE, b: _MODE) -> _MODE:
+    """Combine two advantage states.
+
+    Any combination of advantage and disadvantage cancels to "none". If one side
+    is "none", the other side wins. Otherwise the inputs match and are returned
+    unchanged.
+    """
+    if a == b:
+        return a
+    if a == "none":
+        return b
+    if b == "none":
+        return a
+    return "none"
+
 _DIE_PAT = re.compile(r"^(\d+)d(\d+)$")
 
 def parse_die(die: str) -> Die | None:

@@ -1,6 +1,6 @@
 from typing import List
 from ..codex.weapons import Weapon
-from .attack_math import double_die_text, hit_probabilities
+from .attack_math import double_die_text, hit_probabilities, combine_modes
 from .weapon_notes import weapon_notes
 
 # Expect character to expose:
@@ -21,6 +21,73 @@ def format_mod(n: int) -> str:
 
 def _fmt_pct(x: float) -> str:
     return f"{x * 100:.1f}%"
+
+
+_COVER_TO_AC = {"none": 0, "half": 2, "three-quarters": 5, "total": 9999}
+
+
+def _weapon_has_ranged_profile(w: Weapon) -> bool:
+    return w.kind == "ranged" or w.has_prop("thrown") or w.has_prop("range")
+
+
+def _long_range_applies(w: Weapon, distance_ft: int | None) -> bool:
+    if distance_ft is None or not _weapon_has_ranged_profile(w):
+        return False
+    rng = w.range_tuple()
+    if not rng:
+        return False
+    normal, long = rng
+    return normal < distance_ft <= long
+
+
+def _out_of_range(w: Weapon, distance_ft: int | None) -> bool:
+    if distance_ft is None or not _weapon_has_ranged_profile(w):
+        return False
+    rng = w.range_tuple()
+    if not rng:
+        return False
+    _, long = rng
+    return distance_ft > long
+
+
+def _effective_ac(ac: int, cover: str, has_sharpshooter: bool) -> int:
+    if cover == "total":
+        return 10 ** 9
+    bump = 0 if (has_sharpshooter and cover in {"half", "three-quarters"}) else _COVER_TO_AC.get(cover, 0)
+    return ac + bump
+
+
+def _apply_range_cover_context(character, w: Weapon, *, base_mode: str, target_ac: int | None,
+                               target_distance: int | None, cover: str | None):
+    eff_mode = base_mode
+    eff_ac = target_ac
+    notes: list[str] = []
+
+    has_ss = has_feat(character, "Sharpshooter")
+
+    if target_distance is not None and _weapon_has_ranged_profile(w):
+        if _out_of_range(w, target_distance):
+            return eff_mode, eff_ac, notes + ["out of range"], True
+        if _long_range_applies(w, target_distance):
+            if not has_ss:
+                eff_mode = combine_modes(eff_mode, "disadvantage")
+                notes.append("long range (disadvantage)")
+            else:
+                notes.append("long range (Sharpshooter: no disadvantage)")
+
+    if target_ac is not None and cover:
+        eff_ac = _effective_ac(target_ac, cover, has_ss)
+        if cover != "none":
+            if cover == "total":
+                notes.append("total cover")
+            else:
+                if has_ss:
+                    notes.append(f"{cover} (Sharpshooter: ignore cover)")
+                else:
+                    bump = _COVER_TO_AC[cover]
+                    notes.append(f"{cover} (+{bump} AC)")
+
+    return eff_mode, eff_ac, notes, False
 
 
 def has_style(character, style_name: str) -> bool:
@@ -204,6 +271,8 @@ def build_attacks_block(
     target_ac: int | None = None,
     mode: str = "none",
     show_power_variant: bool = True,
+    target_distance: int | None = None,
+    cover: str | None = None,
 ) -> List[dict]:
     out = []
     for name in getattr(character, "equipped_weapons", []):
@@ -229,10 +298,22 @@ def build_attacks_block(
 
         odds = ""
         if target_ac is not None:
-            p = hit_probabilities(ab, target_ac, mode)
-            odds = (
-                f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {target_ac}"
+            eff_mode, eff_ac, notes, oob = _apply_range_cover_context(
+                character,
+                w,
+                base_mode=mode,
+                target_ac=target_ac,
+                target_distance=target_distance,
+                cover=cover or "none",
             )
+            if oob or eff_ac >= 10 ** 9:
+                odds = f"unattackable [{', '.join(notes)}]" if notes else "unattackable"
+            else:
+                p = hit_probabilities(ab, eff_ac, eff_mode)
+                odds = (
+                    f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {eff_ac}"
+                    + (f" [{', '.join(notes)}]" if notes else "")
+                )
 
         notes = weapon_notes(w)
 
@@ -261,10 +342,22 @@ def build_attacks_block(
                 "properties": properties,
             }
             if target_ac is not None:
-                p2 = hit_probabilities(ab_p, target_ac, mode)
-                e2["odds"] = (
-                    f"hit {_fmt_pct(p2['hit'])} • crit {_fmt_pct(p2['crit'])} vs AC {target_ac}"
+                eff_mode, eff_ac, notes, oob = _apply_range_cover_context(
+                    character,
+                    w,
+                    base_mode=mode,
+                    target_ac=target_ac,
+                    target_distance=target_distance,
+                    cover=cover or "none",
                 )
+                if oob or eff_ac >= 10 ** 9:
+                    e2["odds"] = f"unattackable [{', '.join(notes)}]" if notes else "unattackable"
+                else:
+                    p2 = hit_probabilities(ab_p, eff_ac, eff_mode)
+                    e2["odds"] = (
+                        f"hit {_fmt_pct(p2['hit'])} • crit {_fmt_pct(p2['crit'])} vs AC {eff_ac}"
+                        + (f" [{', '.join(notes)}]" if notes else "")
+                    )
             out.append(e2)
 
     off = getattr(character, "equipped_offhand", None)
@@ -291,10 +384,22 @@ def build_attacks_block(
 
             odds = ""
             if target_ac is not None:
-                p = hit_probabilities(ab, target_ac, mode)
-                odds = (
-                    f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {target_ac}"
+                eff_mode, eff_ac, notes, oob = _apply_range_cover_context(
+                    character,
+                    w,
+                    base_mode=mode,
+                    target_ac=target_ac,
+                    target_distance=target_distance,
+                    cover=cover or "none",
                 )
+                if oob or eff_ac >= 10 ** 9:
+                    odds = f"unattackable [{', '.join(notes)}]" if notes else "unattackable"
+                else:
+                    p = hit_probabilities(ab, eff_ac, eff_mode)
+                    odds = (
+                        f"hit {_fmt_pct(p['hit'])} • crit {_fmt_pct(p['crit'])} vs AC {eff_ac}"
+                        + (f" [{', '.join(notes)}]" if notes else "")
+                    )
 
             out.append(
                 {
