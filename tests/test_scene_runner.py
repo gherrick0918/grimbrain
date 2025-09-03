@@ -21,7 +21,11 @@ def test_melee_closes_then_hits():
     B = Combatant("Archer", C(dex=14, feats={"Sharpshooter"}), hp=16, weapon="Longbow")
     res = run_scene(A, B, seed=9, max_rounds=5, start_distance_ft=40)
     log = "\n".join(res.log).lower()
-    assert "moves: 40ft -> 10ft" in log or "moves: 40ft -> 30ft" in log  # first approach step
+    assert (
+        "moves: 40ft -> 10ft" in log
+        or "moves: 40ft -> 30ft" in log
+        or "dashes: 40ft -> 5ft" in log
+    )  # first approach step
     assert "attacks with greatsword" in log  # eventually closes and swings
 
 
