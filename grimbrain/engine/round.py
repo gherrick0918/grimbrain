@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .types import Combatant, Target, Cover
 from .death import roll_death_save, apply_damage_while_down
+from .damage import apply_defenses
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
@@ -103,7 +104,14 @@ def _attack_once(attacker: Combatant, defender: Combatant, wname: str, *,
     log.append(f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
     if res["spent_ammo"]:
         log.append("  ammo: spent 1")
-    return TurnResult(log, int(res["damage"]["total"]), False, w.has_prop("loading"))
+
+    dtype = w.damage_type
+    raw = int(res["damage"]["total"])
+    final, notes2, _ = apply_defenses(raw, dtype, defender)
+    for n in notes2:
+        log.append(f"  {n}")
+
+    return TurnResult(log, final, False, w.has_prop("loading"))
 
 
 def _offhand_if_applicable(attacker: Combatant, defender: Combatant, *,
@@ -132,7 +140,12 @@ def _offhand_if_applicable(attacker: Combatant, defender: Combatant, *,
     tag = "CRIT" if res["is_crit"] else ("HIT" if res["is_hit"] else "MISS")
     log.append(f"  Off-hand {res['weapon']} => {tag}")
     log.append(f"    damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
-    return TurnResult(log, int(res["damage"]["total"]), False, False)
+    dtype = w.damage_type
+    raw = int(res["damage"]["total"])
+    final, notes2, _ = apply_defenses(raw, dtype, defender)
+    for n in notes2:
+        log.append(f"    {n}")
+    return TurnResult(log, final, False, False)
 
 
 def take_turn(attacker: Combatant, defender: Combatant, *,
