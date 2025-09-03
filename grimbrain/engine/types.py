@@ -1,7 +1,15 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Literal
 
 Cover = Literal["none", "half", "three-quarters", "total"]
+
+
+@dataclass
+class DeathState:
+    successes: int = 0
+    failures: int = 0
+    stable: bool = False
+    dead: bool = False
 
 
 @dataclass
@@ -23,3 +31,4 @@ class Combatant:
     offhand: Optional[str] = None
     distance_ft: Optional[int] = None
     cover: Cover = "none"
+    death: DeathState = field(default_factory=DeathState)  # per-combat state
