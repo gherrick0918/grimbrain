@@ -13,7 +13,9 @@ from rich.table import Table
 from grimbrain.models.pc import ABILITY_ORDER, PlayerCharacter
 from grimbrain.characters import spell_save_dc, spell_attack_bonus
 from grimbrain.codex.weapons import WeaponIndex
+from grimbrain.codex.armor import ArmorIndex
 from grimbrain.rules.attacks import format_mod
+from grimbrain.rules.defense import compute_ac
 
 ABIL_NAMES = {
     "str": "STR",
@@ -24,9 +26,9 @@ ABIL_NAMES = {
     "cha": "CHA",
 }
 
-WEAPON_INDEX = WeaponIndex.load(
-    Path(__file__).resolve().parent.parent / "data" / "weapons.json"
-)
+BASE_PATH = Path(__file__).resolve().parent.parent
+WEAPON_INDEX = WeaponIndex.load(BASE_PATH / "data" / "weapons.json")
+ARMOR_INDEX = ArmorIndex.load(BASE_PATH / "data" / "armor.json")
 
 
 def _caps_csv(items: Iterable[str]) -> str:
@@ -154,6 +156,13 @@ def render_console(
     c = Console()
     header = f"[bold]{pc.name}[/] — {pc.class_}{f' ({pc.subclass})' if pc.subclass else ''}  L{pc.level}"
     c.rule(header)
+    ac_info = compute_ac(pc, ARMOR_INDEX)
+    parts = ", ".join(ac_info["components"])
+    notes = "; ".join(ac_info["notes"]) if ac_info["notes"] else ""
+    line = f"AC {ac_info['ac']} — {parts}"
+    if notes:
+        line += f"; {notes}"
+    c.print(line)
     c.print(Panel(ability_block(pc), title="Abilities", border_style="cyan"))
     c.print(Panel(prof_block(pc), title="Proficiencies", border_style="magenta"))
     c.print(Panel(defense_block(pc), title="Defense", border_style="green"))

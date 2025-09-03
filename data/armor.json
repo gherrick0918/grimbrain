@@ -1,0 +1,18 @@
+[
+  {"name":"Padded","category":"light","base_ac":11,"dex_cap":null,"stealth_disadvantage":true,"str_min":null},
+  {"name":"Leather","category":"light","base_ac":11,"dex_cap":null,"stealth_disadvantage":false,"str_min":null},
+  {"name":"Studded Leather","category":"light","base_ac":12,"dex_cap":null,"stealth_disadvantage":false,"str_min":null},
+
+  {"name":"Hide","category":"medium","base_ac":12,"dex_cap":2,"stealth_disadvantage":false,"str_min":null},
+  {"name":"Chain Shirt","category":"medium","base_ac":13,"dex_cap":2,"stealth_disadvantage":false,"str_min":null},
+  {"name":"Scale Mail","category":"medium","base_ac":14,"dex_cap":2,"stealth_disadvantage":true,"str_min":null},
+  {"name":"Breastplate","category":"medium","base_ac":14,"dex_cap":2,"stealth_disadvantage":false,"str_min":null},
+  {"name":"Half Plate","category":"medium","base_ac":15,"dex_cap":2,"stealth_disadvantage":true,"str_min":null},
+
+  {"name":"Ring Mail","category":"heavy","base_ac":14,"dex_cap":0,"stealth_disadvantage":true,"str_min":null},
+  {"name":"Chain Mail","category":"heavy","base_ac":16,"dex_cap":0,"stealth_disadvantage":true,"str_min":13},
+  {"name":"Splint","category":"heavy","base_ac":17,"dex_cap":0,"stealth_disadvantage":true,"str_min":15},
+  {"name":"Plate","category":"heavy","base_ac":18,"dex_cap":0,"stealth_disadvantage":true,"str_min":15},
+
+  {"name":"Shield","category":"shield","base_ac":0,"dex_cap":null,"stealth_disadvantage":false,"str_min":null}
+]
