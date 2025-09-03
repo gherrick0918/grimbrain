@@ -12,6 +12,7 @@ class Character:
     proficiency_bonus: int = 2
     fighting_styles: Set[str] = field(default_factory=set)
     feats: Set[str] = field(default_factory=set)
+    speed_ft: int = 30
     equipped_weapons: List[str] = field(default_factory=list)
     equipped_offhand: Optional[str] = None
     equipped_armor: Optional[str] = None   # e.g., "Chain Mail"
