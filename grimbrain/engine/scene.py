@@ -78,24 +78,41 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 new_dist = new_dist2
         # Attack if in reach
         if new_dist <= reach:
-            res = resolve_attack(
-                attacker.actor, attacker.weapon,
-                Target(ac=_ac_for(defender, armor_idx), hp=defender.hp, cover=defender.cover, distance_ft=new_dist),
-                weapon_idx, base_mode="none", power=False, offhand=False, two_handed=False,
-                has_fired_loading_weapon_this_turn=False, rng=rng
-            )
-            if not res["ok"]:
-                log.append(f"{attacker.name} cannot attack: {res['reason']}")
-            else:
+            swings = max(1, int(getattr(attacker.actor, "attacks_per_action", 1)))
+            for i in range(swings):
+                res = resolve_attack(
+                    attacker.actor,
+                    attacker.weapon,
+                    Target(
+                        ac=_ac_for(defender, armor_idx),
+                        hp=defender.hp,
+                        cover=defender.cover,
+                        distance_ft=new_dist,
+                    ),
+                    weapon_idx,
+                    base_mode="none",
+                    power=False,
+                    offhand=False,
+                    two_handed=False,
+                    has_fired_loading_weapon_this_turn=used_loading_this_turn,
+                    rng=rng,
+                )
+                if not res["ok"]:
+                    log.append(f"{attacker.name} cannot attack: {res['reason']}")
+                    break
                 tag = "CRIT" if res["is_crit"] else ("HIT" if res["is_hit"] else "MISS")
-                log.append(f"{attacker.name} attacks with {res['weapon']} @ {new_dist}ft => {tag}")
-                log.append(f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
+                log.append(
+                    f"{attacker.name} attacks with {res['weapon']} @ {new_dist}ft => {tag}"
+                )
+                log.append(
+                    f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}"
+                )
                 if res["spent_ammo"]:
                     log.append("  ammo: spent 1")
                 defender.hp -= int(res["damage"]["total"])
                 performed_action = True
                 if w_main.has_prop("loading"):
-                    used_loading_this_turn = True
+                    used_loading_this_turn = True  # one shot per action
                 if defender.hp <= 0:
                     log.append(f"{defender.name} drops to 0 HP!")
                     return (log, new_dist, True)

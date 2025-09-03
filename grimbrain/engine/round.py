@@ -141,17 +141,34 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
     # Track per-turn loading usage
     used_loading = False
 
-    # Primary attack
-    t1 = _attack_once(attacker, defender, attacker.weapon, weapon_idx=weapon_idx, armor_idx=armor_idx, rng=rng, already_loaded_this_turn=used_loading)
-    log.extend(t1.log)
-    defender.hp -= t1.damage
-    used_loading = used_loading or t1.used_loading
-    if defender.hp <= 0:
-        log.append(f"{defender.name} drops to 0 HP!")
-        return log
+    # Primary attack(s)
+    swings = max(1, int(getattr(attacker.actor, "attacks_per_action", 1)))
+    for i in range(swings):
+        t1 = _attack_once(
+            attacker,
+            defender,
+            attacker.weapon,
+            weapon_idx=weapon_idx,
+            armor_idx=armor_idx,
+            rng=rng,
+            already_loaded_this_turn=used_loading,
+        )
+        log.extend([f"[Attack {i+1}/{swings}]"] + t1.log)
+        defender.hp -= t1.damage
+        used_loading = used_loading or t1.used_loading
+        if defender.hp <= 0:
+            log.append(f"{defender.name} drops to 0 HP!")
+            return log
 
     # Optional off-hand
-    t2 = _offhand_if_applicable(attacker, defender, weapon_idx=weapon_idx, armor_idx=armor_idx, rng=rng, already_loaded_this_turn=used_loading)
+    t2 = _offhand_if_applicable(
+        attacker,
+        defender,
+        weapon_idx=weapon_idx,
+        armor_idx=armor_idx,
+        rng=rng,
+        already_loaded_this_turn=used_loading,
+    )
     log.extend(t2.log)
     defender.hp -= t2.damage
     used_loading = used_loading or t2.used_loading
