@@ -134,5 +134,7 @@
     "damage": "—",
     "damage_type": "—",
     "properties": ["special", "thrown", "range:5/15"]
-  }
+  },
+  {"name":"Spear","category":"simple","kind":"melee","damage":"1d6","damage_type":"piercing","properties":["thrown","range:20/60","versatile:1d8"]},
+  {"name":"Greataxe","category":"martial","kind":"melee","damage":"1d12","damage_type":"slashing","properties":["heavy","two-handed"]}
 ]
