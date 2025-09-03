@@ -1,4 +1,5 @@
 Conflict: rule/attack.shortbow -> keeping generated, ignoring legacy-data
+Conflict: rule/attack.shortsword -> keeping generated, ignoring legacy-data
 Effect on Hero begins
 Hero ignites Hero (burning)
 Hero starts burning

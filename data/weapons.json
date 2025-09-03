@@ -16,6 +16,22 @@
     "properties": ["finesse"]
   },
   {
+    "name": "Scimitar",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d6",
+    "damage_type": "slashing",
+    "properties": ["finesse", "light"]
+  },
+  {
+    "name": "Shortsword",
+    "category": "martial",
+    "kind": "melee",
+    "damage": "1d6",
+    "damage_type": "piercing",
+    "properties": ["finesse", "light"]
+  },
+  {
     "name": "Longsword",
     "category": "martial",
     "kind": "melee",
