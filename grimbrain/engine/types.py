@@ -18,6 +18,7 @@ class Target:
     hp: int
     cover: Cover = "none"
     distance_ft: Optional[int] = None
+    conditions: Set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -36,3 +37,4 @@ class Combatant:
     vulnerable: Set[str] = field(default_factory=set)
     immune: Set[str] = field(default_factory=set)
     temp_hp: int = 0
+    conditions: Set[str] = field(default_factory=set)

@@ -13,6 +13,7 @@ from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
 from ..rules.attacks import can_two_weapon
 from .combat import resolve_attack
+from .saves import roll_save
 
 
 def _reach_ft(weapon) -> int:
@@ -20,7 +21,8 @@ def _reach_ft(weapon) -> int:
 
 
 def _speed(cmb: Combatant) -> int:
-    return getattr(cmb.actor, "speed_ft", 30)
+    base = getattr(cmb.actor, "speed_ft", 30)
+    return 0 if "restrained" in cmb.conditions else base
 
 
 def _ac_for(defender: Combatant, armor_idx: ArmorIndex) -> int:
@@ -61,9 +63,18 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         if attacker.death.stable:
             log.append(f"{attacker.name} is stable at 0 HP (unconscious).")
             return (log, distance_ft, False)
+    if "restrained" in attacker.conditions:
+        ok, d, cands = roll_save(attacker.actor, "STR", 10, rng=rng)
+        if ok:
+            attacker.conditions.discard("restrained")
+            log.append(f"{attacker.name} escapes restraint (STR save {d}+mod >= 10)")
+        else:
+            log.append(f"{attacker.name} fails to escape restraint (STR save {d}+mod < 10)")
+            return (log, distance_ft, False)
     speed = _speed(attacker)
     w_main = weapon_idx.get(attacker.weapon)
     reach = _reach_ft(w_main)
+    is_ranged = w_main.kind == "ranged" and not w_main.has_prop("thrown")
 
     # Decide movement
     new_dist = distance_ft
@@ -71,7 +82,7 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     used_loading_this_turn = False
 
     # Simple policies
-    if w_main.kind == "melee":
+    if not is_ranged:
         if new_dist > reach:
             gap = new_dist - reach
             if gap > speed:
@@ -99,6 +110,7 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                         hp=defender.hp,
                         cover=defender.cover,
                         distance_ft=new_dist,
+                        conditions=defender.conditions,
                     ),
                     weapon_idx,
                     base_mode="none",
@@ -118,6 +130,8 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 log.append(
                     f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}"
                 )
+                for n in res["notes"]:
+                    log.append(f"  {n}")
                 if res["spent_ammo"]:
                     log.append("  ammo: spent 1")
                 dtype = w_main.damage_type
@@ -140,15 +154,29 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
             w_off = weapon_idx.get(attacker.offhand)
             if can_two_weapon(w_off) and new_dist <= _reach_ft(w_off):
                 res = resolve_attack(
-                    attacker.actor, attacker.offhand,
-                    Target(ac=_ac_for(defender, armor_idx), hp=defender.hp, cover=defender.cover, distance_ft=new_dist),
-                    weapon_idx, base_mode="none", power=False, offhand=True, two_handed=False,
-                    has_fired_loading_weapon_this_turn=used_loading_this_turn, rng=rng
+                    attacker.actor,
+                    attacker.offhand,
+                    Target(
+                        ac=_ac_for(defender, armor_idx),
+                        hp=defender.hp,
+                        cover=defender.cover,
+                        distance_ft=new_dist,
+                        conditions=defender.conditions,
+                    ),
+                    weapon_idx,
+                    base_mode="none",
+                    power=False,
+                    offhand=True,
+                    two_handed=False,
+                    has_fired_loading_weapon_this_turn=used_loading_this_turn,
+                    rng=rng,
                 )
                 if res["ok"]:
                     tag = "CRIT" if res["is_crit"] else ("HIT" if res["is_hit"] else "MISS")
                     log.append(f"  Off-hand {res['weapon']} => {tag}")
                     log.append(f"    damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
+                    for n in res["notes"]:
+                        log.append(f"    {n}")
                     dtype = w_off.damage_type
                     raw = int(res["damage"]["total"])
                     final, notes2, _ = apply_defenses(raw, dtype, defender)
@@ -178,6 +206,7 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 hp=defender.hp,
                 cover=defender.cover,
                 distance_ft=new_dist,
+                conditions=defender.conditions,
             ),
             weapon_idx,
             base_mode="none",
@@ -195,6 +224,8 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         log.append(
             f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}"
         )
+        for n in res["notes"]:
+            log.append(f"  {n}")
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
         dtype = w_main.damage_type
@@ -227,10 +258,22 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 log.append(f"{attacker.name} moves: {new_dist}ft -> {new_dist2}ft")
                 new_dist = new_dist2
         res = resolve_attack(
-            attacker.actor, attacker.weapon,
-            Target(ac=_ac_for(defender, armor_idx), hp=defender.hp, cover=defender.cover, distance_ft=new_dist),
-            weapon_idx, base_mode="none", power=False, offhand=False, two_handed=False,
-            has_fired_loading_weapon_this_turn=False, rng=rng
+            attacker.actor,
+            attacker.weapon,
+            Target(
+                ac=_ac_for(defender, armor_idx),
+                hp=defender.hp,
+                cover=defender.cover,
+                distance_ft=new_dist,
+                conditions=defender.conditions,
+            ),
+            weapon_idx,
+            base_mode="none",
+            power=False,
+            offhand=False,
+            two_handed=False,
+            has_fired_loading_weapon_this_turn=False,
+            rng=rng,
         )
         if not res["ok"]:
             log.append(f"{attacker.name} cannot attack: {res['reason']}")
@@ -238,6 +281,8 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         tag = "CRIT" if res["is_crit"] else ("HIT" if res["is_hit"] else "MISS")
         log.append(f"{attacker.name} shoots with {res['weapon']} @ {new_dist}ft => {tag}")
         log.append(f"  damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
+        for n in res["notes"]:
+            log.append(f"  {n}")
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
         dtype = w_main.damage_type

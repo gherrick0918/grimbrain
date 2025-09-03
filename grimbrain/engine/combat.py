@@ -397,6 +397,10 @@ def _effective_ac(ac: int, cover: Cover, has_sharp: bool) -> int:
     return ac + bump
 
 
+def _has(cond: str, cbt) -> bool:
+    return cond in getattr(cbt, "conditions", set())
+
+
 def resolve_attack(
     attacker,
     weapon_name: str,
@@ -464,6 +468,18 @@ def resolve_attack(
         mode = combine_modes(mode, "disadvantage")
         notes.append("in melee with ranged weapon (disadvantage)")
 
+    if _has("poisoned", attacker):
+        mode = combine_modes(mode, "disadvantage")
+        notes.append("poisoned (disadvantage)")
+
+    if _has("restrained", target):
+        mode = combine_modes(mode, "advantage")
+        notes.append("target restrained (advantage)")
+
+    if _has("restrained", attacker):
+        mode = combine_modes(mode, "disadvantage")
+        notes.append("restrained (disadvantage)")
+
     # Attack bonus and d20 roll
     ab = attack_bonus(attacker, w, power=power)
 
@@ -482,6 +498,10 @@ def resolve_attack(
         d = candidates[0]
 
     is_hit, is_crit = roll_outcome(d, ab, eff_ac)
+
+    if is_hit and w.name.lower() == "net":
+        getattr(target, "conditions", set()).add("restrained")
+        notes.append("net hit: target restrained (dc 10 str to escape)")
 
     # Ammo spend (only if we attempted a legal attack; spend regardless of hit)
     spent_ammo = False
