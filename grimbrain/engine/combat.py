@@ -384,6 +384,12 @@ def _out_of_range(w: Weapon, dist: Optional[int]) -> bool:
     return bool(L and dist > L)
 
 
+def _ranged_in_melee_disadvantage(w: Weapon, dist: Optional[int]) -> bool:
+    # Disadvantage when making a RANGED weapon attack within 5 ft of a hostile creature.
+    # Thrown melee (kind="melee" with "thrown") is NOT a ranged weapon, so it's excluded.
+    return w.kind == "ranged" and (dist is not None) and dist <= 5
+
+
 def _effective_ac(ac: int, cover: Cover, has_sharp: bool) -> int:
     if cover == "total":
         return 10**9
@@ -452,6 +458,11 @@ def resolve_attack(
             "notes": ["total cover"],
             "spent_ammo": False,
         }
+
+    # Close-quarters ranged attacks impose disadvantage
+    if _ranged_in_melee_disadvantage(w, dist):
+        mode = combine_modes(mode, "disadvantage")
+        notes.append("in melee with ranged weapon (disadvantage)")
 
     # Attack bonus and d20 roll
     ab = attack_bonus(attacker, w, power=power)
