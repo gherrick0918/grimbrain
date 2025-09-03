@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .types import Combatant, Target
 from .round import roll_initiative   # reuse your initiative helper
+from .death import roll_death_save, apply_damage_while_down
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
@@ -50,6 +51,15 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     Returns (log, new_distance_ft, defender_dropped)
     """
     log: List[str] = []
+    if attacker.hp <= 0 and not attacker.death.stable and not attacker.death.dead:
+        outcome = roll_death_save(attacker.death, rng)
+        log.append(f"{attacker.name} death save: {outcome}")
+        if attacker.death.dead:
+            log.append(f"{attacker.name} dies.")
+            return (log, distance_ft, False)
+        if attacker.death.stable:
+            log.append(f"{attacker.name} is stable at 0 HP (unconscious).")
+            return (log, distance_ft, False)
     speed = _speed(attacker)
     w_main = weapon_idx.get(attacker.weapon)
     reach = _reach_ft(w_main)
@@ -113,8 +123,11 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 performed_action = True
                 if w_main.has_prop("loading"):
                     used_loading_this_turn = True  # one shot per action
-                if defender.hp <= 0:
+                if defender.hp <= 0 and res["is_hit"]:
+                    apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
                     log.append(f"{defender.name} drops to 0 HP!")
+                    if defender.death.dead:
+                        log.append(f"{defender.name} dies.")
                     return (log, new_dist, True)
         # Optional off-hand if applicable and still alive/in reach
         if defender.hp > 0 and attacker.offhand:
@@ -131,8 +144,11 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                     log.append(f"  Off-hand {res['weapon']} => {tag}")
                     log.append(f"    damage {res['damage_string']}: rolls={res['damage']['rolls']} total={res['damage']['total']}")
                     defender.hp -= int(res["damage"]["total"])
-                    if defender.hp <= 0:
+                    if defender.hp <= 0 and res["is_hit"]:
+                        apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_off.kind == "melee"))
                         log.append(f"{defender.name} drops to 0 HP!")
+                        if defender.death.dead:
+                            log.append(f"{defender.name} dies.")
                         return (log, new_dist, True)
         return (log, new_dist, False)
 
@@ -171,8 +187,11 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
         defender.hp -= int(res["damage"]["total"])
-        if defender.hp <= 0:
+        if defender.hp <= 0 and res["is_hit"]:
+            apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")
+            if defender.death.dead:
+                log.append(f"{defender.name} dies.")
             return (log, new_dist, True)
         return (log, new_dist, False)
     else:
@@ -206,8 +225,11 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         if res["spent_ammo"]:
             log.append("  ammo: spent 1")
         defender.hp -= int(res["damage"]["total"])
-        if defender.hp <= 0:
+        if defender.hp <= 0 and res["is_hit"]:
+            apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")
+            if defender.death.dead:
+                log.append(f"{defender.name} dies.")
             return (log, new_dist, True)
         return (log, new_dist, False)
 
@@ -222,21 +244,21 @@ def run_scene(a: Combatant, b: Combatant, *, seed: int = 42, max_rounds: int = 2
     log: List[str] = [f"Initiative — {first.name} vs {second.name}: {init['A']} to {init['B']}", f"Start distance: {distance}ft"]
     round_no = 1
 
-    while a.hp > 0 and b.hp > 0 and round_no <= max_rounds:
+    while not a.death.dead and not b.death.dead and round_no <= max_rounds:
         log.append(f"— Round {round_no} —")
         # First acts
-        tlog, distance, down = _take_scene_turn(first, second, weapon_idx=widx, armor_idx=aidx, rng=rng, distance_ft=distance)
+        tlog, distance, _ = _take_scene_turn(first, second, weapon_idx=widx, armor_idx=aidx, rng=rng, distance_ft=distance)
         log.extend(tlog)
-        if down:
+        if second.death.dead:
             break
         # Second acts
-        tlog, distance, down = _take_scene_turn(second, first, weapon_idx=widx, armor_idx=aidx, rng=rng, distance_ft=distance)
+        tlog, distance, _ = _take_scene_turn(second, first, weapon_idx=widx, armor_idx=aidx, rng=rng, distance_ft=distance)
         log.extend(tlog)
-        if down:
+        if first.death.dead:
             break
         round_no += 1
 
-    winner = first.name if second.hp <= 0 else (second.name if first.hp <= 0 else "none")
+    winner = first.name if second.death.dead else (second.name if first.death.dead else "none")
     return SceneResult(winner=winner, rounds=round_no if winner != "none" else max_rounds, log=log,
                        final_distance_ft=distance, a_hp=a.hp, b_hp=b.hp)
 

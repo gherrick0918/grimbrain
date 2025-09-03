@@ -5,6 +5,7 @@ import random
 from pathlib import Path
 
 from .types import Combatant, Target, Cover
+from .death import roll_death_save, apply_damage_while_down
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
@@ -141,6 +142,17 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
     # Track per-turn loading usage
     used_loading = False
 
+    # Start-of-turn death save if attacker is down
+    if attacker.hp <= 0 and not attacker.death.stable and not attacker.death.dead:
+        outcome = roll_death_save(attacker.death, rng)
+        log.append(f"{attacker.name} death save: {outcome}")
+        if attacker.death.dead:
+            log.append(f"{attacker.name} dies.")
+            return log
+        if attacker.death.stable:
+            log.append(f"{attacker.name} is stable at 0 HP (unconscious).")
+            return log
+
     # Primary attack(s)
     swings = max(1, int(getattr(attacker.actor, "attacks_per_action", 1)))
     for i in range(swings):
@@ -156,8 +168,11 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
         log.extend([f"[Attack {i+1}/{swings}]"] + t1.log)
         defender.hp -= t1.damage
         used_loading = used_loading or t1.used_loading
-        if defender.hp <= 0:
+        if defender.hp <= 0 and t1.damage > 0:
+            apply_damage_while_down(defender.death, melee_within_5ft=True)
             log.append(f"{defender.name} drops to 0 HP!")
+            if defender.death.dead:
+                log.append(f"{defender.name} dies.")
             return log
 
     # Optional off-hand
@@ -172,8 +187,11 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
     log.extend(t2.log)
     defender.hp -= t2.damage
     used_loading = used_loading or t2.used_loading
-    if defender.hp <= 0:
+    if defender.hp <= 0 and t2.damage > 0:
+        apply_damage_while_down(defender.death, melee_within_5ft=True)
         log.append(f"{defender.name} drops to 0 HP!")
+        if defender.death.dead:
+            log.append(f"{defender.name} dies.")
     return log
 
 
@@ -186,15 +204,18 @@ def run_encounter(a: Combatant, b: Combatant, *, seed: int = 42, max_rounds: int
     log: List[str] = [f"Initiative — {first.name} vs {second.name}: {init['A']} to {init['B']}"]
     round_no = 1
 
-    while a.hp > 0 and b.hp > 0 and round_no <= max_rounds:
+    while not a.death.dead and not b.death.dead and round_no <= max_rounds:
         log.append(f"— Round {round_no} —")
         # First acts
         log.extend(take_turn(first, second, weapon_idx=widx, armor_idx=aidx, rng=rng))
-        if second.hp <= 0: break
+        if second.death.dead:
+            break
         # Second acts
         log.extend(take_turn(second, first, weapon_idx=widx, armor_idx=aidx, rng=rng))
+        if first.death.dead:
+            break
         round_no += 1
 
-    winner = first.name if second.hp <= 0 else (second.name if first.hp <= 0 else "none")
+    winner = first.name if second.death.dead else (second.name if first.death.dead else "none")
     return {"winner": winner, "rounds": round_no if winner != "none" else max_rounds, "log": log, "a_hp": a.hp, "b_hp": b.hp}
 
