@@ -28,6 +28,7 @@ class Combatant:
     actor: object     # your Character
     hp: int
     weapon: str
+    team: str = "A"     # e.g., "A", "B"
     # NEW: resting state
     max_hp: Optional[int] = None          # if None, treat as current hp at creation time
     hd_faces: int = 8                     # e.g., Fighter 10, Wizard 6
