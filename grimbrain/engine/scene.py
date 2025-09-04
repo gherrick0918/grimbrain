@@ -24,7 +24,12 @@ def _reach_ft(weapon) -> int:
 
 def _speed(cmb: Combatant) -> int:
     base = getattr(cmb.actor, "speed_ft", 30)
-    return 0 if "restrained" in cmb.conditions else base
+    return 0 if ("restrained" in cmb.conditions or "grappled" in cmb.conditions) else base
+
+
+def effective_speed(cmb: Combatant) -> int:
+    """Public helper to fetch a combatant's usable speed."""
+    return _speed(cmb)
 
 
 def _ac_for(defender: Combatant, armor_idx: ArmorIndex) -> int:

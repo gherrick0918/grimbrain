@@ -23,9 +23,97 @@ from ..rules.attacks import (
     has_feat,
 )
 from ..rules.attack_math import roll_outcome, combine_modes
-from .types import Target, Cover
+from .types import Combatant as GBCombatant, Target, Cover
 
 
+def _ability_check(c: GBCombatant, ability: str, *, rng: Optional[random.Random] = None, proficient: bool = False) -> Tuple[int, str]:
+    """d20 + ability modifier (+ proficiency if applicable)."""
+    rng = rng or random.Random()
+    die = rng.randint(1, 20)
+    mod = c.actor.ability_mod(ability.upper()) if hasattr(c, "actor") else 0
+    prof = c.actor.proficiency_bonus if proficient else 0
+    total = die + mod + prof
+    note = f"d20({die}) + {ability.upper()}({mod})" + (f" + PROF({c.actor.proficiency_bonus})" if prof else "")
+    return total, note
+
+
+def contested_check_grapple_or_shove(attacker: GBCombatant, defender: GBCombatant, *, rng: Optional[random.Random] = None) -> Tuple[bool, str]:
+    """Resolve contested Athletics vs Athletics/Acrobatics check."""
+    atk_total, atk_note = _ability_check(attacker, "STR", rng=rng, proficient=getattr(attacker, "proficient_athletics", False))
+    d_str, note_str = _ability_check(defender, "STR", rng=rng, proficient=getattr(defender, "proficient_athletics", False))
+    d_dex, note_dex = _ability_check(defender, "DEX", rng=rng, proficient=getattr(defender, "proficient_acrobatics", False))
+    if d_dex >= d_str:
+        d_tot, d_note, d_choice = d_dex, note_dex, "DEX(Acrobatics)"
+    else:
+        d_tot, d_note, d_choice = d_str, note_str, "STR(Athletics)"
+    log = (
+        f"Grapple/Shove contest: {attacker.name} [{atk_note}] = {atk_total} vs "
+        f"{defender.name} [{d_choice} {d_note}] = {d_tot}"
+    )
+    return atk_total > d_tot, log
+
+
+def grapple_action(attacker: GBCombatant, defender: GBCombatant, *, rng: Optional[random.Random] = None, notes: Optional[List[str]] = None) -> bool:
+    win, log = contested_check_grapple_or_shove(attacker, defender, rng=rng)
+    if notes is not None:
+        notes.append(log)
+    if win and "grappled" not in defender.conditions:
+        defender.conditions.add("grappled")
+        defender.grappled_by = attacker.name
+        if notes is not None:
+            notes.append(f"{attacker.name} grapples {defender.name}: speed set to 0.")
+        return True
+    if notes is not None:
+        notes.append("Grapple failed.")
+    return False
+
+
+def escape_grapple_action(defender: GBCombatant, all_combatants: Dict[str, GBCombatant], *, rng: Optional[random.Random] = None, notes: Optional[List[str]] = None) -> bool:
+    if "grappled" not in defender.conditions or not defender.grappled_by:
+        if notes is not None:
+            notes.append("Not grappled → no escape needed.")
+        return True
+    grappler = all_combatants.get(defender.grappled_by)
+    if grappler is None:
+        defender.clear_grapple()
+        if notes is not None:
+            notes.append("Grappler missing → cleared grapple.")
+        return True
+    win, log = contested_check_grapple_or_shove(defender, grappler, rng=rng)
+    if notes is not None:
+        notes.append(f"Escape contest: {log}")
+    if win:
+        defender.clear_grapple()
+        if notes is not None:
+            notes.append(f"{defender.name} escapes the grapple.")
+        return True
+    if notes is not None:
+        notes.append(f"{defender.name} fails to escape.")
+    return False
+
+
+def shove_action(attacker: GBCombatant, defender: GBCombatant, *, choice: str = "prone", rng: Optional[random.Random] = None,
+                 distance_ft: int = 5, reach_threshold: int = 5, notes: Optional[List[str]] = None, trigger_oa_fn=None) -> bool:
+    win, log = contested_check_grapple_or_shove(attacker, defender, rng=rng)
+    if notes is not None:
+        notes.append(log)
+    if not win:
+        if notes is not None:
+            notes.append("Shove failed.")
+        return False
+    if choice == "prone":
+        defender.conditions.add("prone")
+        if notes is not None:
+            notes.append(f"{attacker.name} shoves {defender.name} prone.")
+        return True
+    new_distance = distance_ft + 5
+    if notes is not None:
+        notes.append(f"{attacker.name} pushes {defender.name} 5 ft ({distance_ft}→{new_distance}).")
+    if distance_ft <= reach_threshold and new_distance > reach_threshold and callable(trigger_oa_fn):
+        if notes is not None:
+            notes.append("Push leaves reach → provoking OA.")
+        trigger_oa_fn(attacker, defender)
+    return True
 class Combatant:
     """Internal mutable combatant state."""
 
@@ -425,6 +513,7 @@ def resolve_attack(
     rng = rng or random.Random()
     w = weapon_index.get(weapon_name)
     notes: List[str] = []
+    reach = 10 if w.has_prop("reach") else 5
 
     # Loading gate
     if w.has_prop("loading") and has_fired_loading_weapon_this_turn:
@@ -467,6 +556,19 @@ def resolve_attack(
     if _ranged_in_melee_disadvantage(w, dist):
         mode = combine_modes(mode, "disadvantage")
         notes.append("in melee with ranged weapon (disadvantage)")
+
+    if _has("prone", target):
+        if w.kind == "melee" and dist is not None and dist <= reach:
+            mode = combine_modes(mode, "advantage")
+            notes.append("prone target (advantage)")
+        else:
+            mode = combine_modes(mode, "disadvantage")
+            notes.append("prone target (disadvantage)")
+
+    if _has("prone", attacker):
+        if not (w.kind == "melee" and dist is not None and dist <= reach):
+            mode = combine_modes(mode, "disadvantage")
+            notes.append("attacker prone (disadvantage)")
 
     if _has("poisoned", attacker):
         mode = combine_modes(mode, "disadvantage")
