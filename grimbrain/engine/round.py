@@ -7,12 +7,13 @@ from pathlib import Path
 from .types import Combatant, Target, Cover
 from .death import roll_death_save, apply_damage_while_down
 from .damage import apply_defenses
+from .concentration import check_concentration_on_damage, drop_concentration
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
 from ..rules.attacks import (
     attack_bonus, damage_die, damage_modifier, damage_string, power_feat_for,
-    can_two_weapon, has_style
+    can_two_weapon, has_style, has_feat
 )
 from ..rules.attack_math import hit_probabilities
 
@@ -180,6 +181,19 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
         )
         log.extend([f"[Attack {i+1}/{swings}]"] + t1.log)
         defender.hp -= t1.damage
+        if t1.damage > 0 and defender.concentration:
+            ok, dc = check_concentration_on_damage(
+                defender,
+                t1.damage,
+                rng=rng,
+                has_war_caster=has_feat(defender.actor, "War Caster"),
+            )
+            tag = "maintains" if ok else "drops"
+            log.append(f"  concentration {tag} (DC {dc})")
+        if defender.hp <= 0 and defender.concentration:
+            msg = drop_concentration(defender, "unconscious")
+            if msg:
+                log.append(f"  {msg}")
         used_loading = used_loading or t1.used_loading
         if defender.hp <= 0 and t1.damage > 0:
             apply_damage_while_down(defender.death, melee_within_5ft=True)
@@ -199,6 +213,19 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
     )
     log.extend(t2.log)
     defender.hp -= t2.damage
+    if t2.damage > 0 and defender.concentration:
+        ok, dc = check_concentration_on_damage(
+            defender,
+            t2.damage,
+            rng=rng,
+            has_war_caster=has_feat(defender.actor, "War Caster"),
+        )
+        tag = "maintains" if ok else "drops"
+        log.append(f"    concentration {tag} (DC {dc})")
+    if defender.hp <= 0 and defender.concentration:
+        msg = drop_concentration(defender, "unconscious")
+        if msg:
+            log.append(f"    {msg}")
     used_loading = used_loading or t2.used_loading
     if defender.hp <= 0 and t2.damage > 0:
         apply_damage_while_down(defender.death, melee_within_5ft=True)
