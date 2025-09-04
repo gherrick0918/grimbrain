@@ -45,6 +45,7 @@ class Combatant:
     consumables: Dict[str, int] = field(default_factory=dict)  # e.g., {"Potion of Healing": 2}
     death: DeathState = field(default_factory=DeathState)  # per-combat state
     concentration: Optional[str] = None  # name/label of the effect or spell
+    attacks_per_action: int = 1  # <-- Add this line
 
     def __post_init__(self) -> None:
         if self.max_hp is None:

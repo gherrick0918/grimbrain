@@ -24,6 +24,29 @@ class Character:
     equipped_shield: bool = False
     ammo: Dict[str, int] = field(default_factory=dict)
 
+    def __init__(
+        self,
+        str_score,
+        dex_score,
+        proficiency_bonus,
+        fighting_styles,
+        feats,
+        proficiencies,
+        speed_ft,
+        ammo,
+        attacks=1,
+        **kwargs
+    ):
+        self.str_score = str_score
+        self.dex_score = dex_score
+        self.proficiency_bonus = proficiency_bonus
+        self.fighting_styles = fighting_styles
+        self.feats = feats
+        self.proficiencies = proficiencies
+        self.speed_ft = speed_ft
+        self.ammo = ammo
+        self.attacks_per_action = attacks  # Store attacks per action
+
     def ability_mod(self, key: str) -> int:
         score = {
             "STR": self.str_score,
