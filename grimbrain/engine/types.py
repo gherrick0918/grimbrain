@@ -28,13 +28,22 @@ class Combatant:
     actor: object     # your Character
     hp: int
     weapon: str
+    # NEW: resting state
+    max_hp: Optional[int] = None          # if None, treat as current hp at creation time
+    hd_faces: int = 8                     # e.g., Fighter 10, Wizard 6
+    hd_total: int = 1
+    hd_remaining: int = 1
     # Optional extras
     offhand: Optional[str] = None
     distance_ft: Optional[int] = None
     cover: Cover = "none"
-    death: DeathState = field(default_factory=DeathState)  # per-combat state
+    conditions: Set[str] = field(default_factory=set)
     resist: Set[str] = field(default_factory=set)
     vulnerable: Set[str] = field(default_factory=set)
     immune: Set[str] = field(default_factory=set)
     temp_hp: int = 0
-    conditions: Set[str] = field(default_factory=set)
+    death: DeathState = field(default_factory=DeathState)  # per-combat state
+
+    def __post_init__(self) -> None:
+        if self.max_hp is None:
+            self.max_hp = self.hp
