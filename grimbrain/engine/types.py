@@ -48,7 +48,14 @@ class Combatant:
     concentration: Optional[str] = None  # name/label of the effect or spell
     attacks_per_action: int = 1  # <-- Add this line
     reaction_available: bool = True  # reset at start of each round
+    grappled_by: Optional[str] = None
+    proficient_athletics: bool = False
+    proficient_acrobatics: bool = False
 
     def __post_init__(self) -> None:
         if self.max_hp is None:
             self.max_hp = self.hp
+
+    def clear_grapple(self) -> None:
+        self.conditions.discard("grappled")
+        self.grappled_by = None
