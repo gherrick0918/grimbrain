@@ -8,10 +8,11 @@ from .types import Combatant, Target
 from .round import roll_initiative   # reuse your initiative helper
 from .death import roll_death_save, apply_damage_while_down
 from .damage import apply_defenses
+from .concentration import check_concentration_on_damage, drop_concentration
 from ..codex.weapons import WeaponIndex
 from ..codex.armor import ArmorIndex
 from ..rules.defense import compute_ac
-from ..rules.attacks import can_two_weapon
+from ..rules.attacks import can_two_weapon, has_feat
 from .combat import resolve_attack
 from .saves import roll_save
 
@@ -140,6 +141,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                 for n in notes2:
                     log.append(f"  {n}")
                 defender.hp -= final
+                if final > 0 and defender.concentration:
+                    ok, dc = check_concentration_on_damage(
+                        defender,
+                        final,
+                        rng=rng,
+                        has_war_caster=has_feat(defender.actor, "War Caster"),
+                    )
+                    tag = "maintains" if ok else "drops"
+                    log.append(f"  concentration {tag} (DC {dc})")
+                if defender.hp <= 0 and defender.concentration:
+                    msg = drop_concentration(defender, "unconscious")
+                    if msg:
+                        log.append(f"  {msg}")
                 performed_action = True
                 if w_main.has_prop("loading"):
                     used_loading_this_turn = True  # one shot per action
@@ -183,6 +197,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
                     for n in notes2:
                         log.append(f"    {n}")
                     defender.hp -= final
+                    if final > 0 and defender.concentration:
+                        ok, dc = check_concentration_on_damage(
+                            defender,
+                            final,
+                            rng=rng,
+                            has_war_caster=has_feat(defender.actor, "War Caster"),
+                        )
+                        tag = "maintains" if ok else "drops"
+                        log.append(f"    concentration {tag} (DC {dc})")
+                    if defender.hp <= 0 and defender.concentration:
+                        msg = drop_concentration(defender, "unconscious")
+                        if msg:
+                            log.append(f"    {msg}")
                     if defender.hp <= 0 and res["is_hit"]:
                         apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_off.kind == "melee"))
                         log.append(f"{defender.name} drops to 0 HP!")
@@ -234,6 +261,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         for n in notes2:
             log.append(f"  {n}")
         defender.hp -= final
+        if final > 0 and defender.concentration:
+            ok, dc = check_concentration_on_damage(
+                defender,
+                final,
+                rng=rng,
+                has_war_caster=has_feat(defender.actor, "War Caster"),
+            )
+            tag = "maintains" if ok else "drops"
+            log.append(f"  concentration {tag} (DC {dc})")
+        if defender.hp <= 0 and defender.concentration:
+            msg = drop_concentration(defender, "unconscious")
+            if msg:
+                log.append(f"  {msg}")
         if defender.hp <= 0 and res["is_hit"]:
             apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")
@@ -291,6 +331,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
         for n in notes2:
             log.append(f"  {n}")
         defender.hp -= final
+        if final > 0 and defender.concentration:
+            ok, dc = check_concentration_on_damage(
+                defender,
+                final,
+                rng=rng,
+                has_war_caster=has_feat(defender.actor, "War Caster"),
+            )
+            tag = "maintains" if ok else "drops"
+            log.append(f"  concentration {tag} (DC {dc})")
+        if defender.hp <= 0 and defender.concentration:
+            msg = drop_concentration(defender, "unconscious")
+            if msg:
+                log.append(f"  {msg}")
         if defender.hp <= 0 and res["is_hit"]:
             apply_damage_while_down(defender.death, melee_within_5ft=(new_dist <= 5 and w_main.kind == "melee"))
             log.append(f"{defender.name} drops to 0 HP!")

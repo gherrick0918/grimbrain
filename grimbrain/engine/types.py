@@ -43,6 +43,7 @@ class Combatant:
     immune: Set[str] = field(default_factory=set)
     temp_hp: int = 0
     death: DeathState = field(default_factory=DeathState)  # per-combat state
+    concentration: Optional[str] = None  # name/label of the effect or spell
 
     def __post_init__(self) -> None:
         if self.max_hp is None:
