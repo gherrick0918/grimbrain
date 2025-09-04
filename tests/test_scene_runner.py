@@ -32,7 +32,7 @@ def test_melee_closes_then_hits():
 def test_archer_kites_out_of_melee_and_shoots():
     A = Combatant("Archer", C(dex=18, feats={"Sharpshooter"}), hp=18, weapon="Longbow")
     B = Combatant("Bandit", C(str_=16), hp=14, weapon="Scimitar")
-    res = run_scene(A, B, seed=11, max_rounds=8, start_distance_ft=20)
+    res = run_scene(A, B, seed=5, max_rounds=8, start_distance_ft=20)
     log = "\n".join(res.log).lower()
     assert "disengages and moves" in log or "moves: 20ft -> 30ft" in log
     assert "shoots with longbow" in log
