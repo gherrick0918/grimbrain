@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Literal, Set
+from typing import Optional, Literal, Set, Dict
 
 Cover = Literal["none", "half", "three-quarters", "total"]
 
@@ -42,6 +42,7 @@ class Combatant:
     vulnerable: Set[str] = field(default_factory=set)
     immune: Set[str] = field(default_factory=set)
     temp_hp: int = 0
+    consumables: Dict[str, int] = field(default_factory=dict)  # e.g., {"Potion of Healing": 2}
     death: DeathState = field(default_factory=DeathState)  # per-combat state
     concentration: Optional[str] = None  # name/label of the effect or spell
 

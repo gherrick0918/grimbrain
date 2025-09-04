@@ -15,6 +15,7 @@ from ..rules.defense import compute_ac
 from ..rules.attacks import can_two_weapon, has_feat
 from .combat import resolve_attack
 from .saves import roll_save
+from .consumables import drink_potion_of_healing
 
 
 def _reach_ft(weapon) -> int:
@@ -76,6 +77,19 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     w_main = weapon_idx.get(attacker.weapon)
     reach = _reach_ft(w_main)
     is_ranged = w_main.kind == "ranged" and not w_main.has_prop("thrown")
+
+    # Emergency heal: if hurt and we have a potion, drink instead of attacking.
+    MAX = getattr(attacker, "max_hp", None) or attacker.hp
+    threshold = int(MAX * 0.35)
+    if attacker.consumables.get("Potion of Healing", 0) > 0 and attacker.hp > 0 and attacker.hp <= threshold:
+        out = drink_potion_of_healing(attacker, rng=rng)
+        if out["ok"]:
+            log.append(f"{attacker.name} drinks a Potion of Healing (2d4+2): rolls={out['rolls']} total={out['total']} → healed {out['healed']} (left {out['remaining']})")
+            # using the Action ends the turn
+            return (log, distance_ft, False)
+        else:
+            log.append(f"{attacker.name} tries to drink a potion but can't: {out['reason']}")
+            return (log, distance_ft, False)
 
     # Decide movement
     new_dist = distance_ft
