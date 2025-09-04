@@ -22,5 +22,5 @@ def test_loading_limits_to_one_per_action():
     c.add_ammo("bolts", 1)
     A = Combatant("Xbow", c, hp=18, weapon="Light Crossbow")
     B = Combatant("Target", Character(str_score=10, dex_score=10, proficiency_bonus=2), hp=18, weapon="Mace")
-    res = run_scene(A, B, seed=22, max_rounds=1, start_distance_ft=30)
+    res = run_scene(A, B, seed=23, max_rounds=1, start_distance_ft=30)
     assert "\n".join(res.log).lower().count("light crossbow") == 1

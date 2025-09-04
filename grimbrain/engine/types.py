@@ -46,6 +46,7 @@ class Combatant:
     death: DeathState = field(default_factory=DeathState)  # per-combat state
     concentration: Optional[str] = None  # name/label of the effect or spell
     attacks_per_action: int = 1  # <-- Add this line
+    reaction_available: bool = True  # reset at start of each round
 
     def __post_init__(self) -> None:
         if self.max_hp is None:

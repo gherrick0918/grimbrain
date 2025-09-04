@@ -26,26 +26,28 @@ class Character:
 
     def __init__(
         self,
-        str_score,
-        dex_score,
-        proficiency_bonus,
-        fighting_styles,
-        feats,
-        proficiencies,
-        speed_ft,
-        ammo,
-        attacks=1,
-        **kwargs
-    ):
+        str_score: int = 10,
+        dex_score: int = 10,
+        proficiency_bonus: int = 2,
+        fighting_styles: Optional[Set[str]] = None,
+        feats: Optional[Set[str]] = None,
+        proficiencies: Optional[Set[str]] = None,
+        speed_ft: int = 30,
+        ammo: Optional[Dict[str, int]] = None,
+        attacks: int = 1,
+        **kwargs,
+    ) -> None:
         self.str_score = str_score
         self.dex_score = dex_score
         self.proficiency_bonus = proficiency_bonus
-        self.fighting_styles = fighting_styles
-        self.feats = feats
-        self.proficiencies = proficiencies
+        self.fighting_styles = fighting_styles or set()
+        self.feats = feats or set()
+        self.proficiencies = proficiencies or set()
         self.speed_ft = speed_ft
-        self.ammo = ammo
+        self.ammo = ammo or {}
         self.attacks_per_action = attacks  # Store attacks per action
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def ability_mod(self, key: str) -> int:
         score = {
