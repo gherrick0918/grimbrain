@@ -51,11 +51,40 @@ class Combatant:
     grappled_by: Optional[str] = None
     proficient_athletics: bool = False
     proficient_acrobatics: bool = False
+    # --- PR40 short-lived tactical state ---
+    dodging: bool = False
+    help_tokens: Dict[str, int] = field(default_factory=dict)  # target_id -> remaining uses
+    readied_action: Optional["Readied"] = None
+    id: Optional[str] = None  # simple identifier for mapping help/ready triggers
 
     def __post_init__(self) -> None:
         if self.max_hp is None:
             self.max_hp = self.hp
+        if self.id is None:
+            # default identifier: use name
+            self.id = self.name
 
     def clear_grapple(self) -> None:
         self.conditions.discard("grappled")
         self.grappled_by = None
+
+    # --- PR40 helpers ---
+    def consume_help_token(self, target_id: str) -> bool:
+        """Decrement and remove a help token against ``target_id`` if present."""
+        n = self.help_tokens.get(target_id, 0)
+        if n > 0:
+            new_n = n - 1
+            if new_n > 0:
+                self.help_tokens[target_id] = new_n
+            else:
+                self.help_tokens.pop(target_id, None)
+            return True
+        return False
+
+
+@dataclass
+class Readied:
+    """Simplified readied attack descriptor."""
+    trigger: str  # e.g. "enemy_enters_melee" | "enemy_within_30ft"
+    target_id: str
+    weapon_name: Optional[str] = None
