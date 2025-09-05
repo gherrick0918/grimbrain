@@ -10,6 +10,9 @@ import io
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+from grimbrain.engine.progression import award_xp, maybe_level_up
+from grimbrain.engine.loot import roll_loot
+from grimbrain.engine.shop import run_shop
 import subprocess
 
 from grimbrain.effects import EffectEngine
@@ -50,28 +53,35 @@ def _suggest(name: str, options: Iterable[str]) -> List[str]:
     return difflib.get_close_matches(name.lower(), [o.lower() for o in options], n=3, cutoff=0.6)
 
 
-def _load_party(path: Path) -> List[Dict[str, object]]:
+def _load_party(path: Path) -> tuple[List[Dict[str, object]], int, Dict[str, int]]:
     try:
         data = json.loads(path.read_text())
     except Exception:
-        return []
+        return [], 0, {}
     party = data.get("party") or []
+    gold = int(data.get("gold", 0))
+    inv = dict(data.get("inventory", {}))
     res: List[Dict[str, object]] = []
     for pc in party:
         if not isinstance(pc, dict):
             continue
         pc = dict(pc)
         pc.setdefault("name", "hero")
+        pc.setdefault("id", pc.get("name"))
+        pc.setdefault("level", 1)
+        pc.setdefault("xp", 0)
         pc.setdefault("hp", 1)
         pc.setdefault("ac", 10)
         pc.setdefault("max_hp", pc.get("hp", 1))
         pc.setdefault("mods", {})
         pc.setdefault("skills", [])
-        pc.setdefault("prof", pc.get("prof_bonus", pc.get("prof", 0)))
+        pc.setdefault("pb", pc.get("prof_bonus", pc.get("prof", 2)))
+        pc["prof"] = pc.get("pb", 2)
+        pc.setdefault("con_mod", 0)
         pc.setdefault("side", "party")
         pc.setdefault("tags", set())
         res.append(pc)
-    return res
+    return res, gold, inv
 
 
 def _parse_encounter(spec: str) -> List[str]:
@@ -103,6 +113,16 @@ def _monster_indexes(manifest: Dict[str, dict]) -> tuple[Dict[str, dict], Dict[s
     return id_map, alias_map
 
 
+def _save_party(path: Path, party: List[Dict[str, object]], gold: int, inventory: Dict[str, int]) -> None:
+    out_party: List[Dict[str, object]] = []
+    for pc in party:
+        d = dict(pc)
+        if isinstance(d.get("tags"), set):
+            d["tags"] = sorted(d["tags"])
+        out_party.append(d)
+    Path(path).write_text(json.dumps({"party": out_party, "gold": gold, "inventory": inventory}, indent=2))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="play", description="Run a simple encounter")
     parser.add_argument("--pc", required=True, help="Path to PC JSON")
@@ -117,6 +137,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--summary-only", action="store_true", help="Emit only the final summary event")
     parser.add_argument("--quiet", action="store_true", help="Suppress step logs")
+    parser.add_argument("--shop", action="store_true", help="Enter shop instead of combat")
     args = parser.parse_args(argv)
     if args.summary_only:
         args.quiet = True
@@ -149,7 +170,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     manifest = json.loads((chroma_dir / "manifest.json").read_text()) if (chroma_dir / "manifest.json").exists() else {}
     mon_id_map, mon_alias = _monster_indexes(manifest)
 
-    party = _load_party(Path(args.pc))
+    party, gold, inventory = _load_party(Path(args.pc))
     monsters: List[Dict[str, object]] = []
     for name in _parse_encounter(args.encounter):
         key = mon_alias.get(name.lower()) or mon_alias.get(canonicalize_id("monster", name))
@@ -177,6 +198,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     name_map = {c["name"].lower(): c for c in combatants}
 
     rng = random.Random(args.seed)
+
+    if args.shop:
+        notes: List[str] = []
+        state = {"gold": gold, "inventory": inventory}
+        run_shop(state, notes, rng, args.script)
+        gold = state["gold"]
+        inventory = state["inventory"]
+        if args.json:
+            print(json.dumps({"event": "shop", "gold": gold, "inventory": inventory}))
+        else:
+            if not args.quiet:
+                for n in notes:
+                    log(n)
+        _save_party(Path(args.pc), party, gold, inventory)
+        return 0
+
     resolver = RuleResolver()
     msg = resolver.warm()
     if msg:
@@ -324,6 +361,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     alive = [c["name"] for c in combatants if c.get("hp", 0) > 0 and not c.get("dead")]
     dead = [c["name"] for c in combatants if c.get("dead")]
     stable = [c["name"] for c in combatants if c.get("stable")]
+
+    notes: List[str] = []
+    enemy_names = [m["name"] for m in monsters]
+    xp_gain = award_xp(enemy_names, party, notes)
+    leveled: List[str] = []
+    for pc in party:
+        if maybe_level_up(pc, rng, notes):
+            leveled.append(pc.get("id") or pc.get("name"))
+    loot = roll_loot(enemy_names, rng, notes)
+    gold += loot.pop("gold", 0)
+    for k, v in loot.items():
+        inventory[k] = inventory.get(k, 0) + v
+    _save_party(Path(args.pc), party, gold, inventory)
+
     summary = f"Summary: rounds={rounds}; alive={alive}; dead={dead}; stable={stable}"
     if args.json:
         if not args.quiet:
@@ -334,9 +385,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             "alive": alive,
             "dead": dead,
             "stable": stable,
+            "xp_gain": xp_gain,
+            "leveled": leveled,
+            "loot": {"gold": gold, **inventory},
         }))
     else:
         log(summary)
+        if not args.quiet:
+            for n in notes:
+                log(n)
     return 0
 
 
