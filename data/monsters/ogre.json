@@ -1,0 +1,19 @@
+{
+  "name": "Ogre",
+  "ac": 11,
+  "hp": 59,
+  "str_mod": 4,
+  "dex_mod": -1,
+  "con_mod": 3,
+  "int_mod": -2,
+  "wis_mod": -1,
+  "cha_mod": -2,
+  "proficiency_bonus": 2,
+  "speed": 40,
+  "reach": 5,
+  "ranged": false,
+  "proficient_athletics": true,
+  "proficient_acrobatics": false,
+  "weapon_primary": "Greatclub",
+  "weapon_offhand": null
+}

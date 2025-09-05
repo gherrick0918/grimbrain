@@ -1,0 +1,19 @@
+{
+  "name": "Wolf",
+  "ac": 13,
+  "hp": 11,
+  "str_mod": 1,
+  "dex_mod": 2,
+  "con_mod": 1,
+  "int_mod": -4,
+  "wis_mod": 1,
+  "cha_mod": -2,
+  "proficiency_bonus": 2,
+  "speed": 40,
+  "reach": 5,
+  "ranged": false,
+  "proficient_athletics": true,
+  "proficient_acrobatics": true,
+  "weapon_primary": "Dagger",
+  "weapon_offhand": null
+}

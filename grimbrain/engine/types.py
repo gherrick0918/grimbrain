@@ -29,6 +29,17 @@ class Combatant:
     hp: int
     weapon: str
     team: str = "A"     # e.g., "A", "B"
+    ac: int = 10
+    str_mod: int = 0
+    dex_mod: int = 0
+    con_mod: int = 0
+    int_mod: int = 0
+    wis_mod: int = 0
+    cha_mod: int = 0
+    proficiency_bonus: int = 2
+    reach: int = 5
+    speed: int = 30
+    ranged: bool = False
     # NEW: resting state
     max_hp: Optional[int] = None          # if None, treat as current hp at creation time
     hd_faces: int = 8                     # e.g., Fighter 10, Wizard 6

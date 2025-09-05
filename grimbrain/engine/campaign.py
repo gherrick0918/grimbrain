@@ -50,7 +50,7 @@ class Campaign:
     seed: Optional[int] = None
 
 
-def load_campaign(path: str | Path) -> Campaign:
+def load_yaml_campaign(path: str | Path) -> Campaign:
     p = Path(path)
     if p.is_dir():
         data = yaml.safe_load((p / "campaign.yaml").read_text())
@@ -97,7 +97,7 @@ def load_party(camp: Campaign, base: Path) -> List[PC]:
     return pcs
 
 
-def run_encounter(
+def run_campaign_encounter(
     pcs: List[PC],
     enemy_name: str,
     seed: int | None = None,
@@ -115,3 +115,107 @@ def run_encounter(
     hp = {c["name"]: c["hp"] for c in res["state"]["party"]}
     summary = f"{outcome} in {res['rounds']} rounds"
     return {"result": outcome, "summary": summary, "hp": hp}
+
+
+# --- Lightweight campaign state utilities (PR41) ---
+from dataclasses import asdict
+
+
+@dataclass
+class PartyMemberRef:
+    id: str
+    name: str
+    str_mod: int
+    dex_mod: int
+    con_mod: int
+    int_mod: int
+    wis_mod: int
+    cha_mod: int
+    ac: int
+    max_hp: int
+    pb: int
+    speed: int
+    reach: int = 5
+    ranged: bool = False
+    prof_athletics: bool = False
+    prof_acrobatics: bool = False
+    weapon_primary: Optional[str] = None
+    weapon_offhand: Optional[str] = None
+
+
+@dataclass
+class QuestLogItem:
+    id: str
+    text: str
+    done: bool = False
+
+
+@dataclass
+class CampaignState:
+    seed: int
+    day: int = 1
+    time_of_day: str = "morning"
+    location: str = "Wilderness"
+    gold: int = 0
+    inventory: Dict[str, int] = field(default_factory=dict)
+    party: List[PartyMemberRef] = field(default_factory=list)
+    current_hp: Dict[str, int] = field(default_factory=dict)
+    quest_log: List[QuestLogItem] = field(default_factory=list)
+    last_long_rest_day: int = 0
+
+
+def load_campaign(path: str) -> CampaignState:
+    with open(path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    party = [PartyMemberRef(**p) for p in raw.get("party", [])]
+    quests = [QuestLogItem(**q) for q in raw.get("quest_log", [])]
+    st = CampaignState(
+        seed=raw["seed"],
+        day=raw.get("day", 1),
+        time_of_day=raw.get("time_of_day", "morning"),
+        location=raw.get("location", "Wilderness"),
+        gold=raw.get("gold", 0),
+        inventory=raw.get("inventory", {}),
+        party=party,
+        current_hp=raw.get("current_hp", {}),
+        quest_log=quests,
+        last_long_rest_day=raw.get("last_long_rest_day", 0),
+    )
+    if not st.current_hp:
+        for p in st.party:
+            st.current_hp[p.id] = p.max_hp
+    return st
+
+
+def save_campaign(state: CampaignState, path: str) -> None:
+    blob = asdict(state)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(blob, f, indent=2)
+
+
+def advance_time(state: CampaignState, hours: int = 4) -> None:
+    order = ["morning", "afternoon", "evening", "night"]
+    idx = order.index(state.time_of_day)
+    steps = max(1, hours // 4)
+    idx2 = (idx + steps) % 4
+    if idx == 3 and idx2 == 0:
+        state.day += 1
+    state.time_of_day = order[idx2]
+
+
+def party_to_combatants(state: CampaignState) -> Dict[str, Combatant]:
+    from .util import make_combatant_from_party_member
+
+    res: Dict[str, Combatant] = {}
+    for p in state.party:
+        c = make_combatant_from_party_member(p, team="A", cid=p.id)
+        c.hp = state.current_hp.get(p.id, p.max_hp)
+        c.max_hp = p.max_hp
+        res[p.id] = c
+    return res
+
+
+def apply_combat_results(state: CampaignState, roster: Dict[str, Combatant]) -> None:
+    for cid, cmb in roster.items():
+        state.current_hp[cid] = max(0, cmb.hp)
+

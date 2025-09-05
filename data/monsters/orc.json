@@ -1,0 +1,19 @@
+{
+  "name": "Orc",
+  "ac": 13,
+  "hp": 15,
+  "str_mod": 3,
+  "dex_mod": 0,
+  "con_mod": 3,
+  "int_mod": -2,
+  "wis_mod": 0,
+  "cha_mod": 0,
+  "proficiency_bonus": 2,
+  "speed": 30,
+  "reach": 5,
+  "ranged": false,
+  "proficient_athletics": true,
+  "proficient_acrobatics": false,
+  "weapon_primary": "Greataxe",
+  "weapon_offhand": null
+}
