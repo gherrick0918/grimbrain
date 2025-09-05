@@ -235,6 +235,15 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
     return log
 
 
+# --- PR40 start-turn cleanup -----------------------------------------------
+
+def start_turn(state, actor: Combatant, rng: random.Random, notes: List[str]) -> None:
+    """Clear short-lived tactical flags at the beginning of ``actor``'s turn."""
+    actor.dodging = False
+    actor.help_tokens.clear()
+    actor.readied_action = None
+
+
 # ---------- encounter ----------
 def run_encounter(a: Combatant, b: Combatant, *, seed: int = 42, max_rounds: int = 20) -> Dict[str, object]:
     rng = random.Random(seed)

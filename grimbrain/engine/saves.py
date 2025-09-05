@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Literal, Tuple
 import random
 
+from ..rules.attack_math import combine_modes
+from .types import Combatant
+
 Ability = Literal["STR", "DEX", "CON", "INT", "WIS", "CHA"]
 
 
@@ -25,9 +28,14 @@ def roll_save(
     *,
     mode: Literal["none", "advantage", "disadvantage"] = "none",
     rng: random.Random | None = None,
+    combatant: Combatant | None = None,
 ) -> Tuple[bool, int, tuple[int, int]]:
     rng = rng or random.Random()
     d1, d2 = rng.randint(1, 20), rng.randint(1, 20)
+    # PR40: Dodge grants advantage on DEX saves
+    if ability == "DEX" and combatant is not None and combatant.dodging:
+        mode = combine_modes(mode, "advantage")
+
     if mode == "advantage":
         d = max(d1, d2)
     elif mode == "disadvantage":

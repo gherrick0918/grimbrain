@@ -23,7 +23,7 @@ from ..rules.attacks import (
     has_feat,
 )
 from ..rules.attack_math import roll_outcome, combine_modes
-from .types import Combatant as GBCombatant, Target, Cover
+from .types import Combatant as GBCombatant, Target, Cover, Readied
 
 
 def _ability_check(c: GBCombatant, ability: str, *, rng: Optional[random.Random] = None, proficient: bool = False) -> Tuple[int, str]:
@@ -114,6 +114,34 @@ def shove_action(attacker: GBCombatant, defender: GBCombatant, *, choice: str = 
             notes.append("Push leaves reach → provoking OA.")
         trigger_oa_fn(attacker, defender)
     return True
+
+
+# ---- PR40 core actions -----------------------------------------------------
+
+def take_dodge_action(actor: GBCombatant, *, notes: Optional[List[str]] = None) -> None:
+    """Set the dodging flag on ``actor``."""
+    actor.dodging = True
+    if notes is not None:
+        notes.append(f"{actor.name} takes the Dodge action.")
+
+
+def take_help_action(helper: GBCombatant, ally: GBCombatant, target: GBCombatant,
+                      *, notes: Optional[List[str]] = None) -> None:
+    """Grant ``ally`` one advantaged attack against ``target``."""
+    ally.help_tokens[target.id] = ally.help_tokens.get(target.id, 0) + 1
+    if notes is not None:
+        notes.append(
+            f"{helper.name} helps {ally.name} against {target.name} (next attack advantage)."
+        )
+
+
+def take_ready_action(actor: GBCombatant, trigger: str, target_id: str,
+                      weapon_name: Optional[str] = None, *, notes: Optional[List[str]] = None) -> None:
+    actor.readied_action = Readied(trigger=trigger, target_id=target_id, weapon_name=weapon_name)
+    if notes is not None:
+        notes.append(
+            f"{actor.name} readies an attack: trigger={trigger} vs target={target_id}."
+        )
 class Combatant:
     """Internal mutable combatant state."""
 
@@ -502,6 +530,8 @@ def resolve_attack(
     has_fired_loading_weapon_this_turn: bool = False,
     rng: Optional[random.Random] = None,
     forced_d20: Tuple[int, int] | None = None,  # (d1, d2) for tests
+    attacker_state: GBCombatant | None = None,
+    defender_state: GBCombatant | None = None,
 ) -> Dict[str, Any]:
     """Resolve a single weapon attack.
 
@@ -515,6 +545,16 @@ def resolve_attack(
     notes: List[str] = []
     reach = 10 if w.has_prop("reach") else 5
 
+    # --- PR40: short-lived tactical modifiers ---
+    mode = base_mode
+    if attacker_state is not None and defender_state is not None:
+        if attacker_state.help_tokens.get(defender_state.id, 0) > 0:
+            mode = combine_modes(mode, "advantage")
+            notes.append("helped attack")
+        if defender_state.dodging:
+            mode = combine_modes(mode, "disadvantage")
+            notes.append("defender dodging")
+
     # Loading gate
     if w.has_prop("loading") and has_fired_loading_weapon_this_turn:
         return {
@@ -525,7 +565,6 @@ def resolve_attack(
         }
 
     # Range/cover adjustments
-    mode = base_mode
     has_ss = has_feat(attacker, "Sharpshooter")
     dist = target.distance_ft
     if _out_of_range(w, dist):
@@ -630,6 +669,9 @@ def resolve_attack(
         if is_hit
         else {"rolls": [], "sum_dice": 0, "mod": 0, "total": 0}
     )
+    # consume help token if present
+    if attacker_state is not None and defender_state is not None:
+        attacker_state.consume_help_token(defender_state.id)
 
     return {
         "ok": True,
@@ -648,4 +690,5 @@ def resolve_attack(
         "spent_ammo": spent_ammo,
         "notes": notes,
     }
+
 
