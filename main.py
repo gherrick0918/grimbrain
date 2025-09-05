@@ -686,9 +686,9 @@ def run_campaign_cli(
 
     from grimbrain.engine import checks  # local import to avoid heavy deps
     from grimbrain.engine.campaign import (
-        load_campaign as _load_campaign,
+        load_yaml_campaign as _load_campaign,
         load_party as _load_party,
-        run_encounter,
+        run_campaign_encounter as run_encounter,
     )
     from grimbrain.content.select import select_monster as _select_monster
 

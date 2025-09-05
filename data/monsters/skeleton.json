@@ -1,0 +1,19 @@
+{
+  "name": "Skeleton",
+  "ac": 13,
+  "hp": 13,
+  "str_mod": 0,
+  "dex_mod": 2,
+  "con_mod": 0,
+  "int_mod": -2,
+  "wis_mod": 0,
+  "cha_mod": -2,
+  "proficiency_bonus": 2,
+  "speed": 30,
+  "reach": 5,
+  "ranged": true,
+  "proficient_athletics": false,
+  "proficient_acrobatics": false,
+  "weapon_primary": "Shortsword",
+  "weapon_offhand": "Shortbow"
+}

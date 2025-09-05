@@ -1,0 +1,19 @@
+{
+  "name": "Goblin",
+  "ac": 15,
+  "hp": 7,
+  "str_mod": -1,
+  "dex_mod": 2,
+  "con_mod": 0,
+  "int_mod": 0,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "proficiency_bonus": 2,
+  "speed": 30,
+  "reach": 5,
+  "ranged": true,
+  "proficient_athletics": false,
+  "proficient_acrobatics": true,
+  "weapon_primary": "Scimitar",
+  "weapon_offhand": null
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Bandit",
+  "ac": 12,
+  "hp": 11,
+  "str_mod": 0,
+  "dex_mod": 1,
+  "con_mod": 0,
+  "int_mod": 0,
+  "wis_mod": 0,
+  "cha_mod": 0,
+  "proficiency_bonus": 2,
+  "speed": 30,
+  "reach": 5,
+  "ranged": true,
+  "proficient_athletics": false,
+  "proficient_acrobatics": false,
+  "weapon_primary": "Scimitar",
+  "weapon_offhand": null
+}
