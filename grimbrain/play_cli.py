@@ -79,7 +79,11 @@ def _load_party(path: Path) -> tuple[List[Dict[str, object]], int, Dict[str, int
         pc["prof"] = pc.get("pb", 2)
         pc.setdefault("con_mod", 0)
         pc.setdefault("side", "party")
-        pc.setdefault("tags", set())
+        tags = pc.get("tags")
+        if isinstance(tags, list):
+            pc["tags"] = set(tags)
+        else:
+            pc.setdefault("tags", set())
         res.append(pc)
     return res, gold, inv
 
