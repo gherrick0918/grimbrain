@@ -2,7 +2,7 @@
   "party": [
     {
       "name": "Hero",
-      "hp": 4,
+      "hp": -8,
       "ac": 10,
       "max_hp": 10,
       "mods": {
@@ -22,9 +22,9 @@
       "tags": []
     }
   ],
-  "gold": 10,
+  "gold": 30,
   "inventory": {
-    "potion_healing": 1,
-    "ammo_arrows": 20
+    "potion_healing": 3,
+    "ammo_arrows": 60
   }
 }
