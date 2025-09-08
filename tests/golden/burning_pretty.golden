@@ -9,3 +9,5 @@ Hero takes 2 ongoing damage
 Hero takes 2 ongoing damage
 Effect on Hero ends
 Summary: rounds=4; alive=['Hero', 'Goblin']; dead=[]; stable=[]
+XP awarded: 50 total -> 50 each to 1 PC(s).
+Loot: +10 gp, items={'potion_healing': 1, 'ammo_arrows': 20}

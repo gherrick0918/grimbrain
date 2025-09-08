@@ -36,7 +36,10 @@ def award_xp(enemies: List[str], pcs: List[dict], notes: List[str]) -> Dict[str,
         if pc in living:
             pc["xp"] = pc.get("xp", 0) + share
             gains[pid] = share
-    notes.append(f"XP awarded: {total} total → {share} each to {len(living)} PC(s).")
+    # Use ASCII arrow to avoid encoding issues on some platforms
+    notes.append(
+        f"XP awarded: {total} total -> {share} each to {len(living)} PC(s)."
+    )
     return gains
 
 
