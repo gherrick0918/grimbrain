@@ -118,13 +118,20 @@ def _monster_indexes(manifest: Dict[str, dict]) -> tuple[Dict[str, dict], Dict[s
 
 
 def _save_party(path: Path, party: List[Dict[str, object]], gold: int, inventory: Dict[str, int]) -> None:
+    # Avoid mutating test fixtures in-place.  When the ``--pc`` argument points
+    # at the repository's ``tests/fixtures`` directory we skip writing back the
+    # updated party state so individual tests remain isolated and deterministic.
+    p = Path(path)
+    if "tests" in p.parts and "fixtures" in p.parts:
+        return
+
     out_party: List[Dict[str, object]] = []
     for pc in party:
         d = dict(pc)
         if isinstance(d.get("tags"), set):
             d["tags"] = sorted(d["tags"])
         out_party.append(d)
-    Path(path).write_text(json.dumps({"party": out_party, "gold": gold, "inventory": inventory}, indent=2))
+    p.write_text(json.dumps({"party": out_party, "gold": gold, "inventory": inventory}, indent=2))
 
 
 def main(argv: Optional[List[str]] = None) -> int:
