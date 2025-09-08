@@ -2,12 +2,29 @@
   "party": [
     {
       "name": "Hero",
-      "hp": 10,
+      "hp": 4,
       "ac": 10,
       "max_hp": 10,
-      "mods": {"STR": 0, "WIS": 0},
-      "skills": ["medicine"],
-      "prof": 2
+      "mods": {
+        "STR": 0,
+        "WIS": 0
+      },
+      "skills": [
+        "medicine"
+      ],
+      "prof": 2,
+      "id": "Hero",
+      "level": 1,
+      "xp": 50,
+      "pb": 2,
+      "con_mod": 0,
+      "side": "party",
+      "tags": []
     }
-  ]
+  ],
+  "gold": 10,
+  "inventory": {
+    "potion_healing": 1,
+    "ammo_arrows": 20
+  }
 }
