@@ -2,7 +2,7 @@
   "party": [
     {
       "name": "Hero",
-      "hp": -8,
+      "hp": 10,
       "ac": 10,
       "max_hp": 10,
       "mods": {
