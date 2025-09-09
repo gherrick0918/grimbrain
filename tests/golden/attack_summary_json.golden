@@ -1,1 +1,1 @@
-{"event": "summary", "rounds": 4, "alive": ["Hero", "Goblin"], "dead": [], "stable": []}
+{"event": "summary", "rounds": 4, "alive": ["Hero", "Goblin"], "dead": [], "stable": [], "xp_gain": {"Hero": 50}, "leveled": [], "loot": {"gold": 45, "potion_healing": 3, "ammo_arrows": 60}}
