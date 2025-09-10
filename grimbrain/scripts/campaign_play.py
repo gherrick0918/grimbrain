@@ -20,10 +20,16 @@ def travel(load: str = typer.Option(..., "--load"), hours: int = 4, seed: int | 
     notes = []
     advance_time(st, hours=hours)
     res = run_encounter(st, rng, notes)
+    st.seed = rng.randint(0, int(1e9))
     save_campaign(st, load)
     print(f"Day {st.day} {st.time_of_day} @ {st.location}")
-    print("\n".join(notes))
-    print(res)
+    if res.get("encounter"):
+        outcome = (
+            "Victory!" if res.get("winner") == "A" else "Defeat" if res.get("winner") == "B" else "Stalemate"
+        )
+        print(f"Encounter: {res['encounter']} – {outcome}")
+    if notes:
+        print("\n".join(notes))
 
 
 @app.command()

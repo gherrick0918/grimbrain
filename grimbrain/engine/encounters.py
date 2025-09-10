@@ -6,6 +6,7 @@ from .campaign import CampaignState, party_to_combatants, apply_combat_results
 from .bestiary import make_combatant_from_monster, weapon_names_for_monster
 from .skirmish import run_skirmish
 from .types import Combatant
+from .progression import award_xp, maybe_level_up
 
 TABLE = [
     {"name": "Goblins (2)", "enemies": ["Goblin", "Goblin"]},
@@ -39,6 +40,34 @@ def run_encounter(state: CampaignState, rng: random.Random, notes: List[str]) ->
     roster = list(allies_map.values()) + enemies
     res = run_skirmish(roster, seed=rng.randint(1, 999999))
     apply_combat_results(state, allies_map)
-    notes.append(f"Encounter: {table['name']}")
-    return {"encounter": table["name"], "winner": res.get("winner")}
+
+    winner = res.get("winner")
+    if winner == "A":
+        pcs_data = []
+        for p in state.party:
+            pdata = {
+                "id": p.id,
+                "name": p.name,
+                "xp": p.xp,
+                "level": p.level,
+                "max_hp": p.max_hp,
+                "con_mod": p.con_mod,
+                "pb": p.pb,
+                "hp": state.current_hp.get(p.id, p.max_hp),
+            }
+            pcs_data.append((p, pdata))
+
+        award_xp(table["enemies"], [d for _, d in pcs_data], notes)
+
+        for p, pdata in pcs_data:
+            p.xp = pdata["xp"]
+
+        for p, pdata in pcs_data:
+            if maybe_level_up(pdata, rng, notes):
+                p.level = pdata["level"]
+                p.max_hp = pdata["max_hp"]
+                p.pb = pdata["pb"]
+                state.current_hp[p.id] = pdata["hp"]
+
+    return {"encounter": table["name"], "winner": winner}
 
