@@ -135,6 +135,8 @@ class PartyMemberRef:
     max_hp: int
     pb: int
     speed: int
+    xp: int = 0
+    level: int = 1
     reach: int = 5
     ranged: bool = False
     prof_athletics: bool = False
