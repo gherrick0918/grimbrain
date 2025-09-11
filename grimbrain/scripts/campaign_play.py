@@ -19,16 +19,24 @@ def travel(
     hours: int = 4,
     seed: int | None = None,
     force_encounter: bool = typer.Option(False, "--force-encounter", "-F"),
+    encounter_chance: int | None = typer.Option(
+        None, "--encounter-chance", help="Percent chance (0-100) for overland encounter"
+    ),
 ):
     st = load_campaign(load)
     rng = random.Random(seed if seed is not None else st.seed)
     notes = []
+    # PR 44a: allow per-call override and persist it
+    if encounter_chance is not None:
+        st.encounter_chance = max(0, min(100, encounter_chance))
     advance_time(st, hours=hours)
     res = run_encounter(st, rng, notes, force=force_encounter)
     # Advance stored seed so subsequent travels use a fresh sequence
     st.seed = rng.randrange(1_000_000_000)
     save_campaign(st, load)
-    print(f"Day {st.day} {st.time_of_day} @ {st.location}")
+    print(
+        f"Day {st.day} {st.time_of_day} @ {st.location} | encounter_chance={st.encounter_chance}%"
+    )
     if res.get("encounter"):
         winner = res.get("winner", "?")
         outcome = "Victory!" if winner == "A" else "Defeat..."
