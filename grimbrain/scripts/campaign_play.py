@@ -1,12 +1,12 @@
 import random
+
 import typer
 
 from grimbrain.engine.campaign import (
+    QuestLogItem,
     advance_time,
     load_campaign,
     save_campaign,
-    CampaignState,
-    QuestLogItem,
 )
 from grimbrain.engine.encounters import run_encounter
 
@@ -14,22 +14,31 @@ app = typer.Typer(help="Play a lightweight solo campaign loop.")
 
 
 @app.command()
-def travel(load: str = typer.Option(..., "--load"), hours: int = 4, seed: int | None = None):
+def travel(
+    load: str = typer.Option(..., "--load"),
+    hours: int = 4,
+    seed: int | None = None,
+    force_encounter: bool = typer.Option(False, "--force-encounter", "-F"),
+):
     st = load_campaign(load)
-    rng = random.Random(seed or st.seed)
+    rng = random.Random(seed if seed is not None else st.seed)
     notes = []
     advance_time(st, hours=hours)
-    res = run_encounter(st, rng, notes)
-    st.seed = rng.randint(0, int(1e9))
+    res = run_encounter(st, rng, notes, force=force_encounter)
+    # Advance stored seed so subsequent travels use a fresh sequence
+    st.seed = rng.randrange(1_000_000_000)
     save_campaign(st, load)
     print(f"Day {st.day} {st.time_of_day} @ {st.location}")
     if res.get("encounter"):
-        outcome = (
-            "Victory!" if res.get("winner") == "A" else "Defeat" if res.get("winner") == "B" else "Stalemate"
-        )
-        print(f"Encounter: {res['encounter']} – {outcome}")
+        winner = res.get("winner", "?")
+        outcome = "Victory!" if winner == "A" else "Defeat..."
+        print(f"Encounter: {res['encounter']} — {outcome}")
+    else:
+        print("No encounter.")
     if notes:
         print("\n".join(notes))
+    if res:
+        print(res)
 
 
 @app.command()
@@ -44,7 +53,9 @@ def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None)
     notes = []
     for p in st.party:
         heal = rng.randint(1, 8) + p.con_mod
-        st.current_hp[p.id] = min(p.max_hp, st.current_hp.get(p.id, p.max_hp) + max(1, heal))
+        st.current_hp[p.id] = min(
+            p.max_hp, st.current_hp.get(p.id, p.max_hp) + max(1, heal)
+        )
         notes.append(f"{p.name} heals {heal} (short rest).")
     save_campaign(st, load)
     print("\n".join(notes))

@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 import random
 from typing import Dict, List, Optional
 
-from .campaign import CampaignState, party_to_combatants, apply_combat_results
 from .bestiary import make_combatant_from_monster, weapon_names_for_monster
+from .campaign import CampaignState, apply_combat_results, party_to_combatants
+from .progression import award_xp, maybe_level_up
 from .skirmish import run_skirmish
 from .types import Combatant
-from .progression import award_xp, maybe_level_up
 
 TABLE = [
     {"name": "Goblins (2)", "enemies": ["Goblin", "Goblin"]},
@@ -28,9 +29,11 @@ def _enemy_to_combatant(name: str, idx: int) -> Combatant:
     return cmb
 
 
-def run_encounter(state: CampaignState, rng: random.Random, notes: List[str]) -> Dict[str, object]:
+def run_encounter(
+    state: CampaignState, rng: random.Random, notes: List[str], force: bool = False
+) -> Dict[str, object]:
     allies_map = party_to_combatants(state)
-    table = roll_overland_encounter(state, rng)
+    table = roll_overland_encounter(state, rng) if not force else rng.choice(TABLE)
     if not table:
         notes.append("No encounter.")
         return {"encounter": None}
@@ -70,4 +73,3 @@ def run_encounter(state: CampaignState, rng: random.Random, notes: List[str]) ->
                 state.current_hp[p.id] = pdata["hp"]
 
     return {"encounter": table["name"], "winner": winner}
-
