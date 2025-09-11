@@ -51,7 +51,10 @@
       "weapon_offhand": null
     }
   ],
-  "current_hp": {},
+  "current_hp": {
+    "PC1": 24,
+    "PC2": 16
+  },
   "quest_log": [],
   "last_long_rest_day": 0
 }
