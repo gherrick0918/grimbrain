@@ -164,6 +164,8 @@ class CampaignState:
     current_hp: Dict[str, int] = field(default_factory=dict)
     quest_log: List[QuestLogItem] = field(default_factory=list)
     last_long_rest_day: int = 0
+    # PR 44a: base encounter chance percent (0–100). Default 30%.
+    encounter_chance: int = 30
 
 
 def load_campaign(path: str) -> CampaignState:
@@ -182,6 +184,7 @@ def load_campaign(path: str) -> CampaignState:
         current_hp=raw.get("current_hp", {}),
         quest_log=quests,
         last_long_rest_day=raw.get("last_long_rest_day", 0),
+        encounter_chance=raw.get("encounter_chance", 30),
     )
     if not st.current_hp:
         for p in st.party:
