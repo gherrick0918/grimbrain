@@ -1,6 +1,6 @@
 {
-  "seed": 4242,
-  "day": 1,
+  "seed": 149559891,
+  "day": 2,
   "time_of_day": "morning",
   "location": "Wilderness",
   "gold": 0,
@@ -52,8 +52,8 @@
     }
   ],
   "current_hp": {
-    "PC1": 24,
-    "PC2": 16
+    "PC1": 0,
+    "PC2": 0
   },
   "quest_log": [],
   "last_long_rest_day": 0

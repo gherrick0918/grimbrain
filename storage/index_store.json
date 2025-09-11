@@ -1,1 +1,1 @@
-{"index_store/data": {"2b1ddac1-a6ce-4ce1-a568-38b424bff26e": {"__type__": "vector_store", "__data__": "{\"index_id\": \"2b1ddac1-a6ce-4ce1-a568-38b424bff26e\", \"summary\": null, \"nodes_dict\": {}, \"doc_id_dict\": {}, \"embeddings_dict\": {}}"}}}
+{"index_store/data": {"f67b707b-fce5-4e87-8169-469f3bc6cea2": {"__type__": "vector_store", "__data__": "{\"index_id\": \"f67b707b-fce5-4e87-8169-469f3bc6cea2\", \"summary\": null, \"nodes_dict\": {}, \"doc_id_dict\": {}, \"embeddings_dict\": {}}"}}}
