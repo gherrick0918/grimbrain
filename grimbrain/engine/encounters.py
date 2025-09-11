@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 from .bestiary import make_combatant_from_monster, weapon_names_for_monster
 from .campaign import CampaignState, apply_combat_results, party_to_combatants
+from .loot import roll_loot
 from .progression import award_xp, maybe_level_up
 from .skirmish import run_skirmish
 from .types import Combatant
@@ -45,6 +46,7 @@ def run_encounter(
     apply_combat_results(state, allies_map)
 
     winner = res.get("winner")
+    loot: Dict[str, int] = {}
     if winner == "A":
         pcs_data = []
         for p in state.party:
@@ -72,4 +74,11 @@ def run_encounter(
                 p.pb = pdata["pb"]
                 state.current_hp[p.id] = pdata["hp"]
 
-    return {"encounter": table["name"], "winner": winner}
+        loot = roll_loot(table["enemies"], rng, notes)
+        state.gold += loot.get("gold", 0)
+        for item, qty in loot.items():
+            if item == "gold":
+                continue
+            state.inventory[item] = state.inventory.get(item, 0) + qty
+
+    return {"encounter": table["name"], "winner": winner, "loot": loot}

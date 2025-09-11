@@ -82,11 +82,18 @@ def quest(
         qid = f"Q{len(st.quest_log)+1}"
         st.quest_log.append(QuestLogItem(id=qid, text=add, done=False))
         print(f"Added quest {qid}: {add}")
-    if done:
+    elif done:
         for q in st.quest_log:
             if q.id == done:
                 q.done = True
                 print(f"Completed quest {done}")
+    else:
+        if st.quest_log:
+            for q in st.quest_log:
+                status = "Yes" if q.done else "No"
+                print(f"{q.id}. {q.text} (Done: {status})")
+        else:
+            print("No quests.")
     save_campaign(st, load)
 
 
