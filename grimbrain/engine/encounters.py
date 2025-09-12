@@ -19,8 +19,10 @@ TABLE = [
 
 def roll_overland_encounter(state: CampaignState, rng: random.Random) -> Optional[dict]:
     """Roll for an overland encounter using the state's configured chance."""
-    # PR 44a: use state.encounter_chance (percent) instead of fixed 3/20
-    chance = max(0, min(100, getattr(state, "encounter_chance", 30)))
+    # PR 44a/44b: effective chance = base + clock (capped 0..100)
+    base = max(0, min(100, getattr(state, "encounter_chance", 30)))
+    clock = max(0, getattr(state, "encounter_clock", 0))
+    chance = min(100, base + clock)
     if rng.randint(1, 100) <= chance:
         return rng.choice(TABLE)
     return None
