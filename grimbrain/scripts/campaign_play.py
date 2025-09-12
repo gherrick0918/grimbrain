@@ -49,12 +49,15 @@ def travel(
         winner = res.get("winner", "?")
         outcome = "Victory!" if winner == "A" else "Defeat..."
         print(f"Encounter: {res['encounter']} — {outcome}")
+        if notes:
+            print("\n".join(notes))
+        hp = ", ".join(
+            f"{p.name} {st.current_hp.get(p.id, p.max_hp)}/{p.max_hp}" for p in st.party
+        )
+        print(f"Party HP: {hp}")
     else:
+        # notes already contains "No encounter." in this branch
         print("No encounter.")
-    if notes:
-        print("\n".join(notes))
-    if res:
-        print(res)
 
 
 @app.command()
@@ -170,8 +173,8 @@ def quest(
     else:
         if st.quest_log:
             for q in st.quest_log:
-                status = "Yes" if q.done else "No"
-                print(f"{q.id}. {q.text} (Done: {status})")
+                status = "Completed" if q.done else "In Progress"
+                print(f"{q.id}: {q.text} — {status}")
         else:
             print("No quests.")
     save_campaign(st, load)
