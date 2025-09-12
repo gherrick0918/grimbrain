@@ -1,0 +1,22 @@
+name: "Ogre Hunt"
+seed: 1
+party_files: []
+scenes:
+  start:
+    text: "Your party enters a dark forest. Suddenly, an Ogre appears!"
+    encounter: Ogre
+    on_victory: ogre_down
+    on_defeat: game_over
+  ogre_down:
+    text: "The Ogre lies defeated. You see two paths ahead."
+    choices:
+      - text: "Take the left path toward the mountains."
+        next: mountains
+      - text: "Head right into the valley."
+        next: valley
+  mountains:
+    text: "You climbed the mountain and found a treasure. You win!"
+  valley:
+    text: "A dead end... but at least the journey was peaceful. The End."
+  game_over:
+    text: "The Ogre proved too strong. Your quest ends in failure."
