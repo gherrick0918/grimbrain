@@ -166,6 +166,9 @@ class CampaignState:
     last_long_rest_day: int = 0
     # PR 44a: base encounter chance percent (0–100). Default 30%.
     encounter_chance: int = 30
+    # PR 44b: encounter clock that ramps chance until an encounter happens
+    encounter_clock: int = 0  # additive percent
+    encounter_clock_step: int = 10  # how much to add after each no-encounter
 
 
 def load_campaign(path: str) -> CampaignState:
@@ -185,6 +188,8 @@ def load_campaign(path: str) -> CampaignState:
         quest_log=quests,
         last_long_rest_day=raw.get("last_long_rest_day", 0),
         encounter_chance=raw.get("encounter_chance", 30),
+        encounter_clock=raw.get("encounter_clock", 0),
+        encounter_clock_step=raw.get("encounter_clock_step", 10),
     )
     if not st.current_hp:
         for p in st.party:

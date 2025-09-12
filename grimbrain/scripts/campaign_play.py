@@ -33,9 +33,16 @@ def travel(
     res = run_encounter(st, rng, notes, force=force_encounter)
     # Advance stored seed so subsequent travels use a fresh sequence
     st.seed = rng.randrange(1_000_000_000)
+    # PR 44b: update the encounter clock based on outcome
+    if res.get("encounter") or force_encounter:
+        st.encounter_clock = 0
+    else:
+        step = max(0, getattr(st, "encounter_clock_step", 10))
+        st.encounter_clock = min(100, st.encounter_clock + step)
     save_campaign(st, load)
+    eff = min(100, st.encounter_chance + st.encounter_clock)
     print(
-        f"Day {st.day} {st.time_of_day} @ {st.location} | encounter_chance={st.encounter_chance}%"
+        f"Day {st.day} {st.time_of_day} @ {st.location} | chance={st.encounter_chance}% + clock={st.encounter_clock}% → effective={eff}%"
     )
     if res.get("encounter"):
         winner = res.get("winner", "?")
