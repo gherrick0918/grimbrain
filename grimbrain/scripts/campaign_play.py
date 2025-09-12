@@ -9,6 +9,7 @@ from grimbrain.engine.campaign import (
     save_campaign,
 )
 from grimbrain.engine.encounters import run_encounter
+from grimbrain.engine.shop import PRICES, run_shop
 
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
 
@@ -84,6 +85,70 @@ def long_rest(load: str = typer.Option(..., "--load")):
     st.last_long_rest_day = st.day
     save_campaign(st, load)
     print("Long rest: party restored to full and conditions cleared.")
+
+
+@app.command()
+def shop(
+    load: str = typer.Option(..., "--load"),
+    script: str | None = typer.Option(None, "--script"),
+    seed: int | None = None,
+):
+    """Buy and sell items using campaign gold and inventory."""
+    st = load_campaign(load)
+    rng = random.Random(seed if seed is not None else st.seed)
+    notes: list[str] = []
+    if script:
+        data = {"gold": st.gold, "inventory": st.inventory}
+        run_shop(data, notes, rng, script)
+        st.gold = data["gold"]
+        st.inventory = data["inventory"]
+        save_campaign(st, load)
+        if notes:
+            print("\n".join(notes))
+        print(f"Leaving shop. Current gold: {st.gold}.")
+        return
+    items = ", ".join(f"{k} ({v} gp)" for k, v in PRICES.items())
+    print(f"Items for sale: {items}")
+    while True:
+        try:
+            raw = input("shop> ").strip()
+        except EOFError:
+            print()
+            break
+        if not raw:
+            continue
+        parts = raw.split()
+        op = parts[0].lower()
+        if op == "buy" and len(parts) >= 2:
+            item = parts[1]
+            qty = int(parts[2]) if len(parts) > 2 else 1
+            price = PRICES.get(item, 0) * qty
+            if st.gold >= price:
+                st.gold -= price
+                st.inventory[item] = st.inventory.get(item, 0) + qty
+                print(f"Bought {qty}× {item} for {price} gp.")
+            else:
+                print(f"Not enough gold to buy {qty}× {item}.")
+        elif op == "sell" and len(parts) >= 2:
+            item = parts[1]
+            qty = int(parts[2]) if len(parts) > 2 else 1
+            have = st.inventory.get(item, 0)
+            qty = min(qty, have)
+            if qty <= 0:
+                print(f"No {item} to sell.")
+                continue
+            price = int(PRICES.get(item, 0) * 0.5) * qty
+            st.inventory[item] = have - qty
+            if st.inventory[item] <= 0:
+                st.inventory.pop(item, None)
+            st.gold += price
+            print(f"Sold {qty}× {item} for {price} gp.")
+        elif op in {"leave", "exit", "quit"}:
+            break
+        else:
+            print("Unknown command.")
+    save_campaign(st, load)
+    print(f"Leaving shop. Current gold: {st.gold}.")
 
 
 @app.command()
