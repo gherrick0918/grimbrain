@@ -1,0 +1,23 @@
+name: "Goblin Hunt"
+party_files: []  # (Leave empty to use default party for testing)
+scenes:
+  start:
+    text: "Your party enters a dark forest. Suddenly, a Goblin appears!"
+    encounter: Goblin
+    on_victory: goblin_down
+    on_defeat: game_over
+
+  goblin_down:
+    text: "The Goblin lies defeated. You see two paths ahead."
+    choices:
+      - text: "Take the left path toward the mountains."
+        next: mountains
+      - text: "Head right into the valley."
+        next: valley
+
+  mountains:
+    text: "You climbed the mountain and found a treasure. You win!"
+  valley:
+    text: "A dead end... but at least the journey was peaceful. The End."
+  game_over:
+    text: "The Goblin proved too strong. Your quest ends in failure."
