@@ -10,7 +10,6 @@ from grimbrain.engine.campaign import (
     save_campaign,
     load_yaml_campaign,
     load_party,
-    CampaignState,
     PartyMemberRef,
     party_to_combatants,
     apply_combat_results,
@@ -21,6 +20,7 @@ from grimbrain.engine.loot import roll_loot
 from grimbrain.engine.progression import award_xp, maybe_level_up
 from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.skirmish import run_skirmish
+from grimbrain.engine.narrator import get_narrator
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -187,22 +187,87 @@ def long_rest(load: str = typer.Option(..., "--load")):
 
 
 @app.command()
-def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
-    camp = load_yaml_campaign(file)
-    base = Path(file).resolve().parent
+def story(
+    load: str = typer.Option(..., "--load", help="Path to campaign state JSON"),
+    story: str | None = typer.Option(
+        None, "--story", help="Path to story YAML (defaults to positional arg)"
+    ),
+    file: str | None = typer.Argument(
+        None, help="Path to story YAML (deprecated positional argument)"
+    ),
+):
+    """Play a scripted story scene-by-scene, tracking simple campaign flags."""
+
+    story_path = story or file
+    if not story_path:
+        raise typer.BadParameter("Provide a story YAML via --story or positional argument.")
+
+    camp = load_yaml_campaign(story_path)
+    base = Path(story_path).resolve().parent
     pcs = load_party(camp, base)
-    if pcs:
-        party = [_pc_to_ref(pc, i + 1) for i, pc in enumerate(pcs)]
-    else:
-        party = _default_party()
-    state = CampaignState(seed=camp.seed or 0, party=party)
+
+    state = load_campaign(load)
+    if not state.party:
+        if pcs:
+            state.party = [_pc_to_ref(pc, i + 1) for i, pc in enumerate(pcs)]
+        else:
+            state.party = _default_party()
     for p in state.party:
-        state.current_hp[p.id] = p.max_hp
-    rng = random.Random(camp.seed or 0)
+        state.current_hp.setdefault(p.id, p.max_hp)
+
+    rng_seed = camp.seed if camp.seed is not None else state.seed
+    rng = random.Random(rng_seed or 0)
+    narrator = get_narrator()
+
+    flags_obj = state.inventory.setdefault("_flags", [])
+    if isinstance(flags_obj, list):
+        flags: list[str] = flags_obj
+    elif isinstance(flags_obj, (set, tuple)):
+        flags = list(flags_obj)
+        state.inventory["_flags"] = flags
+    elif flags_obj:
+        flags = [str(flags_obj)]
+        state.inventory["_flags"] = flags
+    else:
+        flags = []
+        state.inventory["_flags"] = flags
+
+    def persist() -> None:
+        if load:
+            save_campaign(state, load)
+
+    def apply_flags(scene_obj) -> None:
+        for flag in getattr(scene_obj, "set_flags", []) or []:
+            if flag and flag not in flags:
+                flags.append(flag)
+
     current = camp.start
     while True:
         scene = camp.scenes[current]
-        print(scene.text)
+        ctx = {
+            "day": state.day,
+            "time_of_day": state.time_of_day,
+            "party_gold": getattr(state, "gold", 0),
+            "pc1_name": state.party[0].name if state.party else "Hero",
+            "location": state.location,
+            "scene_id": scene.id,
+            "flags": ", ".join(flags),
+            "party_names": ", ".join(p.name for p in state.party) if state.party else "Hero",
+        }
+
+        missing = [req for req in scene.requires if req and req not in flags]
+        if missing:
+            print(f"(You lack: {', '.join(missing)})")
+            persist()
+            break
+
+        if scene.text:
+            print(narrator.render(scene.text, ctx))
+
+        if scene.if_flag and scene.if_flag.flag and scene.if_flag.flag in flags:
+            cond_text = scene.if_flag.text or ""
+            if cond_text:
+                print(narrator.render(cond_text, ctx))
 
         if scene.check:
             chk = scene.check
@@ -231,9 +296,13 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                     f"(Skill check: rolled {roll1} + {mod} = {total} vs DC {chk.dc} — {result})"
                 )
             if total >= chk.dc and chk.on_success:
+                apply_flags(scene)
+                persist()
                 current = chk.on_success
                 continue
             if total < chk.dc and chk.on_failure:
+                apply_flags(scene)
+                persist()
                 current = chk.on_failure
                 continue
 
@@ -289,13 +358,19 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                 if notes:
                     print("\n".join(notes))
                 if scene.on_victory:
+                    apply_flags(scene)
+                    persist()
                     current = scene.on_victory
                     continue
             else:
                 if scene.on_defeat:
+                    apply_flags(scene)
+                    persist()
                     current = scene.on_defeat
                     continue
                 print("All heroes have fallen. Game over.")
+                apply_flags(scene)
+                persist()
                 return
 
         if scene.rest:
@@ -325,6 +400,8 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                 try:
                     raw = input("choice> ").strip()
                 except EOFError:
+                    apply_flags(scene)
+                    persist()
                     return
                 if raw.isdigit():
                     num = int(raw)
@@ -332,9 +409,13 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                         sel = num
                         break
                 print("Invalid choice.")
+            apply_flags(scene)
+            persist()
             current = scene.choices[sel - 1].next
             continue
         else:
+            apply_flags(scene)
+            persist()
             print("(End of story)")
             break
 
