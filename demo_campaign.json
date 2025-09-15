@@ -1,10 +1,14 @@
 {
   "seed": 4242,
-  "day": 2,
-  "time_of_day": "afternoon",
+  "day": 1,
+  "time_of_day": "morning",
   "location": "Wilderness",
   "gold": 0,
-  "inventory": {},
+  "inventory": {
+    "_flags": [
+      "met_guard"
+    ]
+  },
   "party": [
     {
       "id": "PC1",
@@ -56,7 +60,7 @@
     "PC2": 16
   },
   "quest_log": [],
-  "last_long_rest_day": 1,
+  "last_long_rest_day": 0,
   "encounter_chance": 30,
   "encounter_clock": 0,
   "encounter_clock_step": 10,

@@ -1,0 +1,30 @@
+name: "Town Visit"
+start: "gate"
+scenes:
+  gate:
+    text: "Day {{day}} {{time_of_day}}. You approach the town gate with {{party_gold}} gp."
+    choices:
+      - text: "Greet the guard"
+        next: greet
+      - text: "Sneak in"
+        next: sneak
+
+  greet:
+    text: "The guard smiles. 'Welcome, {{pc1_name}}.'"
+    set_flags: ["met_guard"]
+    choices:
+      - text: "Enter town"
+        next: square
+
+  sneak:
+    text: "You slip past the watch."
+    choices:
+      - text: "Enter town"
+        next: square
+
+  square:
+    text: "The square is bustling."
+    if_flag:
+      flag: "met_guard"
+      text: "Because you greeted the guard, townsfolk are friendly."
+    choices: []
