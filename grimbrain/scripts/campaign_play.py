@@ -553,35 +553,15 @@ def campaign_loop(path: str) -> None:
         if not raw:
             continue
         if raw in {"t", "travel"}:
-            rng = random.Random(state.seed)
-            notes: list[str] = []
-            advance_time(state, hours=4)
-            res = run_encounter(state, rng, notes)
-            state.seed = rng.randrange(1_000_000_000)
-            if res.get("encounter"):
-                state.encounter_clock = 0
-                winner = res.get("winner", "?")
-                outcome = "Victory!" if winner == "A" else "Defeat..."
-                print(f"Encounter: {res['encounter']} — {outcome}")
-                if notes:
-                    print("\n".join(notes))
-                hp = ", ".join(
-                    f"{p.name} {state.current_hp.get(p.id, p.max_hp)}/{p.max_hp}"
-                    for p in state.party
-                )
-                print(f"Party HP: {hp}")
-            else:
-                step = max(0, getattr(state, "encounter_clock_step", 10))
-                state.encounter_clock = min(100, state.encounter_clock + step)
-                print("No encounter.")
-            save_campaign(state, path)
+            travel(load=path)
+            state = load_campaign(path)
         elif raw in {"r", "rest"}:
             try:
                 kind = input("Short or long rest? (s/l) > ").strip().lower()
             except EOFError:
                 break
             if kind.startswith("s"):
-                short_rest(load=path, seed=state.seed)
+                short_rest(load=path)
                 state = load_campaign(path)
             elif kind.startswith("l"):
                 long_rest(load=path)
