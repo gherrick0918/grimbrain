@@ -30,6 +30,12 @@ class Check:
 
 
 @dataclass
+class IfFlagBlock:
+    flag: str
+    text: str = ""
+
+
+@dataclass
 class Scene:
     id: str
     text: str
@@ -39,6 +45,9 @@ class Scene:
     rest: Optional[str] = None
     check: Optional[Check] = None
     choices: List[Choice] = field(default_factory=list)
+    set_flags: List[str] = field(default_factory=list)
+    requires: List[str] = field(default_factory=list)
+    if_flag: Optional[IfFlagBlock] = None
 
 
 @dataclass
@@ -69,6 +78,16 @@ def load_yaml_campaign(path: str | Path) -> Campaign:
                 c_map["next"] = c_map.pop("goto")
             choices.append(Choice(**c_map))
         check = Check(**sdata["check"]) if "check" in sdata else None
+        set_flags = list(sdata.get("set_flags", []) or [])
+        requires = list(sdata.get("requires", []) or [])
+        if_block = None
+        if "if_flag" in sdata and sdata["if_flag"]:
+            raw_if = sdata["if_flag"]
+            if isinstance(raw_if, dict):
+                if_block = IfFlagBlock(
+                    flag=raw_if.get("flag", ""),
+                    text=raw_if.get("text", ""),
+                )
         scenes[sid] = Scene(
             id=sid,
             text=sdata.get("text", ""),
@@ -78,6 +97,9 @@ def load_yaml_campaign(path: str | Path) -> Campaign:
             rest=sdata.get("rest"),
             check=check,
             choices=choices,
+            set_flags=set_flags,
+            requires=requires,
+            if_flag=if_block,
         )
     start = data.get("start") or next(iter(scenes))
     camp = Campaign(
