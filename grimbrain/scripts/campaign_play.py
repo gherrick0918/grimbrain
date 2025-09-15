@@ -416,5 +416,103 @@ def quest(
     save_campaign(st, load)
 
 
+def campaign_loop(path: str) -> None:
+    """Interactive loop allowing continuous campaign play."""
+    state = load_campaign(path)
+    print("Entering campaign loop. Type 'help' for options.")
+    while True:
+        hp = ", ".join(
+            f"{p.name} {state.current_hp.get(p.id, p.max_hp)}/{p.max_hp}"
+            for p in state.party
+        )
+        print(
+            f"Day {state.day} {state.time_of_day} @ {state.location} | Party: {hp} | Gold: {state.gold}"
+        )
+        try:
+            raw = input(
+                "Choose action: [T]ravel, [R]est, [Q]uest log, [S]hop, [X] Exit > "
+            ).strip().lower()
+        except EOFError:
+            print()
+            break
+        if not raw:
+            continue
+        if raw in {"t", "travel"}:
+            rng = random.Random(state.seed)
+            notes: list[str] = []
+            advance_time(state, hours=4)
+            res = run_encounter(state, rng, notes)
+            state.seed = rng.randrange(1_000_000_000)
+            if res.get("encounter"):
+                state.encounter_clock = 0
+                winner = res.get("winner", "?")
+                outcome = "Victory!" if winner == "A" else "Defeat..."
+                print(f"Encounter: {res['encounter']} — {outcome}")
+                if notes:
+                    print("\n".join(notes))
+                hp = ", ".join(
+                    f"{p.name} {state.current_hp.get(p.id, p.max_hp)}/{p.max_hp}"
+                    for p in state.party
+                )
+                print(f"Party HP: {hp}")
+            else:
+                step = max(0, getattr(state, "encounter_clock_step", 10))
+                state.encounter_clock = min(100, state.encounter_clock + step)
+                print("No encounter.")
+            save_campaign(state, path)
+        elif raw in {"r", "rest"}:
+            try:
+                kind = input("Short or long rest? (s/l) > ").strip().lower()
+            except EOFError:
+                break
+            if kind.startswith("s"):
+                rng = random.Random(state.seed)
+                for p in state.party:
+                    heal = rng.randint(1, 8) + p.con_mod
+                    state.current_hp[p.id] = min(
+                        p.max_hp, state.current_hp.get(p.id, p.max_hp) + max(1, heal)
+                    )
+                    print(f"{p.name} heals {heal} (short rest).")
+                state.seed = rng.randrange(1_000_000_000)
+                save_campaign(state, path)
+            elif kind.startswith("l"):
+                for p in state.party:
+                    state.current_hp[p.id] = p.max_hp
+                state.last_long_rest_day = state.day
+                save_campaign(state, path)
+                print("Long rest: party restored to full and conditions cleared.")
+            else:
+                print("Rest cancelled.")
+        elif raw in {"q", "quest", "quests"}:
+            if state.quest_log:
+                for q in state.quest_log:
+                    status = "Completed" if q.done else "In Progress"
+                    print(f"{q.id}: {q.text} — {status}")
+            else:
+                print("No quests.")
+        elif raw in {"s", "shop"}:
+            save_campaign(state, path)
+            shop(load=path, script=None)
+            state = load_campaign(path)
+        elif raw in {"x", "exit", "quit"}:
+            save_campaign(state, path)
+            print("Exiting campaign.")
+            break
+        elif raw in {"h", "help", "menu"}:
+            print("Commands: [T]ravel, [R]est, [Q]uest log, [S]hop, [X] Exit")
+        else:
+            print("Unknown command.")
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context, load: str = typer.Option(None, "--load")):
+    if ctx.invoked_subcommand is None:
+        if not load:
+            typer.echo("--load is required to start the campaign loop")
+            raise typer.Exit(1)
+        campaign_loop(load)
+        raise typer.Exit()
+
+
 if __name__ == "__main__":
     app()
