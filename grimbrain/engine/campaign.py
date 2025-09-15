@@ -169,6 +169,9 @@ class CampaignState:
     # PR 44b: encounter clock that ramps chance until an encounter happens
     encounter_clock: int = 0  # additive percent
     encounter_clock_step: int = 10  # how much to add after each no-encounter
+    # PR49: rest timing knobs
+    short_rest_hours: int = 4
+    long_rest_to_morning: bool = True
 
 
 def load_campaign(path: str) -> CampaignState:
@@ -190,6 +193,8 @@ def load_campaign(path: str) -> CampaignState:
         encounter_chance=raw.get("encounter_chance", 30),
         encounter_clock=raw.get("encounter_clock", 0),
         encounter_clock_step=raw.get("encounter_clock_step", 10),
+        short_rest_hours=raw.get("short_rest_hours", 4),
+        long_rest_to_morning=raw.get("long_rest_to_morning", True),
     )
     if not st.current_hp:
         for p in st.party:

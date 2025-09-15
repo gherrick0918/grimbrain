@@ -164,6 +164,8 @@ def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None)
             p.max_hp, st.current_hp.get(p.id, p.max_hp) + max(1, heal)
         )
         notes.append(f"{p.name} heals {heal} (short rest).")
+    # PR49: advance time by configured short rest hours
+    advance_time(st, hours=getattr(st, "short_rest_hours", 4))
     save_campaign(st, load)
     print("\n".join(notes))
 
@@ -174,6 +176,12 @@ def long_rest(load: str = typer.Option(..., "--load")):
     for p in st.party:
         st.current_hp[p.id] = p.max_hp
     st.last_long_rest_day = st.day
+    # PR49: advance to next morning if configured
+    if getattr(st, "long_rest_to_morning", True):
+        # advance at least one segment then roll until morning
+        advance_time(st, hours=4)
+        while st.time_of_day != "morning":
+            advance_time(st, hours=4)
     save_campaign(st, load)
     print("Long rest: party restored to full and conditions cleared.")
 
@@ -295,6 +303,10 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                 for p in state.party:
                     state.current_hp[p.id] = p.max_hp
                 print("The party takes a long rest and recovers fully.")
+                if getattr(state, "long_rest_to_morning", True):
+                    advance_time(state, hours=4)
+                    while state.time_of_day != "morning":
+                        advance_time(state, hours=4)
             elif scene.rest == "short":
                 for p in state.party:
                     heal = rng.randint(1, 8) + p.con_mod
@@ -303,6 +315,7 @@ def story(file: str = typer.Argument(..., help="Path to campaign YAML")):
                         state.current_hp.get(p.id, p.max_hp) + max(1, heal),
                     )
                 print("The party takes a short rest and recovers some health.")
+                advance_time(state, hours=getattr(state, "short_rest_hours", 4))
 
         if scene.choices:
             for idx, choice in enumerate(scene.choices, 1):
@@ -466,21 +479,11 @@ def campaign_loop(path: str) -> None:
             except EOFError:
                 break
             if kind.startswith("s"):
-                rng = random.Random(state.seed)
-                for p in state.party:
-                    heal = rng.randint(1, 8) + p.con_mod
-                    state.current_hp[p.id] = min(
-                        p.max_hp, state.current_hp.get(p.id, p.max_hp) + max(1, heal)
-                    )
-                    print(f"{p.name} heals {heal} (short rest).")
-                state.seed = rng.randrange(1_000_000_000)
-                save_campaign(state, path)
+                short_rest(load=path, seed=state.seed)
+                state = load_campaign(path)
             elif kind.startswith("l"):
-                for p in state.party:
-                    state.current_hp[p.id] = p.max_hp
-                state.last_long_rest_day = state.day
-                save_campaign(state, path)
-                print("Long rest: party restored to full and conditions cleared.")
+                long_rest(load=path)
+                state = load_campaign(path)
             else:
                 print("Rest cancelled.")
         elif raw in {"q", "quest", "quests"}:
