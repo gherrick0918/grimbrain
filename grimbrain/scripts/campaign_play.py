@@ -1,7 +1,9 @@
 import random
 from pathlib import Path
+from typing import Any
 
 import typer
+from typer.models import ArgumentInfo, OptionInfo
 
 from grimbrain.engine.campaign import (
     QuestLogItem,
@@ -13,6 +15,7 @@ from grimbrain.engine.campaign import (
     PartyMemberRef,
     party_to_combatants,
     apply_combat_results,
+    CampaignState,
 )
 from grimbrain.engine.bestiary import make_combatant_from_monster, weapon_names_for_monster
 from grimbrain.engine.encounters import run_encounter
@@ -100,6 +103,14 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
     return [text]
 
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
+
+
+def _cli_value(value: Any) -> Any:
+    """Normalize Typer default placeholders to regular Python values."""
+
+    if isinstance(value, (OptionInfo, ArgumentInfo)):
+        return None
+    return value
 
 
 @app.command()
@@ -198,7 +209,14 @@ def story(
 ):
     """Play a scripted story scene-by-scene, tracking simple campaign flags."""
 
-    story_path = story or file
+    load_path = _cli_value(load)
+    story_path = _cli_value(story)
+    file_path = _cli_value(file)
+    if not story_path:
+        story_path = file_path
+    if not story_path and isinstance(load_path, str) and load_path.lower().endswith((".yaml", ".yml")):
+        story_path = load_path
+        load_path = None
     if not story_path:
         raise typer.BadParameter("Provide a story YAML via --story or positional argument.")
 
@@ -206,7 +224,10 @@ def story(
     base = Path(story_path).resolve().parent
     pcs = load_party(camp, base)
 
-    state = load_campaign(load)
+    if load_path:
+        state = load_campaign(load_path)
+    else:
+        state = CampaignState(seed=camp.seed or 0)
     if not state.party:
         if pcs:
             state.party = [_pc_to_ref(pc, i + 1) for i, pc in enumerate(pcs)]
@@ -233,8 +254,8 @@ def story(
         state.inventory["_flags"] = flags
 
     def persist() -> None:
-        if load:
-            save_campaign(state, load)
+        if load_path:
+            save_campaign(state, load_path)
 
     def apply_flags(scene_obj) -> None:
         for flag in getattr(scene_obj, "set_flags", []) or []:
