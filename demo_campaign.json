@@ -1,6 +1,6 @@
 {
-  "seed": 141473664,
-  "day": 1,
+  "seed": 4242,
+  "day": 2,
   "time_of_day": "afternoon",
   "location": "Wilderness",
   "gold": 0,
@@ -58,6 +58,8 @@
   "quest_log": [],
   "last_long_rest_day": 1,
   "encounter_chance": 30,
-  "encounter_clock": 10,
-  "encounter_clock_step": 10
+  "encounter_clock": 0,
+  "encounter_clock_step": 10,
+  "short_rest_hours": 4,
+  "long_rest_to_morning": true
 }
