@@ -199,7 +199,9 @@ def long_rest(load: str = typer.Option(..., "--load")):
 
 @app.command()
 def story(
-    load: str = typer.Option(..., "--load", help="Path to campaign state JSON"),
+    load: str | None = typer.Option(
+        None, "--load", help="Optional campaign state JSON to persist progress"
+    ),
     story: str | None = typer.Option(
         None, "--story", help="Path to story YAML (defaults to positional arg)"
     ),
