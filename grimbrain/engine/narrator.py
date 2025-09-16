@@ -43,14 +43,22 @@ class CachedNarrator:
 
     def __init__(self, backend) -> None:
         self.backend = backend
+        # Only persist and reuse cache entries for non-template backends.
+        # The template narrator is deterministic and should always render the
+        # literal scene text. Reusing cached AI prose while running in template
+        # mode caused stale, flowery narration to bleed into tests that expect
+        # the source YAML strings.
+        self.use_cache = not isinstance(backend, TemplateNarrator)
 
     def render(self, scene_id: str, template: str, ctx: Dict[str, Any]) -> str:
         key = _hash(scene_id, template, ctx)
-        for row in iter_cache(NARRATION_CACHE):
-            if row.get("key") == key:
-                return str(row.get("text", ""))
+        if self.use_cache:
+            for row in iter_cache(NARRATION_CACHE):
+                if row.get("key") == key:
+                    return str(row.get("text", ""))
         text = self.backend.render(template, ctx)
-        append_cache_line(NARRATION_CACHE, {"key": key, "text": text})
+        if self.use_cache:
+            append_cache_line(NARRATION_CACHE, {"key": key, "text": text})
         return text
 
 
