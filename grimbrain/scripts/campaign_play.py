@@ -24,6 +24,7 @@ from grimbrain.engine.progression import award_xp, maybe_level_up
 from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
+from grimbrain.engine.config import load_config, save_config
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -103,6 +104,33 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
     return [text]
 
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
+
+
+@app.command(help="Set or show local Grimbrain dotenv (~/.grimbrain/.env)")
+def config(
+    set_key: str = typer.Option(
+        None, "--set-openai-key", help="Store OPENAI_API_KEY locally"
+    ),
+    show: bool = typer.Option(False, "--show", help="Print current config (keys redacted)"),
+):
+    cfg = load_config()
+    changed = False
+    if set_key is not None:
+        cfg["OPENAI_API_KEY"] = set_key
+        cfg.pop("openai_api_key", None)
+        changed = True
+    if changed:
+        save_config(cfg)
+        print("Config saved.")
+    if show:
+        redacted: dict[str, Any] = {}
+        for key, value in cfg.items():
+            if isinstance(value, str) and key.lower().endswith("api_key"):
+                suffix = value[-4:] if len(value) >= 4 else value
+                redacted[key] = "****" + suffix
+            else:
+                redacted[key] = value
+        print(redacted)
 
 
 def _cli_value(value: Any) -> Any:
@@ -285,12 +313,12 @@ def story(
             break
 
         if scene.text:
-            print(narrator.render(scene.text, ctx))
+            print(narrator.render(scene.id, scene.text, ctx))
 
         if scene.if_flag and scene.if_flag.flag and scene.if_flag.flag in flags:
             cond_text = scene.if_flag.text or ""
             if cond_text:
-                print(narrator.render(cond_text, ctx))
+                print(narrator.render(f"{scene.id}#if", cond_text, ctx))
 
         if scene.check:
             chk = scene.check
