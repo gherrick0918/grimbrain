@@ -6,7 +6,7 @@ MAIN = ROOT / "main.py"
 
 def run_play(script, seed=7, json_mode=True, packs="packs/test_effects"):
     env = os.environ.copy()
-    env.setdefault("GB_ENGINE", "data")
+    env["GB_ENGINE"] = "data"
     env.setdefault("GB_RULES_DIR", "rules")
     env.setdefault("GB_CHROMA_DIR", ".chroma")
     env.setdefault("GB_RESOLVER_WARM_COUNT", "0")
