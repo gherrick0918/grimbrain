@@ -12,8 +12,8 @@ htmlcov/
 # Virtual envs & dotenvs
 .venv/
 venv*/
-.env
 .env.*
+!.env
 
 # Local data / indexes / logs / outputs
 .chroma/
