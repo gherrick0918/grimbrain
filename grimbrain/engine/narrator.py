@@ -72,7 +72,12 @@ def get_narrator():
     layer for determinism.
     """
 
-    use_ai = os.getenv("GRIMBRAIN_AI") == "1"
+    testing = bool(
+        os.getenv("PYTEST_CURRENT_TEST")
+        or os.getenv("GB_TESTING") == "1"
+        or os.getenv("IS_TESTING") == "1"
+    )
+    use_ai = os.getenv("GRIMBRAIN_AI") == "1" and not testing
     key = get_api_key()
     if use_ai and key:
         try:
