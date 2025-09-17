@@ -17,6 +17,8 @@ from .config import (
 class TemplateNarrator:
     """Simple, local narrator that performs inline template replacement."""
 
+    KIND = "template"
+
     def render(self, template: str, ctx: Dict[str, object]) -> str:
         """Render *template* by replacing ``{{key}}`` tokens using *ctx* values."""
 
@@ -26,10 +28,12 @@ class TemplateNarrator:
         return out
 
 
-def _hash(scene_id: str, template: str, ctx: Dict[str, Any]) -> str:
+def _hash(scene_id: str, template: str, ctx: Dict[str, Any], kind: str) -> str:
     """Create a stable hash for the given narration inputs."""
 
     digest = hashlib.sha256()
+    digest.update(kind.encode("utf-8", "ignore"))
+    digest.update(b"\x00")
     digest.update(scene_id.encode("utf-8", "ignore"))
     digest.update(b"\x00")
     digest.update((template or "").encode("utf-8", "ignore"))
@@ -41,28 +45,28 @@ def _hash(scene_id: str, template: str, ctx: Dict[str, Any]) -> str:
 class CachedNarrator:
     """Wrap a narrator backend with simple on-disk caching."""
 
-    def __init__(self, backend) -> None:
+    def __init__(self, backend, debug: bool = False) -> None:
         self.backend = backend
-        # Only persist and reuse cache entries for non-template backends.
-        # The template narrator is deterministic and should always render the
-        # literal scene text. Reusing cached AI prose while running in template
-        # mode caused stale, flowery narration to bleed into tests that expect
-        # the source YAML strings.
-        self.use_cache = not isinstance(backend, TemplateNarrator)
+        self.debug = debug
+        self.kind = getattr(backend, "KIND", "template")
 
     def render(self, scene_id: str, template: str, ctx: Dict[str, Any]) -> str:
-        key = _hash(scene_id, template, ctx)
-        if self.use_cache:
-            for row in iter_cache(NARRATION_CACHE):
-                if row.get("key") == key:
-                    return str(row.get("text", ""))
+        key = _hash(scene_id, template, ctx, self.kind)
+        for row in iter_cache(NARRATION_CACHE):
+            if row.get("key") == key:
+                if self.debug:
+                    print(f"[narration] ai={self.kind} cache=HIT scene={scene_id}")
+                return str(row.get("text", ""))
         text = self.backend.render(template, ctx)
-        if self.use_cache:
-            append_cache_line(NARRATION_CACHE, {"key": key, "text": text})
+        append_cache_line(
+            NARRATION_CACHE, {"key": key, "text": text, "kind": self.kind}
+        )
+        if self.debug:
+            print(f"[narration] ai={self.kind} cache=MISS scene={scene_id}")
         return text
 
 
-def get_narrator():
+def get_narrator(debug: bool = False):
     """Return the active narrator implementation.
 
     The local template narrator is always available. An AI-backed narrator can be
@@ -83,7 +87,7 @@ def get_narrator():
         try:
             from .narrator_ai import AINarrator
 
-            return CachedNarrator(AINarrator(api_key=key))
+            return CachedNarrator(AINarrator(api_key=key), debug=debug)
         except Exception:
             pass
-    return CachedNarrator(TemplateNarrator())
+    return CachedNarrator(TemplateNarrator(), debug=debug)

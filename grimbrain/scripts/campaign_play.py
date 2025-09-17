@@ -106,18 +106,18 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
 
 
-@app.command(help="Set or show local Grimbrain dotenv (~/.grimbrain/.env)")
+@app.command(help="Set or show local Grimbrain config (~/.grimbrain/config.json)")
 def config(
-    set_key: str = typer.Option(
-        None, "--set-openai-key", help="Store OPENAI_API_KEY locally"
+    set_openai_key: str = typer.Option(
+        None, "--set-openai-key", help="Store an OpenAI API key locally"
     ),
     show: bool = typer.Option(False, "--show", help="Print current config (keys redacted)"),
 ):
     cfg = load_config()
     changed = False
-    if set_key is not None:
-        cfg["OPENAI_API_KEY"] = set_key
-        cfg.pop("openai_api_key", None)
+    if set_openai_key is not None:
+        cfg["openai_api_key"] = set_openai_key
+        cfg.pop("OPENAI_API_KEY", None)
         changed = True
     if changed:
         save_config(cfg)
@@ -125,7 +125,7 @@ def config(
     if show:
         redacted: dict[str, Any] = {}
         for key, value in cfg.items():
-            if isinstance(value, str) and key.lower().endswith("api_key"):
+            if isinstance(value, str) and key.lower().endswith("api_key") and value:
                 suffix = value[-4:] if len(value) >= 4 else value
                 redacted[key] = "****" + suffix
             else:
@@ -227,14 +227,17 @@ def long_rest(load: str = typer.Option(..., "--load")):
 
 @app.command()
 def story(
+    file: str | None = typer.Argument(None, help="Path to story YAML"),
     load: str | None = typer.Option(
         None, "--load", help="Optional campaign state JSON to persist progress"
     ),
     story: str | None = typer.Option(
-        None, "--story", help="Path to story YAML (defaults to positional arg)"
+        None, "--story", help="Path to story YAML (overrides positional argument)"
     ),
-    file: str | None = typer.Argument(
-        None, help="Path to story YAML (deprecated positional argument)"
+    narration_debug: bool = typer.Option(
+        False,
+        "--narration-debug",
+        help="Print AI/cache information when rendering narration",
     ),
 ):
     """Play a scripted story scene-by-scene, tracking simple campaign flags."""
@@ -250,8 +253,26 @@ def story(
     if not story_path:
         raise typer.BadParameter("Provide a story YAML via --story or positional argument.")
 
-    camp = load_yaml_campaign(story_path)
-    base = Path(story_path).resolve().parent
+    raw_story = Path(str(story_path)).expanduser()
+    search: list[Path] = [raw_story]
+    if not raw_story.is_absolute():
+        search.append(Path.cwd() / raw_story)
+        search.append(Path("data/stories") / raw_story)
+
+    story_file: Path | None = None
+    tried: list[Path] = []
+    for candidate in search:
+        if candidate.exists():
+            story_file = candidate
+            break
+        tried.append(candidate)
+
+    if story_file is None:
+        tried_text = ", ".join(str(p.resolve()) for p in tried)
+        raise typer.BadParameter(f"Story file not found. Tried: {tried_text}")
+
+    camp = load_yaml_campaign(str(story_file))
+    base = story_file.resolve().parent
     pcs = load_party(camp, base)
 
     if load_path:
@@ -268,7 +289,7 @@ def story(
 
     rng_seed = camp.seed if camp.seed is not None else state.seed
     rng = random.Random(rng_seed or 0)
-    narrator = get_narrator()
+    narrator = get_narrator(debug=bool(narration_debug))
 
     flags_obj = state.inventory.setdefault("_flags", [])
     if isinstance(flags_obj, list):
