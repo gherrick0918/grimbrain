@@ -17,6 +17,8 @@ SYSTEM = (
 class AINarrator:
     """Narrator that requests prose from a remote model."""
 
+    KIND = "openai:gpt-4o-mini"
+
     def __init__(self, api_key: str):
         self.api_key = api_key
 
@@ -54,4 +56,4 @@ class AINarrator:
             text = text.strip()
             return text or prompt
         except Exception:
-            return prompt
+            return TemplateNarrator().render(template, ctx)
