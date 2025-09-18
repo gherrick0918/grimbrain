@@ -111,6 +111,9 @@ def config(
     set_openai_key: str = typer.Option(
         None, "--set-openai-key", help="Store an OpenAI API key locally"
     ),
+    enable_ai: bool = typer.Option(
+        None, "--enable-ai/--disable-ai", help="Toggle AI narration"
+    ),
     show: bool = typer.Option(False, "--show", help="Print current config (keys redacted)"),
 ):
     cfg = load_config()
@@ -118,6 +121,9 @@ def config(
     if set_openai_key is not None:
         cfg["openai_api_key"] = set_openai_key
         cfg.pop("OPENAI_API_KEY", None)
+        changed = True
+    if enable_ai is not None:
+        cfg["GRIMBRAIN_AI"] = "1" if enable_ai else "0"
         changed = True
     if changed:
         save_config(cfg)
