@@ -1,4 +1,4 @@
-import json, urllib.request, urllib.error, sys
+import json, urllib.request, urllib.error, sys, time
 from .narrator import TemplateNarrator
 
 class AINarrator:
@@ -11,6 +11,8 @@ class AINarrator:
         try:
             # First locally expand {{vars}} so the model gets specific context.
             prompt = TemplateNarrator().render(template, ctx)
+            start = time.time()
+            print(f"[narration] CALLING OpenAI backend={self.KIND}", file=sys.stderr)
             body = {
                 "model": "gpt-4o-mini",
                 "input": [
@@ -29,12 +31,16 @@ class AINarrator:
             )
             with urllib.request.urlopen(req, timeout=15) as r:
                 data = json.loads(r.read().decode("utf-8"))
+            elapsed = int((time.time() - start) * 1000)
             out = ""
             for item in data.get("output", []):
                 if isinstance(item, dict) and item.get("content"):
                     for c in item["content"]:
                         if isinstance(c, dict) and c.get("type") == "output_text":
                             out += c.get("text","")
+            usage = data.get("usage") or {}
+            tokens = usage.get("output_tokens") or usage.get("total_tokens") or "?"
+            print(f"[narration] DONE backend={self.KIND} tokens={tokens} time={elapsed}ms", file=sys.stderr)
             return (out or prompt).strip()
         except urllib.error.HTTPError as e:
             print(f"[narration] ERROR http {e.code}: {e.reason}", file=sys.stderr)

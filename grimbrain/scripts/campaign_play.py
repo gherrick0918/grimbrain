@@ -24,7 +24,7 @@ from grimbrain.engine.progression import award_xp, maybe_level_up
 from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
-from grimbrain.engine.config import load_config, save_config
+from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -240,6 +240,12 @@ def story(
     story: str | None = typer.Option(
         None, "--story", help="Path to story YAML (overrides positional argument)"
     ),
+    ai: str | None = typer.Option(
+        None, "--ai", help="'on'/'off' to override env/config narration setting"
+    ),
+    flush_cache: bool = typer.Option(
+        False, "--flush-cache", help="Bypass narration cache for this run"
+    ),
     narration_debug: bool = typer.Option(
         False,
         "--narration-debug",
@@ -251,6 +257,7 @@ def story(
     load_path = _cli_value(load)
     story_path = _cli_value(story)
     file_path = _cli_value(file)
+    ai = _cli_value(ai)
     if not story_path:
         story_path = file_path
     if not story_path and isinstance(load_path, str) and load_path.lower().endswith((".yaml", ".yml")):
@@ -295,7 +302,13 @@ def story(
 
     rng_seed = camp.seed if camp.seed is not None else state.seed
     rng = random.Random(rng_seed or 0)
-    narrator = get_narrator(debug=bool(narration_debug))
+    ai_enabled = choose_ai_enabled(ai)
+    narrator = get_narrator(
+        ai_enabled=ai_enabled, debug=bool(narration_debug), flush=bool(flush_cache)
+    )
+    if narration_debug:
+        src = "flag" if ai is not None else "env/config"
+        print(f"[narration] effective_ai={'ON' if ai_enabled else 'OFF'} (source={src})")
 
     flags_obj = state.inventory.setdefault("_flags", [])
     if isinstance(flags_obj, list):
