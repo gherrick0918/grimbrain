@@ -28,6 +28,14 @@ def get_ai_enabled() -> bool:
         val = str(load_config().get("GRIMBRAIN_AI", "0"))
     return val.strip().lower() in ("1","true","yes","on")
 
+def choose_ai_enabled(override: str | None) -> bool:
+    """
+    override: "on"|"off"|None. Precedence: override > env > config.
+    """
+    if override is not None:
+        return override.strip().lower() in ("on","1","true","yes")
+    return get_ai_enabled()
+
 def append_cache_line(path: Path, obj: Dict[str, Any]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
