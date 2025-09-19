@@ -40,17 +40,29 @@ def _parse_scores_from_array(array_csv: str) -> Dict[str, int]:
     return dict(zip(ABILS, values_sorted))
 
 
-def _parse_scores_from_kv(kv_csv: str) -> Dict[str, int]:
+def _parse_scores_from_kv(kv: str) -> Dict[str, int]:
+    """
+    Accepts either:
+      - "STR=10 DEX=15 CON=14 INT=12 WIS=10 CHA=8" (space-separated)
+      - "STR=10,DEX=15,CON=14,INT=12,WIS=10,CHA=8" (comma-separated)
+    """
+
     results: Dict[str, int] = {}
-    for pair in kv_csv.replace(",", " ").split():
+    tokens: list[str] = []
+    for chunk in kv.split(","):
+        tokens.extend(chunk.strip().split())
+
+    for pair in tokens:
         if "=" not in pair:
             continue
         key, value = pair.split("=", 1)
         key = key.strip().upper()
         results[key] = int(value)
+
     for ability in ABILS:
         if ability not in results:
-            raise ValueError(f"Missing {ability} in --scores")
+            raise ValueError(f"Missing {ability} in scores (have {sorted(results)})")
+
     return results
 
 

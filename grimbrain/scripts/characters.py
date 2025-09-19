@@ -29,9 +29,8 @@ def _parse_bool(value: str) -> bool:
     raise typer.BadParameter("--ranged expects true/false")
 
 
-@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@app.command()
 def new(
-    ctx: typer.Context,
     name: str = typer.Option(..., "--name"),
     klass: str = typer.Option(..., "--class", help="Fighter, Rogue, Wizard (MVP)"),
     weapon: str = typer.Option(..., "--weapon"),
@@ -41,7 +40,10 @@ def new(
     scores: str | None = typer.Option(
         None,
         "--scores",
-        help="e.g. STR=15 DEX=14 CON=14 INT=10 WIS=10 CHA=8",
+        help="Quoted KV list or CSV: \"STR=15 DEX=14 ...\" or STR=15,DEX=14,...",
+    ),
+    score: list[str] | None = typer.Option(
+        None, "--score", help="Repeatable KV: --score STR=15 --score DEX=14 ..."
     ),
     out: str | None = typer.Option(
         None, "--out", help="Output path; default data/pcs/<name>.json"
@@ -49,20 +51,14 @@ def new(
 ):
     """
     Create a level-1 PC and save to JSON under data/pcs/ by default.
-    Provide either --array or (--point-buy and --scores).
+    Provide either --array or (--point-buy and scores via --scores/--score).
     """
 
     if array:
         scores_map = _parse_scores_from_array(array)
-    elif point_buy is not None and scores:
-        extras = []
-        while ctx.args and "=" in ctx.args[0]:
-            extras.append(ctx.args.pop(0))
-        tokens = [scores, *extras]
-        scores_map = _parse_scores_from_kv(" ".join(tokens))
-        if len(scores_map) != len(ABILS):
-            missing = [k for k in ABILS if k not in scores_map]
-            raise typer.BadParameter(f"Missing {' '.join(missing)} in --scores")
+    elif point_buy is not None and (scores or score):
+        kv = " ".join(score) if score else scores
+        scores_map = _parse_scores_from_kv(kv or "")
         spent = _point_buy_cost(scores_map)
         if spent > point_buy:
             raise typer.BadParameter(
@@ -82,4 +78,6 @@ def new(
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "new":
+        sys.argv.pop(1)
     app()
