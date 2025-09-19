@@ -29,6 +29,7 @@ from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
+from grimbrain.engine.journal import log_event
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -187,8 +188,36 @@ def travel(
     else:
         step = max(0, getattr(st, "encounter_clock_step", 10))
         st.encounter_clock = min(100, st.encounter_clock + step)
-    save_campaign(st, load)
     eff = min(100, st.encounter_chance + st.encounter_clock)
+    if res.get("encounter"):
+        winner = res.get("winner", "?")
+        rounds = res.get("rounds")
+        outcome = "Victory" if winner == "A" else "Defeat"
+        summary = f"Travel {hours}h; Encounter {res['encounter']} — {outcome}"
+        if isinstance(rounds, int):
+            summary += f" in {rounds} rounds"
+        log_event(
+            st,
+            summary,
+            kind="travel",
+            extra={
+                "chance": st.encounter_chance,
+                "clock": st.encounter_clock,
+                "effective": eff,
+            },
+        )
+    else:
+        log_event(
+            st,
+            f"Travel {hours}h; No encounter",
+            kind="travel",
+            extra={
+                "chance": st.encounter_chance,
+                "clock": st.encounter_clock,
+                "effective": eff,
+            },
+        )
+    save_campaign(st, load)
     print(
         f"Day {st.day} {st.time_of_day} @ {st.location} | chance={st.encounter_chance}% + clock={st.encounter_clock}% → effective={eff}%"
     )
@@ -244,6 +273,7 @@ def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None)
             p.max_hp, st.current_hp.get(p.id, p.max_hp) + max(1, heal)
         )
         notes.append(f"{p.name} heals {heal} (short rest).")
+    log_event(st, "Short rest", kind="rest", extra={"type": "short"})
     # PR49: advance time by configured short rest hours
     advance_time(st, hours=getattr(st, "short_rest_hours", 4))
     save_campaign(st, load)
@@ -256,6 +286,7 @@ def long_rest(load: str = typer.Option(..., "--load")):
     for p in st.party:
         st.current_hp[p.id] = p.max_hp
     st.last_long_rest_day = st.day
+    log_event(st, "Long rest", kind="rest", extra={"type": "long"})
     # PR49: advance to next morning if configured
     if getattr(st, "long_rest_to_morning", True):
         # advance at least one segment then roll until morning
@@ -381,6 +412,13 @@ def story(
             "party_names": ", ".join(p.name for p in state.party) if state.party else "Hero",
         }
 
+        log_event(
+            state,
+            f"Story scene: {scene.id}",
+            kind="story",
+            extra={"scene": scene.id},
+        )
+
         missing = [req for req in scene.requires if req and req not in flags]
         if missing:
             print(f"(You lack: {', '.join(missing)})")
@@ -451,6 +489,16 @@ def story(
             print(
                 f"(Combat resolved: {outcome} over {', '.join(enemies)} in {res['rounds']} rounds)"
             )
+            rounds = res.get("rounds")
+            detail = f"Story encounter {', '.join(enemies)} — {outcome}"
+            if isinstance(rounds, int):
+                detail += f" in {rounds} rounds"
+            log_event(
+                state,
+                detail,
+                kind="story_encounter",
+                extra={"scene": scene.id, "rounds": rounds},
+            )
             if winner == "A":
                 notes: list[str] = []
                 pcs_data = []
@@ -508,6 +556,12 @@ def story(
                     advance_time(state, hours=4)
                     while state.time_of_day != "morning":
                         advance_time(state, hours=4)
+                log_event(
+                    state,
+                    "Story rest: long",
+                    kind="story_rest",
+                    extra={"scene": scene.id, "type": "long"},
+                )
             elif scene.rest == "short":
                 for p in state.party:
                     heal = rng.randint(1, 8) + p.con_mod
@@ -517,6 +571,12 @@ def story(
                     )
                 print("The party takes a short rest and recovers some health.")
                 advance_time(state, hours=getattr(state, "short_rest_hours", 4))
+                log_event(
+                    state,
+                    "Story rest: short",
+                    kind="story_rest",
+                    extra={"scene": scene.id, "type": "short"},
+                )
 
         if scene.choices:
             for idx, choice in enumerate(scene.choices, 1):
@@ -535,9 +595,16 @@ def story(
                         sel = num
                         break
                 print("Invalid choice.")
+            choice_obj = scene.choices[sel - 1]
+            log_event(
+                state,
+                f"Story choice: {scene.id} → {choice_obj.next}",
+                kind="story",
+                extra={"scene": scene.id, "choice": choice_obj.text},
+            )
             apply_flags(scene)
             persist()
-            current = scene.choices[sel - 1].next
+            current = choice_obj.next
             continue
         else:
             apply_flags(scene)
@@ -586,6 +653,12 @@ def shop(
                 st.gold -= price
                 st.inventory[item] = st.inventory.get(item, 0) + qty
                 print(f"Bought {qty}× {item} for {price} gp.")
+                log_event(
+                    st,
+                    f"Shop: bought {item} x{qty} for {price} gp",
+                    kind="shop",
+                    extra={"item": item, "qty": qty, "gp": price, "op": "buy"},
+                )
             else:
                 print(f"Not enough gold to buy {qty}× {item}.")
         elif op == "sell" and len(parts) >= 2:
@@ -602,12 +675,47 @@ def shop(
                 st.inventory.pop(item, None)
             st.gold += price
             print(f"Sold {qty}× {item} for {price} gp.")
+            log_event(
+                st,
+                f"Shop: sold {item} x{qty} for {price} gp",
+                kind="shop",
+                extra={"item": item, "qty": qty, "gp": price, "op": "sell"},
+            )
         elif op in {"leave", "exit", "quit"}:
             break
         else:
             print("Unknown command.")
     save_campaign(st, load)
     print(f"Leaving shop. Current gold: {st.gold}.")
+
+
+@app.command()
+def journal(
+    load: str = typer.Option(..., "--load"),
+    tail: int | None = typer.Option(None, "--tail", help="Show only the last N entries"),
+    grep: str | None = typer.Option(None, "--grep", help="Filter entries containing text"),
+    clear: bool = typer.Option(False, "--clear", help="Erase the journal after showing"),
+):
+    """Print the adventure log from the campaign save."""
+
+    st = load_campaign(load)
+    entries = list(getattr(st, "journal", []) or [])
+    if grep:
+        needle = grep.lower()
+        entries = [e for e in entries if needle in (e.get("text", "").lower())]
+    if tail is not None and tail > 0:
+        entries = entries[-tail:]
+    for entry in entries:
+        day = entry.get("day")
+        tod = entry.get("time")
+        loc = entry.get("loc")
+        kind = entry.get("kind", "info")
+        text = entry.get("text", "")
+        print(f"[Day {day} {tod} @ {loc}] ({kind}) {text}")
+    if clear:
+        st.journal = []
+        save_campaign(st, load)
+        print("(Journal cleared.)")
 
 
 @app.command()
@@ -621,11 +729,26 @@ def quest(
         qid = f"Q{len(st.quest_log)+1}"
         st.quest_log.append(QuestLogItem(id=qid, text=add, done=False))
         print(f"Added quest {qid}: {add}")
+        log_event(
+            st,
+            f"Quest added: {qid} — {add}",
+            kind="quest",
+            extra={"id": qid, "op": "add"},
+        )
     elif done:
+        found = False
         for q in st.quest_log:
             if q.id == done:
                 q.done = True
                 print(f"Completed quest {done}")
+                found = True
+        if found:
+            log_event(
+                st,
+                f"Quest completed: {done}",
+                kind="quest",
+                extra={"id": done, "op": "done"},
+            )
     else:
         if st.quest_log:
             for q in st.quest_log:
