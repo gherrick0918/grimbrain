@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import json
 import yaml
 
@@ -194,6 +194,7 @@ class CampaignState:
     # PR49: rest timing knobs
     short_rest_hours: int = 4
     long_rest_to_morning: bool = True
+    journal: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def load_campaign(path: str) -> CampaignState:
@@ -217,6 +218,7 @@ def load_campaign(path: str) -> CampaignState:
         encounter_clock_step=raw.get("encounter_clock_step", 10),
         short_rest_hours=raw.get("short_rest_hours", 4),
         long_rest_to_morning=raw.get("long_rest_to_morning", True),
+        journal=raw.get("journal", []) or [],
     )
     if not st.current_hp:
         for p in st.party:
