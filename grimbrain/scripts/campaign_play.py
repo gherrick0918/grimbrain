@@ -1,6 +1,10 @@
 import random
+import sys
 from pathlib import Path
 from typing import Any
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import typer
 from typer.models import ArgumentInfo, OptionInfo
