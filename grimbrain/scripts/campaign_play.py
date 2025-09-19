@@ -107,6 +107,16 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
         return [name] * count
     return [text]
 
+
+def _party_status_line(st: CampaignState) -> str:
+    parts: list[str] = []
+    hp = getattr(st, "current_hp", {}) or {}
+    for pm in st.party:
+        cur = hp.get(pm.id, pm.max_hp)
+        parts.append(f"{pm.name} {cur}/{pm.max_hp}")
+    gold = getattr(st, "gold", 0)
+    return f"Party: {', '.join(parts)} | Gold: {gold}"
+
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
 
 
@@ -195,6 +205,27 @@ def travel(
     else:
         # notes already contains "No encounter." in this branch
         print("No encounter.")
+
+
+@app.command()
+def status(load: str = typer.Option(..., "--load")):
+    """
+    Print day/time, location, encounter chance/clock, party HP, and a couple inventory counts.
+    """
+
+    st = load_campaign(load)
+    chance = getattr(st, "encounter_chance", 30)
+    clock = getattr(st, "encounter_clock", 0)
+    eff = min(100, chance + clock)
+    print(
+        f"Day {st.day} {st.time_of_day} @ {st.location} | "
+        f"chance={chance}% + clock={clock}% → effective={eff}%"
+    )
+    print(_party_status_line(st))
+    inv = getattr(st, "inventory", {}) or {}
+    key_items = [k for k in ("potion_healing", "ammo_arrows") if k in inv]
+    if key_items:
+        print("Inventory:", ", ".join(f"{k}={inv[k]}" for k in key_items))
 
 
 @app.command()
