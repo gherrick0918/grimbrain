@@ -1,0 +1,22 @@
+{
+  "id": "Aria",
+  "name": "Aria",
+  "str_mod": 2,
+  "dex_mod": 2,
+  "con_mod": 1,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 12,
+  "max_hp": 11,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": false,
+  "prof_athletics": false,
+  "prof_acrobatics": false,
+  "weapon_primary": "Longsword",
+  "weapon_offhand": null
+}
