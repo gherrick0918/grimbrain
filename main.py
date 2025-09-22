@@ -797,15 +797,16 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     os.environ.setdefault("GB_ENGINE", "data")
 
+    if args and args[0] == "content":
+        from grimbrain.content.cli import main as content_main
+
+        return content_main(args[1:])
+    if args and args[0] == "play":
+        from grimbrain.play_cli import main as play_main
+
+        return play_main(args[1:])
+
     if os.getenv("GB_ENGINE") == "data":
-        if args and args[0] == "content":
-            from grimbrain.content.cli import main as content_main
-
-            return content_main(args[1:])
-        if args and args[0] == "play":
-            from grimbrain.play_cli import main as play_main
-
-            return play_main(args[1:])
         from grimbrain.rules.cli import main as rules_main  # lazy import
 
         return rules_main(args)
