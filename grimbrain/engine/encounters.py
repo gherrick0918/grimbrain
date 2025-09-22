@@ -88,4 +88,9 @@ def run_encounter(
                 continue
             state.inventory[item] = state.inventory.get(item, 0) + qty
 
-    return {"encounter": table["name"], "winner": winner, "loot": loot}
+    return {
+        "encounter": table["name"],
+        "winner": winner,
+        "loot": loot,
+        "rounds": res.get("rounds"),
+    }
