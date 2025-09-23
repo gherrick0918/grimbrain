@@ -708,9 +708,10 @@ def journal(
     if tail is not None and tail > 0:
         entries = entries[-tail:]
 
-    if export:
-        write_export(entries, export, style=style)
-        print(f"Exported journal to {export}")
+    export_path = export if isinstance(export, str) else None
+    if export_path:
+        write_export(entries, export_path, style=style)
+        print(f"Exported journal to {export_path}")
     else:
         lines = format_entries(entries, style=style)
         if lines:
