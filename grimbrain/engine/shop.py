@@ -1,11 +1,18 @@
 
 from typing import Dict, List, Optional
 
+from .inventory import add_item, remove_item
+
 PRICES = {"potion_healing": 50, "ammo_arrows": 1, "Longsword": 10, "Scimitar": 10, "Longbow": 10}
 
 def run_shop(state: Dict, notes: List[str], rng, script_path: Optional[str] = None) -> None:
     gold = state.setdefault("gold", 0)
     inv = state.setdefault("inventory", {})
+    if isinstance(inv, list):
+        normalized: Dict[str, int] = {}
+        for item in inv:
+            add_item(normalized, item)
+        state["inventory"] = inv = normalized
     cmds: List[str] = []
     if script_path:
         with open(script_path, "r", encoding="utf-8") as f:
@@ -15,8 +22,8 @@ def run_shop(state: Dict, notes: List[str], rng, script_path: Optional[str] = No
         price = PRICES.get(item, 0) * qty
         if gold >= price:
             gold -= price
-            inv[item] = inv.get(item, 0) + qty
-            notes.append(f"Bought {qty}× {item} for {price} gp.")
+            add_item(inv, item, qty)
+            notes.append(f"Bought {item} x{qty} for {price} gp.")
         else:
             notes.append(f"Not enough gold to buy {qty}× {item}.")
     def sell(item: str, qty: int = 1) -> None:
@@ -27,11 +34,11 @@ def run_shop(state: Dict, notes: List[str], rng, script_path: Optional[str] = No
             notes.append(f"No {item} to sell.")
             return
         price = int(PRICES.get(item, 0) * 0.5) * qty
-        inv[item] = have - qty
-        if inv[item] <= 0:
-            inv.pop(item, None)
+        if not remove_item(inv, item, qty):
+            notes.append(f"No {item} to sell.")
+            return
         gold += price
-        notes.append(f"Sold {qty}× {item} for {price} gp.")
+        notes.append(f"Sold {item} x{qty} for {price} gp.")
     for raw in cmds:
         parts = raw.split()
         if not parts:

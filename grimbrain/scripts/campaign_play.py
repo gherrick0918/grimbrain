@@ -26,6 +26,7 @@ from grimbrain.engine.encounters import run_encounter
 from grimbrain.engine.loot import roll_loot
 from grimbrain.engine.progression import award_xp, maybe_level_up
 from grimbrain.engine.shop import PRICES, run_shop
+from grimbrain.engine.inventory import add_item, remove_item, format_inventory
 from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
@@ -251,10 +252,8 @@ def status(load: str = typer.Option(..., "--load")):
         f"chance={chance}% + clock={clock}% → effective={eff}%"
     )
     print(_party_status_line(st))
-    inv = getattr(st, "inventory", {}) or {}
-    key_items = [k for k in ("potion_healing", "ammo_arrows") if k in inv]
-    if key_items:
-        print("Inventory:", ", ".join(f"{k}={inv[k]}" for k in key_items))
+    st.normalize_inventory()
+    print("Inventory:", format_inventory(st.inventory))
 
 
 @app.command()
@@ -621,10 +620,11 @@ def shop(
 ):
     """Buy and sell items using campaign gold and inventory."""
     st = load_campaign(load)
+    st.normalize_inventory()
     rng = random.Random(seed if seed is not None else st.seed)
     notes: list[str] = []
     if script:
-        data = {"gold": st.gold, "inventory": st.inventory}
+        data = {"gold": st.gold, "inventory": dict(st.inventory)}
         run_shop(data, notes, rng, script)
         st.gold = data["gold"]
         st.inventory = data["inventory"]
@@ -651,11 +651,11 @@ def shop(
             price = PRICES.get(item, 0) * qty
             if st.gold >= price:
                 st.gold -= price
-                st.inventory[item] = st.inventory.get(item, 0) + qty
+                add_item(st.inventory, item, qty)
                 print(f"Bought {qty}× {item} for {price} gp.")
                 log_event(
                     st,
-                    f"Shop: bought {item} x{qty} for {price} gp",
+                    f"Bought {item} x{qty} for {price} gp",
                     kind="shop",
                     extra={"item": item, "qty": qty, "gp": price, "op": "buy"},
                 )
@@ -670,14 +670,15 @@ def shop(
                 print(f"No {item} to sell.")
                 continue
             price = int(PRICES.get(item, 0) * 0.5) * qty
-            st.inventory[item] = have - qty
-            if st.inventory[item] <= 0:
-                st.inventory.pop(item, None)
+            removed = remove_item(st.inventory, item, qty)
+            if not removed:
+                print(f"No {item} to sell.")
+                continue
             st.gold += price
             print(f"Sold {qty}× {item} for {price} gp.")
             log_event(
                 st,
-                f"Shop: sold {item} x{qty} for {price} gp",
+                f"Sold {item} x{qty} for {price} gp",
                 kind="shop",
                 extra={"item": item, "qty": qty, "gp": price, "op": "sell"},
             )

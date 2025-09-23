@@ -196,6 +196,22 @@ class CampaignState:
     long_rest_to_morning: bool = True
     journal: List[Dict[str, Any]] = field(default_factory=list)
 
+    def normalize_inventory(self) -> None:
+        """Ensure the inventory is stored as a mapping of item → quantity."""
+
+        if self.inventory is None:
+            self.inventory = {}
+        elif isinstance(self.inventory, list):
+            upgraded: Dict[str, int] = {}
+            for item in self.inventory:
+                upgraded[item] = upgraded.get(item, 0) + 1
+            self.inventory = upgraded
+
+    def __post_init__(self) -> None:
+        if self.journal is None:
+            self.journal = []
+        self.normalize_inventory()
+
 
 def load_campaign(path: str) -> CampaignState:
     with open(path, "r", encoding="utf-8") as f:
