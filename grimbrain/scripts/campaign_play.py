@@ -29,7 +29,7 @@ from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
-from grimbrain.engine.journal import log_event
+from grimbrain.engine.journal import format_entries, log_event, write_export
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -695,8 +695,10 @@ def journal(
     tail: int | None = typer.Option(None, "--tail", help="Show only the last N entries"),
     grep: str | None = typer.Option(None, "--grep", help="Filter entries containing text"),
     clear: bool = typer.Option(False, "--clear", help="Erase the journal after showing"),
+    style: str = typer.Option("compact", "--style", help="compact|detailed"),
+    export: str | None = typer.Option(None, "--export", help="Write to path (.md or .txt)"),
 ):
-    """Print the adventure log from the campaign save."""
+    """Print or export the adventure log from the campaign save."""
 
     st = load_campaign(load)
     entries = list(getattr(st, "journal", []) or [])
@@ -705,13 +707,16 @@ def journal(
         entries = [e for e in entries if needle in (e.get("text", "").lower())]
     if tail is not None and tail > 0:
         entries = entries[-tail:]
-    for entry in entries:
-        day = entry.get("day")
-        tod = entry.get("time")
-        loc = entry.get("loc")
-        kind = entry.get("kind", "info")
-        text = entry.get("text", "")
-        print(f"[Day {day} {tod} @ {loc}] ({kind}) {text}")
+
+    if export:
+        write_export(entries, export, style=style)
+        print(f"Exported journal to {export}")
+    else:
+        lines = format_entries(entries, style=style)
+        if lines:
+            print("\n".join(lines))
+        else:
+            print("(Journal is empty.)")
     if clear:
         st.journal = []
         save_campaign(st, load)
