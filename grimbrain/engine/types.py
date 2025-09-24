@@ -62,6 +62,9 @@ class Combatant:
     grappled_by: Optional[str] = None
     proficient_athletics: bool = False
     proficient_acrobatics: bool = False
+    stealth_disadvantage: bool = False
+    prof_skills: Set[str] = field(default_factory=set)
+    prof_saves: Set[str] = field(default_factory=set)
     # --- PR40 short-lived tactical state ---
     dodging: bool = False
     help_tokens: Dict[str, int] = field(default_factory=dict)  # target_id -> remaining uses

@@ -22,7 +22,7 @@ def check_concentration_on_damage(c: Combatant, damage_taken: int, *, rng: rando
         return True, 0
     dc = max(10, damage_taken // 2)
     mode = "advantage" if has_war_caster else "none"
-    ok, d, _ = roll_save(c.actor, "CON", dc, mode=mode, rng=rng)
+    ok, d, _ = roll_save(c.actor, "CON", dc, mode=mode, rng=rng, combatant=c)
     if not ok:
         drop_concentration(c, f"failed CON save DC {dc} (rolled {d}+mod)")
     return ok, dc

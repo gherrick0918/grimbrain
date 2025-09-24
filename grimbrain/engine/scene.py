@@ -132,7 +132,7 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
             log.append(f"{attacker.name} is stable at 0 HP (unconscious).")
             return (log, distance_ft, False)
     if "restrained" in attacker.conditions:
-        ok, d, cands = roll_save(attacker.actor, "STR", 10, rng=rng)
+        ok, d, cands = roll_save(attacker.actor, "STR", 10, rng=rng, combatant=attacker)
         if ok:
             attacker.conditions.discard("restrained")
             log.append(f"{attacker.name} escapes restraint (STR save {d}+mod >= 10)")

@@ -1,0 +1,17 @@
+{
+  "Fighter": {
+    "prof_saves":["STR","CON"],
+    "prof_skills":["Athletics","Intimidation"],
+    "start_armor":["Chain Mail","Leather","Shield"]
+  },
+  "Rogue": {
+    "prof_saves":["DEX","INT"],
+    "prof_skills":["Stealth","Acrobatics"],
+    "start_armor":["Leather"]
+  },
+  "Wizard": {
+    "prof_saves":["INT","WIS"],
+    "prof_skills":["Arcana","History"],
+    "start_armor":[]
+  }
+}
