@@ -1,7 +1,8 @@
 from dataclasses import asdict
-from typing import Dict
+from typing import Dict, List
 from pathlib import Path
 import json
+import random
 
 from .campaign import PartyMemberRef
 
@@ -103,3 +104,30 @@ def save_pc(pc: PartyMemberRef, out_path: str) -> None:
 def load_pc(path: str) -> PartyMemberRef:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     return PartyMemberRef(**data)
+
+
+def roll_4d6_drop_lowest(rng: random.Random) -> int:
+    dice = sorted([rng.randint(1, 6) for _ in range(4)], reverse=True)
+    return sum(dice[:3])
+
+
+def roll_abilities(seed: int | None = None) -> List[int]:
+    """Roll 4d6 drop lowest, six times, returning descending scores."""
+
+    rng = random.Random(seed)
+    rolls = [roll_4d6_drop_lowest(rng) for _ in range(6)]
+    return sorted(rolls, reverse=True)
+
+
+def scores_from_list_desc(desc_scores: List[int]) -> Dict[str, int]:
+    if len(desc_scores) != 6:
+        raise ValueError("Need 6 scores")
+    return dict(zip(ABILS, list(desc_scores)))
+
+
+def pc_summary_line(
+    name: str, cls: str, scores: Dict[str, int], weapon: str, ranged: bool
+) -> str:
+    arr = "/".join(str(scores[key]) for key in ABILS)
+    suffix = " (ranged)" if ranged else ""
+    return f"{name} the {cls} [{arr}] w/ {weapon}{suffix}"
