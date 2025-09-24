@@ -37,11 +37,40 @@ def _ability_check(c: GBCombatant, ability: str, *, rng: Optional[random.Random]
     return total, note
 
 
+def _skill_proficient(c: GBCombatant, skill: str) -> bool:
+    profs = getattr(c, "prof_skills", None)
+    if profs:
+        skill_lower = skill.lower()
+        for entry in profs:
+            if str(entry).lower() == skill_lower:
+                return True
+    if skill.lower() == "athletics" and getattr(c, "proficient_athletics", False):
+        return True
+    if skill.lower() == "acrobatics" and getattr(c, "proficient_acrobatics", False):
+        return True
+    return False
+
+
 def contested_check_grapple_or_shove(attacker: GBCombatant, defender: GBCombatant, *, rng: Optional[random.Random] = None) -> Tuple[bool, str]:
     """Resolve contested Athletics vs Athletics/Acrobatics check."""
-    atk_total, atk_note = _ability_check(attacker, "STR", rng=rng, proficient=getattr(attacker, "proficient_athletics", False))
-    d_str, note_str = _ability_check(defender, "STR", rng=rng, proficient=getattr(defender, "proficient_athletics", False))
-    d_dex, note_dex = _ability_check(defender, "DEX", rng=rng, proficient=getattr(defender, "proficient_acrobatics", False))
+    atk_total, atk_note = _ability_check(
+        attacker,
+        "STR",
+        rng=rng,
+        proficient=_skill_proficient(attacker, "Athletics"),
+    )
+    d_str, note_str = _ability_check(
+        defender,
+        "STR",
+        rng=rng,
+        proficient=_skill_proficient(defender, "Athletics"),
+    )
+    d_dex, note_dex = _ability_check(
+        defender,
+        "DEX",
+        rng=rng,
+        proficient=_skill_proficient(defender, "Acrobatics"),
+    )
     if d_dex >= d_str:
         d_tot, d_note, d_choice = d_dex, note_dex, "DEX(Acrobatics)"
     else:

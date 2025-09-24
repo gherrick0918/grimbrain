@@ -5,6 +5,7 @@ import json
 import random
 
 from .campaign import PartyMemberRef
+from .srd import find_armor, find_shield, load_srd
 
 
 HIT_DICE = {
@@ -74,14 +75,48 @@ def build_partymember(
     weapon: str,
     ranged: bool,
     pb: int = 2,
+    armor: str | None = None,
+    shield: bool = False,
+    prof_skills: List[str] | None = None,
+    prof_saves: List[str] | None = None,
 ) -> PartyMemberRef:
     cls_l = cls.lower()
     hit_die = HIT_DICE.get(cls_l, 8)
     mods = {ability.lower() + "_mod": ability_mod(scores[ability]) for ability in ABILS}
     ac = 10 + max(0, mods["dex_mod"])
+    stealth_disadv = False
+    armor_name: str | None = None
+    try:
+        srd = load_srd()
+    except FileNotFoundError:
+        srd = None
+    if armor and srd:
+        armor_obj = find_armor(armor, srd)
+        if not armor_obj:
+            known = ", ".join(sorted(srd.armors))
+            raise ValueError(f"Unknown armor '{armor}'. Known: {known}")
+        dex_bonus = mods["dex_mod"]
+        if armor_obj.dex_cap is not None:
+            dex_bonus = min(dex_bonus, armor_obj.dex_cap)
+        ac = armor_obj.base_ac + max(0, dex_bonus)
+        stealth_disadv = armor_obj.stealth_disadv
+        armor_name = armor_obj.name
+    elif armor:
+        armor_name = armor
+    if shield and srd:
+        shield_obj = find_shield("Shield", srd)
+        if not shield_obj:
+            raise ValueError("Shield data missing from SRD cache")
+        ac += shield_obj.ac_bonus
+    elif shield:
+        ac += 2
     max_hp = hit_die + mods["con_mod"]
     if max_hp < 1:
         max_hp = 1
+    prof_skills_set = sorted(set(prof_skills or []))
+    prof_saves_set = sorted(set(prof_saves or []))
+    has_athletics = "Athletics" in prof_skills_set
+    has_acrobatics = "Acrobatics" in prof_skills_set
     return PartyMemberRef(
         id=name,
         name=name,
@@ -91,6 +126,13 @@ def build_partymember(
         max_hp=max_hp,
         weapon_primary=weapon,
         ranged=ranged,
+        armor=armor_name,
+        shield=bool(shield),
+        stealth_disadv=stealth_disadv,
+        prof_skills=prof_skills_set,
+        prof_saves=prof_saves_set,
+        prof_athletics=has_athletics,
+        prof_acrobatics=has_acrobatics,
         **mods,
     )
 

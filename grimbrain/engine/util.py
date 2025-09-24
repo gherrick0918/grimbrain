@@ -18,6 +18,8 @@ def make_combatant_from_party_member(p: PartyMemberRef, *, team: str, cid: str) 
         proficiency_bonus=p.pb,
         speed_ft=p.speed,
         proficiencies={"simple weapons", "martial weapons"},
+        equipped_armor=p.armor,
+        equipped_shield=p.shield,
     )
     cmb = Combatant(
         id=cid,
@@ -40,5 +42,8 @@ def make_combatant_from_party_member(p: PartyMemberRef, *, team: str, cid: str) 
         ranged=p.ranged,
         proficient_athletics=p.prof_athletics,
         proficient_acrobatics=p.prof_acrobatics,
+        stealth_disadvantage=p.stealth_disadv,
+        prof_skills=set(p.prof_skills or []),
+        prof_saves=set(p.prof_saves or []),
     )
     return cmb

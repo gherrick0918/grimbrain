@@ -31,6 +31,12 @@ from grimbrain.engine.skirmish import run_skirmish
 from grimbrain.engine.narrator import get_narrator
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
 from grimbrain.engine.journal import format_entries, log_event, write_export
+from grimbrain.engine.srd import load_srd, skill_ability
+
+try:
+    _SRD_DATA = load_srd()
+except FileNotFoundError:
+    _SRD_DATA = None
 
 
 def _default_party() -> list[PartyMemberRef]:
@@ -49,6 +55,10 @@ def _default_party() -> list[PartyMemberRef]:
             pb=2,
             speed=30,
             weapon_primary="Longsword",
+            armor="Chain Mail",
+            shield=True,
+            prof_skills=["Athletics"],
+            prof_saves=["STR", "CON"],
         ),
         PartyMemberRef(
             id="PC2",
@@ -65,6 +75,9 @@ def _default_party() -> list[PartyMemberRef]:
             speed=30,
             ranged=True,
             weapon_primary="Longbow",
+            armor="Leather",
+            prof_skills=["Stealth"],
+            prof_saves=["DEX", "INT"],
         ),
     ]
 
@@ -88,6 +101,11 @@ def _pc_to_ref(pc, idx: int) -> PartyMemberRef:
         speed=getattr(pc, "speed", 30),
         ranged=ranged,
         weapon_primary=weapon,
+        armor=getattr(pc, "armor", getattr(pc, "equipped_armor", None)),
+        shield=bool(getattr(pc, "shield", getattr(pc, "equipped_shield", False))),
+        stealth_disadv=getattr(pc, "stealth_disadv", False),
+        prof_skills=list(getattr(pc, "prof_skills", [])),
+        prof_saves=list(getattr(pc, "prof_saves", [])),
     )
 
 
@@ -110,12 +128,46 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
     return [text]
 
 
+def _skill_bonus(pm: PartyMemberRef, skill_name: str) -> int:
+    ability = None
+    canonical = skill_name
+    if _SRD_DATA is not None:
+        canonical_lookup = None
+        for key in _SRD_DATA.skills:
+            if key.lower() == skill_name.lower():
+                canonical_lookup = key
+                break
+        if canonical_lookup:
+            canonical = canonical_lookup
+            ability = skill_ability(canonical_lookup, _SRD_DATA)
+    if ability is None:
+        fallback = {
+            "athletics": "STR",
+            "acrobatics": "DEX",
+            "stealth": "DEX",
+            "perception": "WIS",
+        }
+        ability = fallback.get(skill_name.lower())
+    mod = getattr(pm, f"{ability.lower()}_mod", 0) if ability else 0
+    profs = {str(s).lower() for s in getattr(pm, "prof_skills", []) or []}
+    if canonical and canonical.lower() in profs:
+        mod += pm.pb
+    elif skill_name.lower() == "athletics" and getattr(pm, "prof_athletics", False):
+        mod += pm.pb
+    elif skill_name.lower() == "acrobatics" and getattr(pm, "prof_acrobatics", False):
+        mod += pm.pb
+    return mod
+
+
 def _party_status_line(st: CampaignState) -> str:
     parts: list[str] = []
     hp = getattr(st, "current_hp", {}) or {}
     for pm in st.party:
         cur = hp.get(pm.id, pm.max_hp)
-        parts.append(f"{pm.name} {cur}/{pm.max_hp}")
+        armor = getattr(pm, "armor", None)
+        shield = " +Shield" if getattr(pm, "shield", False) else ""
+        armor_text = f" {armor}" if armor else ""
+        parts.append(f"{pm.name} {cur}/{pm.max_hp} (AC {pm.ac}{armor_text}{shield})")
     gold = getattr(st, "gold", 0)
     return f"Party: {', '.join(parts)} | Gold: {gold}"
 
@@ -437,11 +489,7 @@ def story(
             pc = state.party[0]
             mod = 0
             if chk.skill:
-                skill = chk.skill.lower()
-                if skill == "athletics":
-                    mod = pc.str_mod + (pc.pb if pc.prof_athletics else 0)
-                elif skill == "acrobatics":
-                    mod = pc.dex_mod + (pc.pb if pc.prof_acrobatics else 0)
+                mod = _skill_bonus(pc, chk.skill)
             elif chk.ability:
                 ab = chk.ability.lower()
                 mod = getattr(pc, f"{ab}_mod", 0)

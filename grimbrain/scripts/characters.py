@@ -20,6 +20,7 @@ from grimbrain.engine.characters import (
     scores_from_list_desc,
 )
 from grimbrain.engine.journal import log_event
+from grimbrain.engine.srd import find_armor, load_srd
 
 
 app = typer.Typer(help="Character creation tools")
@@ -105,6 +106,8 @@ def create(
     ),
     weapon: str | None = typer.Option(None, "--weapon"),
     ranged: str | None = typer.Option(None, "--ranged", help="true/false"),
+    armor: str | None = typer.Option(None, "--armor", help="Starting armor (blank for none)"),
+    shield: str | None = typer.Option(None, "--shield", help="true/false to carry a shield"),
     out: str | None = typer.Option(None, "--out"),
     seed: int | None = typer.Option(
         None, "--seed", help="Deterministic ability rolls for method=roll"
@@ -128,6 +131,19 @@ def create(
     )
     if not klass:
         raise typer.BadParameter("Class cannot be blank")
+
+    try:
+        srd = load_srd()
+    except FileNotFoundError:
+        srd = None
+
+    class_info = None
+    if srd is not None:
+        for cname, info in srd.classes.items():
+            if cname.lower() == klass.lower():
+                klass = cname
+                class_info = info
+                break
 
     if not method:
         method = typer.prompt("Ability method (array / point-buy / roll)")
@@ -169,13 +185,53 @@ def create(
     else:
         ranged_bool = _parse_bool(ranged)
 
+    default_armor = None
+    default_shield = False
+    prof_saves = []
+    prof_skills = []
+    if class_info is not None:
+        prof_saves = list(class_info.prof_saves)
+        prof_skills = list(class_info.prof_skills)
+        for choice in class_info.start_armor:
+            if choice.lower() == "shield":
+                default_shield = True
+            elif default_armor is None and find_armor(choice, srd):
+                default_armor = choice
+
+    if armor is not None:
+        armor_choice = armor.strip() or None
+    else:
+        prompt_default = default_armor or ""
+        armor_choice = (
+            typer.prompt("Armor (empty for none)", default=prompt_default).strip() or None
+        )
+    if armor_choice and srd is not None:
+        armor_obj = find_armor(armor_choice, srd)
+        if not armor_obj:
+            known = ", ".join(sorted(srd.armors))
+            raise typer.BadParameter(f"Unknown armor '{armor_choice}'. Known: {known}")
+        armor_choice = armor_obj.name
+
+    if shield is None:
+        shield_bool = typer.confirm("Carry a shield?", default=default_shield)
+    else:
+        shield_bool = _parse_bool(shield)
+
     summary = pc_summary_line(name, klass, scores_map, weapon, ranged_bool)
     typer.echo(f"\n{summary}")
     if not typer.confirm("Save this character?", default=True):
         raise typer.Exit(code=1)
 
     pc = build_partymember(
-        name=name, cls=klass, scores=scores_map, weapon=weapon, ranged=ranged_bool
+        name=name,
+        cls=klass,
+        scores=scores_map,
+        weapon=weapon,
+        ranged=ranged_bool,
+        armor=armor_choice,
+        shield=shield_bool,
+        prof_skills=prof_skills,
+        prof_saves=prof_saves,
     )
     out_path = out or _default_pc_path(name)
     save_pc(pc, out_path)

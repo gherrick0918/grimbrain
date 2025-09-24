@@ -42,6 +42,27 @@ def roll_save(
         d = min(d1, d2)
     else:
         d = d1
-    total = d + ability_mod(actor, ability)
+
+    prof_bonus = 0
+    pb = None
+    if combatant is not None and hasattr(combatant, "proficiency_bonus"):
+        pb = getattr(combatant, "proficiency_bonus")
+    if pb is None and hasattr(actor, "proficiency_bonus"):
+        pb = getattr(actor, "proficiency_bonus")
+    if pb is None and hasattr(actor, "pb"):
+        pb = getattr(actor, "pb")
+    pb = int(pb) if pb is not None else 0
+
+    save_set = set()
+    if combatant is not None and getattr(combatant, "prof_saves", None):
+        save_set = {str(s).upper() for s in combatant.prof_saves}
+    elif hasattr(actor, "prof_saves"):
+        raw = getattr(actor, "prof_saves")
+        if raw:
+            save_set = {str(s).upper() for s in raw}
+    if ability.upper() in save_set:
+        prof_bonus = pb
+
+    total = d + ability_mod(actor, ability) + prof_bonus
     return (total >= dc, d, (d1, d2))
 

@@ -10,7 +10,6 @@ from ..models import PC, MonsterSidecar
 from .combat import run_encounter as _run_encounter
 from .encounter import apply_difficulty
 from ..campaign import load_party_file
-from ..retrieval.query_router import run_query
 
 
 @dataclass
@@ -127,6 +126,8 @@ def run_campaign_encounter(
     difficulty: str = "normal",
     scale: bool = False,
 ) -> Dict[str, object]:
+    from ..retrieval.query_router import run_query
+
     _, data, _ = run_query(enemy_name, "monster")
     if not data:
         raise ValueError(f"Monster '{enemy_name}' not found in index")
@@ -165,6 +166,11 @@ class PartyMemberRef:
     prof_acrobatics: bool = False
     weapon_primary: Optional[str] = None
     weapon_offhand: Optional[str] = None
+    armor: Optional[str] = None
+    shield: bool = False
+    stealth_disadv: bool = False
+    prof_skills: List[str] = field(default_factory=list)
+    prof_saves: List[str] = field(default_factory=list)
 
 
 @dataclass
