@@ -1,0 +1,42 @@
+{
+  "id": "Tharn",
+  "name": "Tharn",
+  "str_mod": 3,
+  "dex_mod": 2,
+  "con_mod": 2,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 18,
+  "max_hp": 12,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": false,
+  "prof_athletics": true,
+  "prof_acrobatics": false,
+  "weapon_primary": "Longsword",
+  "weapon_offhand": null,
+  "armor": "Chain Mail",
+  "shield": true,
+  "stealth_disadv": true,
+  "prof_skills": [
+    "Athletics",
+    "Intimidation"
+  ],
+  "prof_saves": [
+    "CON",
+    "STR"
+  ],
+  "race": "Human",
+  "background": "Soldier",
+  "languages": [
+    "Common"
+  ],
+  "tool_profs": [
+    "Gaming Set",
+    "Vehicles (Land)"
+  ]
+}
