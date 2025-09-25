@@ -1,0 +1,48 @@
+{
+  "id": "Liri",
+  "name": "Liri",
+  "str_mod": 2,
+  "dex_mod": 3,
+  "con_mod": 1,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 14,
+  "max_hp": 9,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": true,
+  "prof_athletics": false,
+  "prof_acrobatics": true,
+  "weapon_primary": "Shortbow",
+  "weapon_offhand": null,
+  "armor": "Leather",
+  "shield": false,
+  "stealth_disadv": false,
+  "prof_skills": [
+    "Acrobatics",
+    "Deception",
+    "Stealth"
+  ],
+  "prof_saves": [
+    "DEX",
+    "INT"
+  ],
+  "race": "Halfling",
+  "background": "Criminal",
+  "languages": [
+    "Common",
+    "Halfling"
+  ],
+  "tool_profs": [
+    "Gaming Set",
+    "Thieves' Tools"
+  ],
+  "features": {
+    "lucky": true
+  },
+  "light_emitter": false
+}

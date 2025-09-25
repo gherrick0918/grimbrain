@@ -1,0 +1,48 @@
+{
+  "id": "Aelar",
+  "name": "Aelar",
+  "str_mod": 2,
+  "dex_mod": 3,
+  "con_mod": 1,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 15,
+  "max_hp": 11,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": false,
+  "prof_athletics": true,
+  "prof_acrobatics": false,
+  "weapon_primary": "Longsword",
+  "weapon_offhand": null,
+  "armor": "Studded Leather",
+  "shield": false,
+  "stealth_disadv": false,
+  "prof_skills": [
+    "Athletics",
+    "Intimidation",
+    "Perception"
+  ],
+  "prof_saves": [
+    "CON",
+    "STR"
+  ],
+  "race": "Elf",
+  "background": "Soldier",
+  "languages": [
+    "Common",
+    "Elvish"
+  ],
+  "tool_profs": [
+    "Gaming Set",
+    "Vehicles (Land)"
+  ],
+  "features": {
+    "darkvision": 60
+  },
+  "light_emitter": false
+}

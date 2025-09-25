@@ -1,0 +1,52 @@
+{
+  "id": "Brokk",
+  "name": "Brokk",
+  "str_mod": 2,
+  "dex_mod": 2,
+  "con_mod": 2,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 18,
+  "max_hp": 12,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": false,
+  "prof_athletics": true,
+  "prof_acrobatics": false,
+  "weapon_primary": "Warhammer",
+  "weapon_offhand": null,
+  "armor": "Chain Mail",
+  "shield": true,
+  "stealth_disadv": true,
+  "prof_skills": [
+    "Athletics",
+    "Intimidation"
+  ],
+  "prof_saves": [
+    "CON",
+    "STR"
+  ],
+  "race": "Dwarf",
+  "background": "Soldier",
+  "languages": [
+    "Common",
+    "Dwarvish"
+  ],
+  "tool_profs": [
+    "Gaming Set",
+    "Vehicles (Land)"
+  ],
+  "features": {
+    "resist": [
+      "poison"
+    ],
+    "adv_saves_tags": [
+      "poison"
+    ]
+  },
+  "light_emitter": false
+}
