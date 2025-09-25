@@ -168,7 +168,11 @@ def learn(
     file: Path = typer.Argument(..., exists=True),
     spell: str = typer.Option(..., help="Spell name to learn"),
 ):
-    pc = load_pc(file)
+    try:
+        pc = load_pc(file)
+    except PrettyError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
     learn_spell(pc, spell)
     save_pc(pc, file)
     typer.secho(f"Learned spell: {spell}", fg=typer.colors.GREEN)
@@ -311,8 +315,10 @@ def equip(
         _apply_items(pc, apply_items)
         applied = True
     if not applied:
-        raise typer.BadParameter(
-            f"Unknown preset '{preset}'. Try a class or background name."
+        typer.secho(
+            f"Unknown preset '{preset}'. Try a class or background name.",
+            fg=typer.colors.RED,
         )
+        raise typer.Exit(1)
     save_pc(pc, file)
     typer.secho(f"Applied '{preset}' kit → {file}", fg=typer.colors.GREEN)

@@ -59,6 +59,10 @@ def _migrate_spells_legacy(data: dict) -> dict:
 def load_pc(path: Path) -> PlayerCharacter:
     data = _read_json(path)
     data = _migrate_spells_legacy(data)
+    if "class" not in data and "class_" in data:
+        data["class"] = data["class_"]
+    if data.get("proficiency_bonus") is None:
+        data["proficiency_bonus"] = data.get("pb") or 2
     _validate_jsonschema(data, _def_schemas["pc"])
     try:
         return PlayerCharacter.model_validate(data)
