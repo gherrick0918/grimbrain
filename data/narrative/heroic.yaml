@@ -1,0 +1,22 @@
+travel_start:
+  - "Sunlight catches on polished {lead_race} mail as {lead} raises a rallying smile; adventure calls."
+  - "Banner-high spirits carry the party from the {location}; {lead_background_hook}confidence lights the way."
+  - "With a laugh, {lead} sets the pace, promising that {time} favors the bold."
+travel_no_encounter:
+  - "The journey flows smoothly, each stride a testament to hard-won preparation."
+  - "{time} over the {location} feels like a blessing, gifting you quiet to plan the next triumph."
+encounter_intro:
+  - "Foes surge ahead, but you meet them with steel already singing."
+  - "Opportunity for glory strides from the {location}; weapons leap to ready hands."
+encounter_victory:
+  - "Cheers break out as the last enemy falls; triumph rings brighter than any warhorn."
+  - "{lead} salutes the brave and turns the moment into legend with a few proud words."
+encounter_defeat:
+  - "Setbacks bite hard, yet resolve flares—this fight is not the tale's end."
+  - "{lead} rallies breath and courage, vowing the next clash will reverse the tide."
+rest_short:
+  - "A quick respite lets you toast small victories and mend gear with practiced ease."
+  - "{lead_background_hook}rituals steady nerves; even brief rest can sharpen heroes."
+rest_long:
+  - "Stars wheel overhead while watchfires guard your sleep; dawn greets a renewed company."
+  - "Morning crowns the camp with golden light, and {lead} readies everyone for grand designs."

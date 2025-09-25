@@ -1,0 +1,22 @@
+travel_start:
+  - "Storm-stained clouds hang low as {lead} cinches worn {lead_race} gear; the march begins grimly."
+  - "The trail bleeds mud beneath weary boots; {lead_background_hook}discipline is all that keeps formation."
+  - "Dawn feels reluctant over the {location}, and {lead} mutters a promise to see everyone home."
+travel_no_encounter:
+  - "No enemy comes, yet the silence feels like a threat waiting to ripen."
+  - "Shadows stretch long across the {location}; even the breeze carries a warning."
+encounter_intro:
+  - "Out of the {location}'s bleak corners, hostility coils and strikes."
+  - "You sense the ambush before you see it; danger has been stalking you for hours."
+encounter_victory:
+  - "Victory arrives ragged, soaked in sweat and the memory of how close it was."
+  - "{lead} wipes blood from their blade, eyes already scanning for the next threat."
+encounter_defeat:
+  - "The world narrows to bruises and grit as defeat crushes the fight from your lungs."
+  - "{lead} stumbles, tasting iron and failure while foes close in."
+rest_short:
+  - "You huddle in a lee of stone, patching wounds in silence and rationing hope."
+  - "A swallow of bitter water and {lead_background_hook}training keep hands from shaking."
+rest_long:
+  - "Night drags by with restless turns; {lead} measures every snap of burning timber."
+  - "Sleep offers little comfort, but morning still pries open weary eyes to duty."

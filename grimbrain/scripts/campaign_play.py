@@ -28,7 +28,7 @@ from grimbrain.engine.progression import award_xp, maybe_level_up
 from grimbrain.engine.shop import PRICES, run_shop
 from grimbrain.engine.inventory import add_item, remove_item, format_inventory
 from grimbrain.engine.skirmish import run_skirmish
-from grimbrain.engine.narrator import get_narrator
+from grimbrain.engine.narrator import get_narrator, pick_template_line
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
 from grimbrain.engine.journal import format_entries, log_event, write_export
 from grimbrain.engine.srd import load_srd, skill_ability
@@ -183,6 +183,87 @@ def _party_status_line(st: CampaignState) -> str:
 app = typer.Typer(help="Play a lightweight solo campaign loop.")
 
 
+_VALID_STYLES = {"classic", "grim", "heroic"}
+_CURRENT_STYLE: str | None = None
+
+try:  # Typer exposes get_current_context in typer.main
+    from typer.main import get_current_context as _typer_get_current_context
+except Exception:  # pragma: no cover - fallback for older Typer
+    _typer_get_current_context = None
+
+
+def _style_from_context(ctx: typer.Context | None) -> str | None:
+    while ctx is not None:
+        obj = getattr(ctx, "obj", None)
+        if isinstance(obj, dict):
+            style = obj.get("style")
+            if style:
+                return str(style)
+        ctx = ctx.parent
+    return None
+
+
+def _apply_style_from_context(state: CampaignState) -> str | None:
+    ctx = None
+    if _typer_get_current_context is not None:
+        try:
+            ctx = _typer_get_current_context(silent=True)
+        except Exception:
+            ctx = None
+    style = _style_from_context(ctx)
+    if not style:
+        style = _CURRENT_STYLE
+    if style:
+        state.narrative_style = style
+    return style
+
+
+def _state_seed(state: CampaignState) -> int | None:
+    seed = getattr(state, "seed", None)
+    return seed if isinstance(seed, int) else None
+
+
+def _seed_with_offset(base: int | None, offset: int = 0) -> int | None:
+    if base is None:
+        return None
+    return base + offset
+
+
+def _narration_context(state: CampaignState) -> dict[str, Any]:
+    lead = state.party[0] if state.party else None
+    race = getattr(lead, "race", "") or ""
+    background = getattr(lead, "background", "") or ""
+    return {
+        "lead": lead.name if lead else "You",
+        "lead_race": race,
+        "lead_race_hook": f"{race} " if race else "",
+        "lead_background": background,
+        "lead_background_hook": f"{background} " if background else "",
+        "time": state.time_of_day,
+        "location": state.location,
+    }
+
+
+def _get_narrator_instance():
+    return get_narrator(ai_enabled=choose_ai_enabled(None), debug=False, flush=False)
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+    style: str = typer.Option(None, "--style", help="classic|grim|heroic"),
+):
+    global _CURRENT_STYLE
+    if ctx.obj is None:
+        ctx.obj = {}
+    if style is not None:
+        normalized = style.lower()
+        if normalized not in _VALID_STYLES:
+            raise typer.BadParameter("Style must be one of classic, grim, or heroic.")
+        ctx.obj["style"] = normalized
+        _CURRENT_STYLE = normalized
+
+
 @app.command(help="Set or show local Grimbrain config (~/.grimbrain/config.json)")
 def config(
     set_openai_key: str = typer.Option(
@@ -237,6 +318,8 @@ def travel(
     light: bool = typer.Option(False, "--light", help="Set light to normal for this segment"),
 ):
     st = load_campaign(load)
+    _apply_style_from_context(st)
+    base_seed = seed if isinstance(seed, int) else _state_seed(st)
     rng = random.Random(seed if seed is not None else st.seed)
     notes = []
     # PR 44a: allow per-call override and persist it
@@ -290,9 +373,25 @@ def travel(
         f"Day {st.day} {st.time_of_day} @ {st.location} | chance={st.encounter_chance}% + clock={st.encounter_clock}% → effective={eff}%"
     )
     print(f"Light: {st.light_level}")
+    tpl_ctx = _narration_context(st)
+    narrator = _get_narrator_instance()
+    style_name = getattr(st, "narrative_style", "classic")
+    start_line = pick_template_line(
+        style_name, "travel_start", tpl_ctx, seed=_seed_with_offset(base_seed, 0)
+    )
+    if start_line:
+        print(narrator.render("travel#start", start_line, tpl_ctx))
     if res.get("encounter"):
         winner = res.get("winner", "?")
         outcome = "Victory!" if winner == "A" else "Defeat..."
+        intro_line = pick_template_line(
+            style_name,
+            "encounter_intro",
+            tpl_ctx,
+            seed=_seed_with_offset(base_seed, 1),
+        )
+        if intro_line:
+            print(narrator.render("travel#encounter_intro", intro_line, tpl_ctx))
         print(f"Encounter: {res['encounter']} — {outcome}")
         if notes:
             print("\n".join(notes))
@@ -300,9 +399,24 @@ def travel(
             f"{p.name} {st.current_hp.get(p.id, p.max_hp)}/{p.max_hp}" for p in st.party
         )
         print(f"Party HP: {hp}")
+        outcome_key = "encounter_victory" if winner == "A" else "encounter_defeat"
+        outcome_line = pick_template_line(
+            style_name,
+            outcome_key,
+            tpl_ctx,
+            seed=_seed_with_offset(base_seed, 2),
+        )
+        if outcome_line:
+            print(narrator.render(f"travel#{outcome_key}", outcome_line, tpl_ctx))
     else:
-        # notes already contains "No encounter." in this branch
-        print("No encounter.")
+        no_encounter_line = pick_template_line(
+            style_name,
+            "travel_no_encounter",
+            tpl_ctx,
+            seed=_seed_with_offset(base_seed, 1),
+        )
+        if no_encounter_line:
+            print(narrator.render("travel#no_encounter", no_encounter_line, tpl_ctx))
 
 
 @app.command()
@@ -312,6 +426,9 @@ def status(load: str = typer.Option(..., "--load")):
     """
 
     st = load_campaign(load)
+    style_override = _apply_style_from_context(st)
+    if style_override:
+        save_campaign(st, load)
     chance = getattr(st, "encounter_chance", 30)
     clock = getattr(st, "encounter_clock", 0)
     eff = min(100, chance + clock)
@@ -333,6 +450,7 @@ def explore(load: str = typer.Option(..., "--load"), seed: int | None = None):
 @app.command()
 def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None):
     st = load_campaign(load)
+    _apply_style_from_context(st)
     rng = random.Random(seed or st.seed)
     notes = []
     for p in st.party:
@@ -345,12 +463,25 @@ def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None)
     # PR49: advance time by configured short rest hours
     advance_time(st, hours=getattr(st, "short_rest_hours", 4))
     save_campaign(st, load)
-    print("\n".join(notes))
+    narrator = _get_narrator_instance()
+    tpl_ctx = _narration_context(st)
+    style_name = getattr(st, "narrative_style", "classic")
+    rest_line = pick_template_line(
+        style_name,
+        "rest_short",
+        tpl_ctx,
+        seed=_seed_with_offset(_state_seed(st), 0),
+    )
+    if rest_line:
+        print(narrator.render("rest#short", rest_line, tpl_ctx))
+    if notes:
+        print("\n".join(notes))
 
 
 @app.command()
 def long_rest(load: str = typer.Option(..., "--load")):
     st = load_campaign(load)
+    _apply_style_from_context(st)
     for p in st.party:
         st.current_hp[p.id] = p.max_hp
     st.last_long_rest_day = st.day
@@ -362,6 +493,17 @@ def long_rest(load: str = typer.Option(..., "--load")):
         while st.time_of_day != "morning":
             advance_time(st, hours=4)
     save_campaign(st, load)
+    narrator = _get_narrator_instance()
+    tpl_ctx = _narration_context(st)
+    style_name = getattr(st, "narrative_style", "classic")
+    rest_line = pick_template_line(
+        style_name,
+        "rest_long",
+        tpl_ctx,
+        seed=_seed_with_offset(_state_seed(st), 0),
+    )
+    if rest_line:
+        print(narrator.render("rest#long", rest_line, tpl_ctx))
     print("Long rest: party restored to full and conditions cleared.")
 
 
@@ -424,8 +566,12 @@ def story(
 
     if load_path:
         state = load_campaign(load_path)
+        style_override = _apply_style_from_context(state)
+        if style_override:
+            save_campaign(state, load_path)
     else:
         state = CampaignState(seed=camp.seed or 0)
+        _apply_style_from_context(state)
     if not state.party:
         if pcs:
             state.party = [_pc_to_ref(pc, i + 1) for i, pc in enumerate(pcs)]

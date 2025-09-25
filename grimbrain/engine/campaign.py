@@ -209,6 +209,7 @@ class CampaignState:
     long_rest_to_morning: bool = True
     journal: List[Dict[str, Any]] = field(default_factory=list)
     light_level: str = "normal"
+    narrative_style: str = "classic"
 
     def normalize_inventory(self) -> None:
         """Ensure the inventory is stored as a mapping of item → quantity."""
@@ -250,6 +251,7 @@ def load_campaign(path: str) -> CampaignState:
         long_rest_to_morning=raw.get("long_rest_to_morning", True),
         journal=raw.get("journal", []) or [],
         light_level=raw.get("light_level", "normal"),
+        narrative_style=raw.get("narrative_style", "classic"),
     )
     if not st.current_hp:
         for p in st.party:
