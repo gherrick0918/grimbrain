@@ -1,0 +1,10 @@
+[2025-09-23T16:49:30Z] Day 2 morning @ Wilderness
+  Kind: travel
+  Text: Travel 4h; Encounter Goblins (2) — Defeat in 2 rounds
+  chance: 40
+  clock: 0
+  effective: 40
+[2025-09-23T16:49:59Z] Day 2 morning @ Wilderness
+  Kind: rest
+  Text: Short rest
+  type: short

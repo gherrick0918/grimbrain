@@ -1,0 +1,33 @@
+{
+  "id": "Ril",
+  "name": "Ril",
+  "str_mod": 2,
+  "dex_mod": 2,
+  "con_mod": 1,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 14,
+  "max_hp": 9,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": true,
+  "prof_athletics": false,
+  "prof_acrobatics": true,
+  "weapon_primary": "Shortbow",
+  "weapon_offhand": null,
+  "armor": "Studded Leather",
+  "shield": false,
+  "stealth_disadv": false,
+  "prof_skills": [
+    "Acrobatics",
+    "Stealth"
+  ],
+  "prof_saves": [
+    "DEX",
+    "INT"
+  ]
+}

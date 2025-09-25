@@ -1,0 +1,33 @@
+{
+  "id": "Doran",
+  "name": "Doran",
+  "str_mod": 2,
+  "dex_mod": 2,
+  "con_mod": 1,
+  "int_mod": 1,
+  "wis_mod": 0,
+  "cha_mod": -1,
+  "ac": 15,
+  "max_hp": 11,
+  "pb": 2,
+  "speed": 30,
+  "xp": 0,
+  "level": 1,
+  "reach": 5,
+  "ranged": false,
+  "prof_athletics": true,
+  "prof_acrobatics": false,
+  "weapon_primary": "Longsword",
+  "weapon_offhand": null,
+  "armor": "Leather",
+  "shield": true,
+  "stealth_disadv": false,
+  "prof_skills": [
+    "Athletics",
+    "Intimidation"
+  ],
+  "prof_saves": [
+    "CON",
+    "STR"
+  ]
+}

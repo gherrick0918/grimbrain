@@ -1,14 +1,14 @@
 {
-  "seed": 840219264,
-  "day": 2,
-  "time_of_day": "afternoon",
+  "seed": 4242,
+  "day": 1,
+  "time_of_day": "morning",
   "location": "Wilderness",
   "gold": 0,
   "inventory": {},
   "party": [
     {
-      "id": "Aria",
-      "name": "Aria",
+      "id": "Cael",
+      "name": "Cael",
       "str_mod": 2,
       "dex_mod": 2,
       "con_mod": 1,
@@ -29,8 +29,8 @@
       "weapon_offhand": null
     },
     {
-      "id": "Bryn",
-      "name": "Bryn",
+      "id": "Nyra",
+      "name": "Nyra",
       "str_mod": 0,
       "dex_mod": 2,
       "con_mod": 2,
@@ -52,40 +52,24 @@
     }
   ],
   "current_hp": {
-    "Aria": 9,
-    "Bryn": 8
+    "Cael": 11,
+    "Nyra": 10
   },
   "quest_log": [],
   "last_long_rest_day": 0,
-  "encounter_chance": 40,
+  "encounter_chance": 30,
   "encounter_clock": 0,
   "encounter_clock_step": 10,
   "short_rest_hours": 4,
   "long_rest_to_morning": true,
   "journal": [
     {
-      "ts": "2025-09-23T16:49:30Z",
-      "day": 2,
+      "ts": "2025-09-24T14:59:35Z",
+      "day": 1,
       "time": "morning",
       "loc": "Wilderness",
-      "kind": "travel",
-      "text": "Travel 4h; Encounter Goblins (2) \u2014 Defeat in 2 rounds",
-      "extra": {
-        "chance": 40,
-        "clock": 0,
-        "effective": 40
-      }
-    },
-    {
-      "ts": "2025-09-23T16:49:59Z",
-      "day": 2,
-      "time": "morning",
-      "loc": "Wilderness",
-      "kind": "rest",
-      "text": "Short rest",
-      "extra": {
-        "type": "short"
-      }
+      "kind": "create",
+      "text": "Created Theo the Fighter"
     }
   ]
 }
