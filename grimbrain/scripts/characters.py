@@ -220,7 +220,7 @@ def create(
     summary = pc_summary_line(name, klass, scores_map, weapon, ranged_bool)
     typer.echo(f"\n{summary}")
     if not typer.confirm("Save this character?", default=True):
-        raise typer.Exit(code=1)
+        raise typer.Exit(1)
 
     pc = build_partymember(
         name=name,

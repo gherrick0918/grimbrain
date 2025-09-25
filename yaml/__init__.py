@@ -4,6 +4,10 @@ from __future__ import annotations
 from typing import Any, Iterable, Tuple
 
 
+class YAMLError(Exception):
+    """Fallback error type for compatibility with PyYAML."""
+
+
 def safe_load(text: str) -> Any:
     lines = _prepare_lines(text)
     if not lines:
@@ -17,6 +21,17 @@ def safe_load(text: str) -> Any:
 
 def safe_dump(data: Any, sort_keys: bool = False, indent: int = 2) -> str:
     return "\n".join(_dump_lines(data, 0, sort_keys=sort_keys, indent=indent)) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# PyYAML compatibility aliases
+# ---------------------------------------------------------------------------
+
+
+dump = safe_dump
+load = safe_load
+safe_load_all = lambda text: [safe_load(text)]
+safe_dump_all = lambda seq, **kwargs: "".join(safe_dump(item, **kwargs) for item in seq)
 
 
 # --- parsing helpers -----------------------------------------------------
@@ -153,6 +168,19 @@ def _parse_scalar(token: str) -> Any:
         return True
     if lowered == "false":
         return False
+    if token == "[]":
+        return []
+    if token == "{}":
+        return {}
+    if token.startswith("[") and token.endswith("]"):
+        inner = token[1:-1].strip()
+        if not inner:
+            return []
+        parts = [p.strip() for p in inner.split(",")]
+        return [
+            _parse_scalar(part[1:-1] if part.startswith('"') and part.endswith('"') else part)
+            for part in parts
+        ]
     try:
         if token.startswith("0") and len(token) > 1 and token[1].isdigit():
             raise ValueError
@@ -224,4 +252,12 @@ def _format_scalar(value: Any) -> str:
     return text
 
 
-__all__ = ["safe_load", "safe_dump"]
+__all__ = [
+    "safe_load",
+    "safe_dump",
+    "load",
+    "dump",
+    "safe_load_all",
+    "safe_dump_all",
+    "YAMLError",
+]
