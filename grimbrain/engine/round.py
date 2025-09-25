@@ -90,7 +90,9 @@ def _attack_once(attacker: Combatant, defender: Combatant, wname: str, *,
         weapon_idx,
         base_mode="none", power=power, offhand=False, two_handed=False,
         has_fired_loading_weapon_this_turn=already_loaded_this_turn,
-        rng=rng
+        rng=rng,
+        attacker_state=attacker,
+        defender_state=defender,
     )
 
     if not res["ok"]:
@@ -134,7 +136,9 @@ def _offhand_if_applicable(attacker: Combatant, defender: Combatant, *,
         weapon_idx,
         base_mode="none", power=False, offhand=True, two_handed=False,
         has_fired_loading_weapon_this_turn=already_loaded_this_turn,
-        rng=rng
+        rng=rng,
+        attacker_state=attacker,
+        defender_state=defender,
     )
     if not res["ok"]:
         return TurnResult(log, 0, False, False)
@@ -158,7 +162,7 @@ def take_turn(attacker: Combatant, defender: Combatant, *,
 
     # Start-of-turn death save if attacker is down
     if attacker.hp <= 0 and not attacker.death.stable and not attacker.death.dead:
-        outcome = roll_death_save(attacker.death, rng)
+        outcome = roll_death_save(attacker.death, rng, pm=attacker)
         log.append(f"{attacker.name} death save: {outcome}")
         if attacker.death.dead:
             log.append(f"{attacker.name} dies.")

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Optional, Literal, Set, Dict
+from typing import Optional, Literal, Set, Dict, Any
+import random
 
 Cover = Literal["none", "half", "three-quarters", "total"]
 
@@ -65,6 +66,10 @@ class Combatant:
     stealth_disadvantage: bool = False
     prof_skills: Set[str] = field(default_factory=set)
     prof_saves: Set[str] = field(default_factory=set)
+    features: Dict[str, Any] = field(default_factory=dict)
+    advantage_save_tags: Set[str] = field(default_factory=set)
+    light_emitter: bool = False
+    environment_light: str = "normal"
     # --- PR40 short-lived tactical state ---
     dodging: bool = False
     help_tokens: Dict[str, int] = field(default_factory=dict)  # target_id -> remaining uses
@@ -94,6 +99,24 @@ class Combatant:
                 self.help_tokens.pop(target_id, None)
             return True
         return False
+
+
+def _feature_map(pm) -> Dict[str, Any]:
+    feats = getattr(pm, "features", None)
+    return feats if isinstance(feats, dict) else {}
+
+
+def roll_d20(rng: random.Random, *, pm=None, log: Optional[list[str]] = None) -> int:
+    """Roll a d20, applying Halfling Lucky if ``pm`` has the feature."""
+
+    initial = rng.randint(1, 20)
+    feats = _feature_map(pm)
+    if feats.get("lucky") and initial == 1:
+        rerolled = rng.randint(1, 20)
+        if log is not None:
+            log.append(f"lucky reroll (1→{rerolled})")
+        return rerolled
+    return initial
 
 
 @dataclass

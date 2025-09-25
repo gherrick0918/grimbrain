@@ -21,6 +21,7 @@ def make_combatant_from_party_member(p: PartyMemberRef, *, team: str, cid: str) 
         equipped_armor=p.armor,
         equipped_shield=p.shield,
     )
+    features = dict(getattr(p, "features", {}) or {})
     cmb = Combatant(
         id=cid,
         name=p.name,
@@ -45,5 +46,15 @@ def make_combatant_from_party_member(p: PartyMemberRef, *, team: str, cid: str) 
         stealth_disadvantage=p.stealth_disadv,
         prof_skills=set(p.prof_skills or []),
         prof_saves=set(p.prof_saves or []),
+        features=features,
+        light_emitter=bool(getattr(p, "light_emitter", False)),
     )
+    actor.features = features
+    resist = features.get("resist")
+    if resist:
+        cmb.resist.update(str(r).lower() for r in resist)
+    adv_tags = features.get("adv_saves_tags")
+    if adv_tags:
+        cmb.advantage_save_tags.update(str(tag).lower() for tag in adv_tags)
+        actor.adv_saves_tags = [str(tag).lower() for tag in adv_tags]
     return cmb
