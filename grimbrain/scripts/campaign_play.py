@@ -167,7 +167,15 @@ def _party_status_line(st: CampaignState) -> str:
         armor = getattr(pm, "armor", None)
         shield = " +Shield" if getattr(pm, "shield", False) else ""
         armor_text = f" {armor}" if armor else ""
-        parts.append(f"{pm.name} {cur}/{pm.max_hp} (AC {pm.ac}{armor_text}{shield})")
+        rb: list[str] = []
+        race = getattr(pm, "race", None)
+        background = getattr(pm, "background", None)
+        if race:
+            rb.append(str(race))
+        if background:
+            rb.append(str(background))
+        tag = f" [{' '.join(rb)}]" if rb else ""
+        parts.append(f"{pm.name}{tag} {cur}/{pm.max_hp} (AC {pm.ac}{armor_text}{shield})")
     gold = getattr(st, "gold", 0)
     return f"Party: {', '.join(parts)} | Gold: {gold}"
 

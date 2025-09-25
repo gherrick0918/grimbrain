@@ -27,6 +27,23 @@ class Shield:
 
 
 @dataclass(frozen=True)
+class RaceBasics:
+    name: str
+    asi: tuple[dict[str, object], ...]
+    skills: tuple[str, ...]
+    languages: tuple[str, ...]
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class BackgroundBasics:
+    name: str
+    skills: tuple[str, ...]
+    tools: tuple[str, ...]
+    languages: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ClassBasics:
     prof_saves: tuple[str, ...]
     prof_skills: tuple[str, ...]
@@ -39,6 +56,8 @@ class SRDData:
     shields: Dict[str, Shield]
     skills: Dict[str, str]
     classes: Dict[str, ClassBasics]
+    races: Dict[str, RaceBasics]
+    backgrounds: Dict[str, BackgroundBasics]
 
 
 _SRD_CACHE: SRDData | None = None
@@ -62,6 +81,8 @@ def load_srd(*, force_reload: bool = False) -> SRDData:
     shields_raw = _load_json("shields.json")
     skills_raw = _load_json("skills.json")
     classes_raw = _load_json("classes_basic.json")
+    races_raw = _load_json("races.json")
+    backgrounds_raw = _load_json("backgrounds.json")
 
     armors = {entry["name"]: Armor(**entry) for entry in armors_raw}
     shields = {entry["name"]: Shield(**entry) for entry in shields_raw}
@@ -72,12 +93,33 @@ def load_srd(*, force_reload: bool = False) -> SRDData:
             prof_skills=tuple(payload.get("prof_skills", [])),
             start_armor=tuple(payload.get("start_armor", [])),
         )
+    races = {
+        entry["name"]: RaceBasics(
+            name=entry["name"],
+            asi=tuple(entry.get("asi", [])),
+            skills=tuple(entry.get("skills", [])),
+            languages=tuple(entry.get("languages", [])),
+            notes=entry.get("notes", ""),
+        )
+        for entry in races_raw
+    }
+    backgrounds = {
+        entry["name"]: BackgroundBasics(
+            name=entry["name"],
+            skills=tuple(entry.get("skills", [])),
+            tools=tuple(entry.get("tools", [])),
+            languages=tuple(entry.get("languages", [])),
+        )
+        for entry in backgrounds_raw
+    }
 
     _SRD_CACHE = SRDData(
         armors=armors,
         shields=shields,
         skills={k: v for k, v in skills_raw.items()},
         classes=classes,
+        races=races,
+        backgrounds=backgrounds,
     )
     return _SRD_CACHE
 

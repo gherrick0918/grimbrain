@@ -1,0 +1,6 @@
+[
+  {"name":"Soldier","skills":["Athletics","Intimidation"],"tools":["Gaming Set","Vehicles (Land)"],"languages":[]},
+  {"name":"Acolyte","skills":["Insight","Religion"],"tools":[],"languages":["Two of your choice"]},
+  {"name":"Criminal","skills":["Deception","Stealth"],"tools":["Thieves' Tools","Gaming Set"],"languages":[]},
+  {"name":"Sage","skills":["Arcana","History"],"tools":[],"languages":["Two of your choice"]}
+]

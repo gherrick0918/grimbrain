@@ -1,0 +1,6 @@
+[
+  {"name":"Human","asi":[{"ability":"STR","bonus":1},{"ability":"DEX","bonus":1},{"ability":"CON","bonus":1},{"ability":"INT","bonus":1},{"ability":"WIS","bonus":1},{"ability":"CHA","bonus":1}],"skills":[],"languages":["Common"],"notes":"+1 all"},
+  {"name":"Dwarf","asi":[{"ability":"CON","bonus":2}],"skills":[],"languages":["Common","Dwarvish"],"notes":"+2 CON"},
+  {"name":"Elf","asi":[{"ability":"DEX","bonus":2}],"skills":["Perception"],"languages":["Common","Elvish"],"notes":"+2 DEX; Perception prof"},
+  {"name":"Halfling","asi":[{"ability":"DEX","bonus":2}],"skills":[],"languages":["Common","Halfling"],"notes":"+2 DEX"}
+]
