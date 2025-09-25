@@ -23,13 +23,18 @@ from ..rules.attacks import (
     has_feat,
 )
 from ..rules.attack_math import roll_outcome, combine_modes
-from .types import Combatant as GBCombatant, Target, Cover, Readied
+from .types import Combatant as GBCombatant, Target, Cover, Readied, roll_d20
+
+
+def _feature_dict(obj) -> Dict[str, Any]:
+    feats = getattr(obj, "features", None)
+    return feats if isinstance(feats, dict) else {}
 
 
 def _ability_check(c: GBCombatant, ability: str, *, rng: Optional[random.Random] = None, proficient: bool = False) -> Tuple[int, str]:
     """d20 + ability modifier (+ proficiency if applicable)."""
     rng = rng or random.Random()
-    die = rng.randint(1, 20)
+    die = roll_d20(rng, pm=c)
     mod = c.actor.ability_mod(ability.upper()) if hasattr(c, "actor") else 0
     prof = c.actor.proficiency_bonus if proficient else 0
     total = die + mod + prof
@@ -465,9 +470,14 @@ def parse_monster_spec(spec: str, lookup: Callable[[str], MonsterSidecar]) -> Li
 # ---------------------------------------------------------------------------
 
 
-def _roll_d20(rng: random.Random) -> int:
-    """Roll a single d20 using ``rng``."""
-    return rng.randint(1, 20)
+def _roll_d20(rng: random.Random, actor=None, *, notes: Optional[List[str]] = None) -> int:
+    """Roll a single d20 using ``rng``, applying Lucky if available."""
+
+    log: List[str] = []
+    result = roll_d20(rng, pm=actor, log=log)
+    if notes is not None:
+        notes.extend(log)
+    return result
 
 
 def _parse_die(die: str) -> Tuple[int, int] | None:
@@ -584,6 +594,21 @@ def resolve_attack(
             mode = combine_modes(mode, "disadvantage")
             notes.append("defender dodging")
 
+    light_level = "normal"
+    if attacker_state is not None:
+        light_level = getattr(attacker_state, "environment_light", light_level)
+    else:
+        light_level = getattr(attacker, "environment_light", light_level)
+    if light_level == "dark":
+        feats = _feature_dict(attacker_state) or _feature_dict(attacker)
+        try:
+            darkvision_range = int(feats.get("darkvision", 0))
+        except (TypeError, ValueError):
+            darkvision_range = 0
+        if darkvision_range < 60:
+            mode = combine_modes(mode, "disadvantage")
+            notes.append("darkness (no darkvision)")
+
     # Loading gate
     if w.has_prop("loading") and has_fired_loading_weapon_this_turn:
         return {
@@ -653,11 +678,12 @@ def resolve_attack(
     # Attack bonus and d20 roll
     ab = attack_bonus(attacker, w, power=power)
 
+    roller = attacker_state if attacker_state is not None else attacker
     if forced_d20:
         candidates = forced_d20
     else:
-        d1 = _roll_d20(rng)
-        d2 = _roll_d20(rng)
+        d1 = _roll_d20(rng, roller, notes=notes)
+        d2 = _roll_d20(rng, roller, notes=notes)
         candidates = (d1, d2)
 
     if mode == "advantage":

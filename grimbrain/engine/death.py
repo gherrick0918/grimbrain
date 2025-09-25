@@ -1,5 +1,5 @@
 import random
-from .types import DeathState
+from .types import DeathState, roll_d20
 
 
 def reset_death_state(ds: DeathState) -> None:
@@ -8,10 +8,10 @@ def reset_death_state(ds: DeathState) -> None:
     ds.dead = False
 
 
-def roll_death_save(ds: DeathState, rng: random.Random) -> str:
+def roll_death_save(ds: DeathState, rng: random.Random, pm=None) -> str:
     if ds.stable or ds.dead:
         return "no-op"
-    d = rng.randint(1, 20)
+    d = roll_d20(rng, pm=pm)
     if d == 1:
         ds.failures += 2
         outcome = "crit-fail"

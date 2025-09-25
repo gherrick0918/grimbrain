@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set
 from pathlib import Path
 import json
 import random
@@ -105,6 +105,7 @@ def build_partymember(
     background: str | None = None,
     languages: List[str] | None = None,
     tool_profs: List[str] | None = None,
+    features: Dict[str, Any] | None = None,
 ) -> PartyMemberRef:
     cls_l = cls.lower()
     hit_die = HIT_DICE.get(cls_l, 8)
@@ -143,6 +144,16 @@ def build_partymember(
     prof_saves_set = sorted(set(prof_saves or []))
     has_athletics = "Athletics" in prof_skills_set
     has_acrobatics = "Acrobatics" in prof_skills_set
+    feature_data: Dict[str, Any] = {}
+    if features:
+        for key, value in features.items():
+            if isinstance(value, list):
+                feature_data[key] = list(value)
+            elif isinstance(value, dict):
+                feature_data[key] = dict(value)
+            else:
+                feature_data[key] = value
+
     return PartyMemberRef(
         id=name,
         name=name,
@@ -161,6 +172,7 @@ def build_partymember(
         background=background,
         languages=sorted(languages or []),
         tool_profs=sorted(tool_profs or []),
+        features=feature_data,
         prof_athletics=has_athletics,
         prof_acrobatics=has_acrobatics,
         **mods,

@@ -47,7 +47,9 @@ def run_encounter(
         return {"encounter": None}
     enemies: List[Combatant] = []
     for idx, ename in enumerate(table["enemies"], 1):
-        enemies.append(_enemy_to_combatant(ename, idx))
+        cmb = _enemy_to_combatant(ename, idx)
+        cmb.environment_light = getattr(state, "light_level", "normal")
+        enemies.append(cmb)
     roster = list(allies_map.values()) + enemies
     res = run_skirmish(roster, seed=rng.randint(1, 999999))
     apply_combat_results(state, allies_map)

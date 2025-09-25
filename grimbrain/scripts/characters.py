@@ -271,6 +271,15 @@ def create(
         list(back_info.languages) if back_info else [],
     )
     tool_profs = merge_unique([], list(back_info.tools) if back_info else [])
+    features: dict[str, object] = {}
+    race_lower = (race or "").lower()
+    if race_lower == "elf":
+        features["darkvision"] = 60
+    if race_lower == "dwarf":
+        features.setdefault("resist", []).append("poison")
+        features.setdefault("adv_saves_tags", []).append("poison")
+    if race_lower == "halfling":
+        features["lucky"] = True
 
     summary = pc_summary_line(name, klass, scores_final, weapon, ranged_bool)
     typer.echo(f"\n{summary}")
@@ -299,6 +308,7 @@ def create(
         background=background,
         languages=languages,
         tool_profs=tool_profs,
+        features=features,
     )
     out_path = out or _default_pc_path(name)
     save_pc(pc, out_path)

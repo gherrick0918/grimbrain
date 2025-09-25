@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal, Tuple
+from typing import Literal, Tuple, Set
 import random
 
 from ..rules.attack_math import combine_modes
-from .types import Combatant
+from .types import Combatant, roll_d20
 
 Ability = Literal["STR", "DEX", "CON", "INT", "WIS", "CHA"]
 
@@ -29,11 +29,22 @@ def roll_save(
     mode: Literal["none", "advantage", "disadvantage"] = "none",
     rng: random.Random | None = None,
     combatant: Combatant | None = None,
+    tag: str | None = None,
 ) -> Tuple[bool, int, tuple[int, int]]:
     rng = rng or random.Random()
-    d1, d2 = rng.randint(1, 20), rng.randint(1, 20)
+    pm = combatant if combatant is not None else actor
+    d1, d2 = roll_d20(rng, pm=pm), roll_d20(rng, pm=pm)
     # PR40: Dodge grants advantage on DEX saves
     if ability == "DEX" and combatant is not None and combatant.dodging:
+        mode = combine_modes(mode, "advantage")
+    tag_lower = str(tag).lower() if tag else None
+    adv_tags: Set[str] = set()
+    if combatant is not None and getattr(combatant, "advantage_save_tags", None):
+        adv_tags.update(str(t).lower() for t in combatant.advantage_save_tags)
+    raw_actor_tags = getattr(actor, "adv_saves_tags", None)
+    if raw_actor_tags:
+        adv_tags.update(str(t).lower() for t in raw_actor_tags)
+    if tag_lower and tag_lower in adv_tags:
         mode = combine_modes(mode, "advantage")
 
     if mode == "advantage":

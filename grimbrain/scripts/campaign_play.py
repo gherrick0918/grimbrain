@@ -32,6 +32,7 @@ from grimbrain.engine.narrator import get_narrator
 from grimbrain.engine.config import load_config, save_config, choose_ai_enabled
 from grimbrain.engine.journal import format_entries, log_event, write_export
 from grimbrain.engine.srd import load_srd, skill_ability
+from grimbrain.engine.types import roll_d20
 
 try:
     _SRD_DATA = load_srd()
@@ -232,6 +233,8 @@ def travel(
     encounter_chance: int | None = typer.Option(
         None, "--encounter-chance", help="Percent chance (0-100) for overland encounter"
     ),
+    dark: bool = typer.Option(False, "--dark", help="Set light to dark for this segment"),
+    light: bool = typer.Option(False, "--light", help="Set light to normal for this segment"),
 ):
     st = load_campaign(load)
     rng = random.Random(seed if seed is not None else st.seed)
@@ -240,6 +243,10 @@ def travel(
     if encounter_chance is not None:
         st.encounter_chance = max(0, min(100, encounter_chance))
     advance_time(st, hours=hours)
+    if dark:
+        st.light_level = "dark"
+    if light:
+        st.light_level = "normal"
     res = run_encounter(st, rng, notes, force=force_encounter)
     # Advance stored seed so subsequent travels use a fresh sequence
     st.seed = rng.randrange(1_000_000_000)
@@ -282,6 +289,7 @@ def travel(
     print(
         f"Day {st.day} {st.time_of_day} @ {st.location} | chance={st.encounter_chance}% + clock={st.encounter_clock}% → effective={eff}%"
     )
+    print(f"Light: {st.light_level}")
     if res.get("encounter"):
         winner = res.get("winner", "?")
         outcome = "Victory!" if winner == "A" else "Defeat..."
@@ -312,6 +320,7 @@ def status(load: str = typer.Option(..., "--load")):
         f"chance={chance}% + clock={clock}% → effective={eff}%"
     )
     print(_party_status_line(st))
+    print(f"Light: {st.light_level}")
     st.normalize_inventory()
     print("Inventory:", format_inventory(st.inventory))
 
@@ -501,8 +510,8 @@ def story(
             elif chk.ability:
                 ab = chk.ability.lower()
                 mod = getattr(pc, f"{ab}_mod", 0)
-            roll1 = rng.randint(1, 20)
-            roll2 = rng.randint(1, 20) if chk.advantage else None
+            roll1 = roll_d20(rng, pm=pc)
+            roll2 = roll_d20(rng, pm=pc) if chk.advantage else None
             roll = max(roll1, roll2) if chk.advantage else roll1
             total = roll + mod
             result = "success" if total >= chk.dc else "failure"
@@ -535,6 +544,7 @@ def story(
                 if wp:
                     cmb.weapon = wp
                 cmb.offhand = off
+                cmb.environment_light = getattr(state, "light_level", "normal")
                 foes.append(cmb)
             roster = list(allies_map.values()) + foes
             res = run_skirmish(roster, seed=rng.randint(1, 999999))

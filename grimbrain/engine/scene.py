@@ -81,6 +81,8 @@ def _maybe_opportunity_attack(
             two_handed=False,
             has_fired_loading_weapon_this_turn=False,
             rng=rng,
+            attacker_state=reactor,
+            defender_state=mover,
         )
         if not res["ok"]:
             log.append(f"  OA not possible: {res.get('reason')}")
@@ -123,7 +125,7 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
     """
     log: List[str] = []
     if attacker.hp <= 0 and not attacker.death.stable and not attacker.death.dead:
-        outcome = roll_death_save(attacker.death, rng)
+        outcome = roll_death_save(attacker.death, rng, pm=attacker)
         log.append(f"{attacker.name} death save: {outcome}")
         if attacker.death.dead:
             log.append(f"{attacker.name} dies.")
@@ -400,6 +402,8 @@ def _take_scene_turn(attacker: Combatant, defender: Combatant, *,
             two_handed=False,
             has_fired_loading_weapon_this_turn=False,
             rng=rng,
+            attacker_state=attacker,
+            defender_state=defender,
         )
         if not res["ok"]:
             log.append(f"{attacker.name} cannot attack: {res['reason']}")

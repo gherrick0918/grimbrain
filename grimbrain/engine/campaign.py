@@ -10,6 +10,7 @@ from ..models import PC, MonsterSidecar
 from .combat import run_encounter as _run_encounter
 from .encounter import apply_difficulty
 from ..campaign import load_party_file
+from .types import Combatant
 
 
 @dataclass
@@ -175,6 +176,8 @@ class PartyMemberRef:
     background: Optional[str] = None
     languages: List[str] = field(default_factory=list)
     tool_profs: List[str] = field(default_factory=list)
+    features: Dict[str, Any] = field(default_factory=dict)
+    light_emitter: bool = False
 
 
 @dataclass
@@ -205,6 +208,7 @@ class CampaignState:
     short_rest_hours: int = 4
     long_rest_to_morning: bool = True
     journal: List[Dict[str, Any]] = field(default_factory=list)
+    light_level: str = "normal"
 
     def normalize_inventory(self) -> None:
         """Ensure the inventory is stored as a mapping of item → quantity."""
@@ -245,6 +249,7 @@ def load_campaign(path: str) -> CampaignState:
         short_rest_hours=raw.get("short_rest_hours", 4),
         long_rest_to_morning=raw.get("long_rest_to_morning", True),
         journal=raw.get("journal", []) or [],
+        light_level=raw.get("light_level", "normal"),
     )
     if not st.current_hp:
         for p in st.party:
@@ -276,6 +281,7 @@ def party_to_combatants(state: CampaignState) -> Dict[str, Combatant]:
         c = make_combatant_from_party_member(p, team="A", cid=p.id)
         c.hp = state.current_hp.get(p.id, p.max_hp)
         c.max_hp = p.max_hp
+        c.environment_light = getattr(state, "light_level", "normal")
         res[p.id] = c
     return res
 
