@@ -1,0 +1,22 @@
+travel_start:
+  - "The road stretches ahead beneath a pale sky; {lead} checks their {lead_race} gear as the party sets out."
+  - "Boots crunch on the path as {time} breaks over the {location}; {lead} leads with quiet confidence."
+  - "Maps rustle in {lead}'s hands while {lead_background_hook}instincts measure the miles ahead."
+travel_no_encounter:
+  - "Hours pass in wary calm; only wind and distant birds keep you company."
+  - "The {location} drifts by under {time}'s light, uneventful but never careless."
+encounter_intro:
+  - "Shapes stir in the {location}'s gloom—trouble finds you."
+  - "A hush falls over the trail as figures emerge where none should stand."
+encounter_victory:
+  - "Breathing hard, you stand amid the quiet aftermath; victory is yours."
+  - "{lead} steadies the party and the threat fades like mist."
+encounter_defeat:
+  - "Pain and dust—your foes press the advantage as darkness crowds in."
+  - "Staggering back, {lead} tastes defeat and the sting of unfinished business."
+rest_short:
+  - "You bind wounds and share water, taking stock before pressing on."
+  - "A brief halt lets {lead_background_hook}habits mend armor straps and spirits alike."
+rest_long:
+  - "Campfire embers fade to ash; dawn comes with stiff backs and steadier hands."
+  - "Night stretches quietly while {lead_race_hook}dreams keep watch over weary companions."

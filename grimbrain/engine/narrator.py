@@ -1,6 +1,38 @@
-import hashlib, sys
+import hashlib, sys, random
+from collections import defaultdict
+from functools import lru_cache
+from pathlib import Path
 from typing import Dict, Any
+
+import yaml
+
 from .config import get_api_key, NARRATION_CACHE, append_cache_line, iter_cache
+
+
+_NARRATIVE_ROOT = Path(__file__).resolve().parents[2] / "data" / "narrative"
+
+
+@lru_cache(maxsize=None)
+def _load_template_pack(pack: str) -> Dict[str, list[str]]:
+    path = _NARRATIVE_ROOT / f"{pack}.yaml"
+    if not path.exists():
+        path = _NARRATIVE_ROOT / "classic.yaml"
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data or {}
+
+
+def pick_template_line(
+    pack: str, section: str, ctx: Dict[str, Any], seed: int | None = None
+) -> str:
+    data = _load_template_pack(pack)
+    options = list(data.get(section) or [])
+    if not options:
+        return ""
+    rng = random.Random(seed)
+    raw = rng.choice(options)
+    return raw.format_map(defaultdict(str, ctx))
 
 class TemplateNarrator:
     KIND = "template"
