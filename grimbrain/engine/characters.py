@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Dict, List
+from typing import Dict, List, Set
 from pathlib import Path
 import json
 import random
@@ -68,6 +68,27 @@ def _parse_scores_from_kv(kv: str) -> Dict[str, int]:
     return results
 
 
+def apply_asi(base_scores: Dict[str, int], asi_list: List[Dict[str, object]]) -> Dict[str, int]:
+    """Return ability scores with ability score increases applied."""
+
+    updated = dict(base_scores)
+    for asi in asi_list or []:
+        ability = str(asi.get("ability", "")).upper()
+        if not ability:
+            continue
+        bonus = int(asi.get("bonus", 0))
+        updated[ability] = updated.get(ability, 10) + bonus
+    return updated
+
+
+def merge_unique(a: List[str] | Set[str] | None, b: List[str] | Set[str] | None) -> List[str]:
+    """Merge two iterables into a sorted list of unique strings."""
+
+    items: Set[str] = set(a or [])
+    items.update(b or [])
+    return sorted(items)
+
+
 def build_partymember(
     name: str,
     cls: str,
@@ -79,6 +100,11 @@ def build_partymember(
     shield: bool = False,
     prof_skills: List[str] | None = None,
     prof_saves: List[str] | None = None,
+    *,
+    race: str | None = None,
+    background: str | None = None,
+    languages: List[str] | None = None,
+    tool_profs: List[str] | None = None,
 ) -> PartyMemberRef:
     cls_l = cls.lower()
     hit_die = HIT_DICE.get(cls_l, 8)
@@ -131,6 +157,10 @@ def build_partymember(
         stealth_disadv=stealth_disadv,
         prof_skills=prof_skills_set,
         prof_saves=prof_saves_set,
+        race=race,
+        background=background,
+        languages=sorted(languages or []),
+        tool_profs=sorted(tool_profs or []),
         prof_athletics=has_athletics,
         prof_acrobatics=has_acrobatics,
         **mods,

@@ -13,7 +13,9 @@ from grimbrain.engine.characters import (
     _parse_scores_from_array,
     _parse_scores_from_kv,
     _point_buy_cost,
+    apply_asi,
     build_partymember,
+    merge_unique,
     pc_summary_line,
     roll_abilities,
     save_pc,
@@ -93,6 +95,8 @@ def _default_pc_path(name: str) -> str:
 def create(
     name: str | None = typer.Option(None, "--name"),
     klass: str | None = typer.Option(None, "--class", help="Fighter, Rogue, Wizard (MVP)"),
+    race: str | None = typer.Option(None, "--race"),
+    background: str | None = typer.Option(None, "--background"),
     method: str | None = typer.Option(None, "--method", help="array | point-buy | roll"),
     array: str | None = typer.Option(None, "--array", help="15,14,13,12,10,8 (for method=array)"),
     point_buy: int = typer.Option(27, "--point-buy", help="Budget for method=point-buy"),
@@ -145,6 +149,45 @@ def create(
                 class_info = info
                 break
 
+    def _canonical_choice(value: str, options: list[str]) -> str | None:
+        normalized = value.strip().lower()
+        for option in options:
+            if option.lower() == normalized:
+                return option
+        return None
+
+    def _select_choice(
+        label: str, provided: str | None, names: list[str], default: str
+    ) -> str:
+        if names:
+            default_choice = default if default in names else names[0]
+            if provided is None:
+                value = typer.prompt(f"{label} {names}", default=default_choice)
+            else:
+                value = provided
+            value = (value or "").strip()
+            if not value:
+                value = default_choice
+            canon = _canonical_choice(value, names)
+            if canon is None:
+                raise typer.BadParameter(
+                    f"Unknown {label.lower()} '{value}'. Options: {', '.join(names)}"
+                )
+            return canon
+        if provided is None:
+            value = typer.prompt(label, default=default)
+        else:
+            value = provided
+        value = (value or "").strip()
+        return value or default
+
+    race_names = sorted(srd.races.keys()) if srd else []
+    back_names = sorted(srd.backgrounds.keys()) if srd else []
+    default_race = "Human" if "Human" in race_names else (race_names[0] if race_names else "Human")
+    default_back = "Soldier" if "Soldier" in back_names else (back_names[0] if back_names else "Soldier")
+    race = _select_choice("Race", race, race_names, default_race)
+    background = _select_choice("Background", background, back_names, default_back)
+
     if not method:
         method = typer.prompt("Ability method (array / point-buy / roll)")
     method = (method or "").strip().lower()
@@ -187,11 +230,11 @@ def create(
 
     default_armor = None
     default_shield = False
-    prof_saves = []
-    prof_skills = []
+    class_prof_saves: list[str] = []
+    class_prof_skills: list[str] = []
     if class_info is not None:
-        prof_saves = list(class_info.prof_saves)
-        prof_skills = list(class_info.prof_skills)
+        class_prof_saves = list(class_info.prof_saves)
+        class_prof_skills = list(class_info.prof_skills)
         for choice in class_info.start_armor:
             if choice.lower() == "shield":
                 default_shield = True
@@ -217,21 +260,45 @@ def create(
     else:
         shield_bool = _parse_bool(shield)
 
-    summary = pc_summary_line(name, klass, scores_map, weapon, ranged_bool)
+    race_info = srd.races.get(race) if srd and race in srd.races else None
+    back_info = srd.backgrounds.get(background) if srd and background in srd.backgrounds else None
+    scores_final = apply_asi(scores_map, list(race_info.asi) if race_info else [])
+    prof_saves = class_prof_saves
+    prof_skills = merge_unique(class_prof_skills, list(race_info.skills) if race_info else [])
+    prof_skills = merge_unique(prof_skills, list(back_info.skills) if back_info else [])
+    languages = merge_unique(
+        list(race_info.languages) if race_info else [],
+        list(back_info.languages) if back_info else [],
+    )
+    tool_profs = merge_unique([], list(back_info.tools) if back_info else [])
+
+    summary = pc_summary_line(name, klass, scores_final, weapon, ranged_bool)
     typer.echo(f"\n{summary}")
+    typer.echo(f"  Race: {race}")
+    typer.echo(f"  Background: {background}")
+    if prof_skills:
+        typer.echo("  Skill profs: " + ", ".join(prof_skills))
+    if languages:
+        typer.echo("  Languages: " + ", ".join(languages))
+    if tool_profs:
+        typer.echo("  Tool profs: " + ", ".join(tool_profs))
     if not typer.confirm("Save this character?", default=True):
         raise typer.Exit(1)
 
     pc = build_partymember(
         name=name,
         cls=klass,
-        scores=scores_map,
+        scores=scores_final,
         weapon=weapon,
         ranged=ranged_bool,
         armor=armor_choice,
         shield=shield_bool,
         prof_skills=prof_skills,
         prof_saves=prof_saves,
+        race=race,
+        background=background,
+        languages=languages,
+        tool_profs=tool_profs,
     )
     out_path = out or _default_pc_path(name)
     save_pc(pc, out_path)
@@ -239,7 +306,12 @@ def create(
 
     if log_to:
         state = load_campaign(log_to)
-        log_event(state, f"Created {name} the {klass}", kind="create")
+        arr = "/".join(str(scores_final[key]) for key in ABILS)
+        log_event(
+            state,
+            f"Created PC: {name} the {klass} ({race} {background}) [{arr}]",
+            kind="create",
+        )
         save_campaign(state, log_to)
         typer.echo(f"(Journal updated in {log_to})")
 

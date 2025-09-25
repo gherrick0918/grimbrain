@@ -171,6 +171,10 @@ class PartyMemberRef:
     stealth_disadv: bool = False
     prof_skills: List[str] = field(default_factory=list)
     prof_saves: List[str] = field(default_factory=list)
+    race: Optional[str] = None
+    background: Optional[str] = None
+    languages: List[str] = field(default_factory=list)
+    tool_profs: List[str] = field(default_factory=list)
 
 
 @dataclass
