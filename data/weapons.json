@@ -160,11 +160,14 @@
     "properties": ["two-handed"]
   },
   {
-    "name": "Warhammer",
-    "category": "martial",
-    "kind": "melee",
-    "damage": "1d8",
-    "damage_type": "bludgeoning",
-    "properties": ["versatile:1d10"]
-  }
+     "name": "Warhammer",
+     "type": "martial",
+     "category": "melee",
+     "damage": "1d8",
+     "damage_type": "bludgeoning",
+     "properties": ["versatile"],
+     "versatile": "1d10",
+     "weight": 2,
+     "cost": "15 gp"
+   }
 ]
