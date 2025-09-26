@@ -586,6 +586,16 @@ def story(
 ):
     """Play a scripted story scene-by-scene, tracking simple campaign flags."""
 
+    # When invoked via Typer the first argument will be a Context instance, but
+    # our unit tests call story("path.yaml") directly. In that scenario Typer's
+    # injection happens at runtime so the positional argument intended for
+    # ``file`` ends up bound to ``ctx``. Detect that case and shuffle the value
+    # back to the ``file`` parameter so the remainder of the logic can operate on
+    # normalized strings.
+    if isinstance(ctx, str) and (file is None or isinstance(file, ArgumentInfo)):
+        file = ctx
+        ctx = None
+
     load_path = _cli_value(load)
     story_path = _cli_value(story)
     file_path = _cli_value(file)
