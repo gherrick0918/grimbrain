@@ -203,9 +203,10 @@ def _style_from_context(ctx: typer.Context | None) -> str | None:
     return None
 
 
-def _apply_style_from_context(state: CampaignState) -> str | None:
-    ctx = None
-    if _typer_get_current_context is not None:
+def _apply_style_from_context(
+    state: CampaignState, ctx: typer.Context | None = None
+) -> str | None:
+    if ctx is None and _typer_get_current_context is not None:
         try:
             ctx = _typer_get_current_context(silent=True)
         except Exception:
@@ -248,10 +249,11 @@ def _get_narrator_instance():
     return get_narrator(ai_enabled=choose_ai_enabled(None), debug=False, flush=False)
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    style: str = typer.Option(None, "--style", help="classic|grim|heroic"),
+    load: str = typer.Option(None, "--load", help="Campaign save to load interactively"),
+    style: str = typer.Option(None, "--style", help="Narrative style: classic|grim|heroic"),
 ):
     global _CURRENT_STYLE
     if ctx.obj is None:
@@ -262,6 +264,12 @@ def main(
             raise typer.BadParameter("Style must be one of classic, grim, or heroic.")
         ctx.obj["style"] = normalized
         _CURRENT_STYLE = normalized
+    if ctx.invoked_subcommand is None:
+        if not load:
+            typer.echo("--load is required to start the campaign loop")
+            raise typer.Exit(1)
+        campaign_loop(load, ctx)
+        raise typer.Exit()
 
 
 @app.command(help="Set or show local Grimbrain config (~/.grimbrain/config.json)")
@@ -307,6 +315,7 @@ def _cli_value(value: Any) -> Any:
 
 @app.command()
 def travel(
+    ctx: typer.Context = None,
     load: str = typer.Option(..., "--load"),
     hours: int = 4,
     seed: int | None = None,
@@ -318,7 +327,7 @@ def travel(
     light: bool = typer.Option(False, "--light", help="Set light to normal for this segment"),
 ):
     st = load_campaign(load)
-    _apply_style_from_context(st)
+    _apply_style_from_context(st, ctx)
     base_seed = seed if isinstance(seed, int) else _state_seed(st)
     rng = random.Random(seed if seed is not None else st.seed)
     notes = []
@@ -420,13 +429,13 @@ def travel(
 
 
 @app.command()
-def status(load: str = typer.Option(..., "--load")):
+def status(ctx: typer.Context = None, load: str = typer.Option(..., "--load")):
     """
     Print day/time, location, encounter chance/clock, party HP, and a couple inventory counts.
     """
 
     st = load_campaign(load)
-    style_override = _apply_style_from_context(st)
+    style_override = _apply_style_from_context(st, ctx)
     if style_override:
         save_campaign(st, load)
     chance = getattr(st, "encounter_chance", 30)
@@ -443,14 +452,22 @@ def status(load: str = typer.Option(..., "--load")):
 
 
 @app.command()
-def explore(load: str = typer.Option(..., "--load"), seed: int | None = None):
-    travel(load=load, hours=4, seed=seed)
+def explore(
+    ctx: typer.Context = None,
+    load: str = typer.Option(..., "--load"),
+    seed: int | None = None,
+):
+    travel(ctx, load=load, hours=4, seed=seed)
 
 
 @app.command()
-def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None):
+def short_rest(
+    ctx: typer.Context = None,
+    load: str = typer.Option(..., "--load"),
+    seed: int | None = None,
+):
     st = load_campaign(load)
-    _apply_style_from_context(st)
+    _apply_style_from_context(st, ctx)
     rng = random.Random(seed or st.seed)
     notes = []
     for p in st.party:
@@ -479,9 +496,9 @@ def short_rest(load: str = typer.Option(..., "--load"), seed: int | None = None)
 
 
 @app.command()
-def long_rest(load: str = typer.Option(..., "--load")):
+def long_rest(ctx: typer.Context = None, load: str = typer.Option(..., "--load")):
     st = load_campaign(load)
-    _apply_style_from_context(st)
+    _apply_style_from_context(st, ctx)
     for p in st.party:
         st.current_hp[p.id] = p.max_hp
     st.last_long_rest_day = st.day
@@ -509,6 +526,7 @@ def long_rest(load: str = typer.Option(..., "--load")):
 
 @app.command()
 def story(
+    ctx: typer.Context = None,
     file: str | None = typer.Argument(None, help="Path to story YAML"),
     load: str | None = typer.Option(
         None, "--load", help="Optional campaign state JSON to persist progress"
@@ -566,12 +584,12 @@ def story(
 
     if load_path:
         state = load_campaign(load_path)
-        style_override = _apply_style_from_context(state)
+        style_override = _apply_style_from_context(state, ctx)
         if style_override:
             save_campaign(state, load_path)
     else:
         state = CampaignState(seed=camp.seed or 0)
-        _apply_style_from_context(state)
+        _apply_style_from_context(state, ctx)
     if not state.party:
         if pcs:
             state.party = [_pc_to_ref(pc, i + 1) for i, pc in enumerate(pcs)]
@@ -904,6 +922,7 @@ def shop(
 
 @app.command()
 def journal(
+    ctx: typer.Context = None,
     load: str = typer.Option(..., "--load"),
     tail: int | None = typer.Option(None, "--tail", help="Show only the last N entries"),
     grep: str | None = typer.Option(None, "--grep", help="Filter entries containing text"),
@@ -914,6 +933,7 @@ def journal(
     """Print or export the adventure log from the campaign save."""
 
     st = load_campaign(load)
+    _apply_style_from_context(st, ctx)
     entries = list(getattr(st, "journal", []) or [])
     if grep:
         needle = grep.lower()
@@ -978,9 +998,10 @@ def quest(
     save_campaign(st, load)
 
 
-def campaign_loop(path: str) -> None:
+def campaign_loop(path: str, ctx: typer.Context | None = None) -> None:
     """Interactive loop allowing continuous campaign play."""
     state = load_campaign(path)
+    _apply_style_from_context(state, ctx)
     print("Entering campaign loop. Type 'help' for options.")
     while True:
         hp = ", ".join(
@@ -1000,19 +1021,22 @@ def campaign_loop(path: str) -> None:
         if not raw:
             continue
         if raw in {"t", "travel"}:
-            travel(load=path)
+            travel(ctx, load=path)
             state = load_campaign(path)
+            _apply_style_from_context(state, ctx)
         elif raw in {"r", "rest"}:
             try:
                 kind = input("Short or long rest? (s/l) > ").strip().lower()
             except EOFError:
                 break
             if kind.startswith("s"):
-                short_rest(load=path)
+                short_rest(ctx, load=path)
                 state = load_campaign(path)
+                _apply_style_from_context(state, ctx)
             elif kind.startswith("l"):
-                long_rest(load=path)
+                long_rest(ctx, load=path)
                 state = load_campaign(path)
+                _apply_style_from_context(state, ctx)
             else:
                 print("Rest cancelled.")
         elif raw in {"q", "quest", "quests"}:
@@ -1026,6 +1050,7 @@ def campaign_loop(path: str) -> None:
             save_campaign(state, path)
             shop(load=path, script=None)
             state = load_campaign(path)
+            _apply_style_from_context(state, ctx)
         elif raw in {"x", "exit", "quit"}:
             save_campaign(state, path)
             print("Exiting campaign.")
@@ -1034,16 +1059,6 @@ def campaign_loop(path: str) -> None:
             print("Commands: [T]ravel, [R]est, [Q]uest log, [S]hop, [X] Exit")
         else:
             print("Unknown command.")
-
-
-@app.callback(invoke_without_command=True)
-def main(ctx: typer.Context, load: str = typer.Option(None, "--load")):
-    if ctx.invoked_subcommand is None:
-        if not load:
-            typer.echo("--load is required to start the campaign loop")
-            raise typer.Exit(1)
-        campaign_loop(load)
-        raise typer.Exit()
 
 
 if __name__ == "__main__":
