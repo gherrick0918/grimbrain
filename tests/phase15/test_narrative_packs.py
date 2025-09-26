@@ -11,7 +11,8 @@ def test_pick_template_line_deterministic():
         "time": "morning",
         "location": "Wilderness",
     }
-    a = pick_template_line("classic", "travel_start", ctx, seed=123)
-    b = pick_template_line("classic", "travel_start", ctx, seed=123)
-    c = pick_template_line("classic", "travel_start", ctx, seed=124)
-    assert a == b and a != c
+    a_text, a_tpl = pick_template_line("classic", "travel_start", ctx, seed=123)
+    b_text, b_tpl = pick_template_line("classic", "travel_start", ctx, seed=123)
+    c_text, c_tpl = pick_template_line("classic", "travel_start", ctx, seed=124)
+    assert a_text == b_text and a_tpl == b_tpl
+    assert a_text != c_text or a_tpl != c_tpl
