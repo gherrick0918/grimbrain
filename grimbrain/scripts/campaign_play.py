@@ -192,6 +192,44 @@ except Exception:  # pragma: no cover - fallback for older Typer
     _typer_get_current_context = None
 
 
+def _normalize_style(style: str | None) -> str | None:
+    if style is None:
+        return None
+    normalized = style.lower()
+    if normalized not in _VALID_STYLES:
+        raise typer.BadParameter("Style must be one of classic, grim, or heroic.")
+    return normalized
+
+
+def _ensure_context(ctx: typer.Context | None) -> typer.Context | None:
+    if ctx is not None:
+        return ctx
+    if _typer_get_current_context is None:
+        return None
+    try:
+        return _typer_get_current_context(silent=True)
+    except Exception:  # pragma: no cover - defensive for older Typer
+        return None
+
+
+def _store_style(style: str | None, ctx: typer.Context | None) -> str | None:
+    """Validate and cache a requested style on the Typer context and module."""
+
+    style = _cli_value(style)
+    normalized = _normalize_style(style)
+    if normalized is None:
+        return None
+    global _CURRENT_STYLE
+    _CURRENT_STYLE = normalized
+    effective_ctx = _ensure_context(ctx)
+    if effective_ctx is not None:
+        if effective_ctx.obj is None:
+            effective_ctx.obj = {}
+        if isinstance(effective_ctx.obj, dict):
+            effective_ctx.obj["style"] = normalized
+    return normalized
+
+
 def _style_from_context(ctx: typer.Context | None) -> str | None:
     while ctx is not None:
         obj = getattr(ctx, "obj", None)
@@ -206,11 +244,7 @@ def _style_from_context(ctx: typer.Context | None) -> str | None:
 def _apply_style_from_context(
     state: CampaignState, ctx: typer.Context | None = None
 ) -> str | None:
-    if ctx is None and _typer_get_current_context is not None:
-        try:
-            ctx = _typer_get_current_context(silent=True)
-        except Exception:
-            ctx = None
+    ctx = _ensure_context(ctx)
     style = _style_from_context(ctx)
     if not style:
         style = _CURRENT_STYLE
@@ -256,14 +290,7 @@ def main(
     style: str = typer.Option(None, "--style", help="Narrative style: classic|grim|heroic"),
 ):
     global _CURRENT_STYLE
-    if ctx.obj is None:
-        ctx.obj = {}
-    if style is not None:
-        normalized = style.lower()
-        if normalized not in _VALID_STYLES:
-            raise typer.BadParameter("Style must be one of classic, grim, or heroic.")
-        ctx.obj["style"] = normalized
-        _CURRENT_STYLE = normalized
+    _store_style(style, ctx)
     if ctx.invoked_subcommand is None:
         if not load:
             typer.echo("--load is required to start the campaign loop")
@@ -317,6 +344,9 @@ def _cli_value(value: Any) -> Any:
 def travel(
     ctx: typer.Context = None,
     load: str = typer.Option(..., "--load"),
+    style: str | None = typer.Option(
+        None, "--style", help="Narrative style: classic|grim|heroic"
+    ),
     hours: int = 4,
     seed: int | None = None,
     force_encounter: bool = typer.Option(False, "--force-encounter", "-F"),
@@ -326,6 +356,7 @@ def travel(
     dark: bool = typer.Option(False, "--dark", help="Set light to dark for this segment"),
     light: bool = typer.Option(False, "--light", help="Set light to normal for this segment"),
 ):
+    _store_style(style, ctx)
     st = load_campaign(load)
     _apply_style_from_context(st, ctx)
     base_seed = seed if isinstance(seed, int) else _state_seed(st)
@@ -429,11 +460,18 @@ def travel(
 
 
 @app.command()
-def status(ctx: typer.Context = None, load: str = typer.Option(..., "--load")):
+def status(
+    ctx: typer.Context = None,
+    load: str = typer.Option(..., "--load"),
+    style: str | None = typer.Option(
+        None, "--style", help="Narrative style: classic|grim|heroic"
+    ),
+):
     """
     Print day/time, location, encounter chance/clock, party HP, and a couple inventory counts.
     """
 
+    _store_style(style, ctx)
     st = load_campaign(load)
     style_override = _apply_style_from_context(st, ctx)
     if style_override:
