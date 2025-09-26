@@ -276,6 +276,7 @@ def _narration_context(state: CampaignState) -> dict[str, Any]:
         "lead_background_hook": f"{background} " if background else "",
         "time": state.time_of_day,
         "location": state.location,
+        "style": getattr(state, "narrative_style", "classic"),
     }
 
 
@@ -484,7 +485,10 @@ def status(
         f"chance={chance}% + clock={clock}% → effective={eff}%"
     )
     print(_party_status_line(st))
-    print(f"Light: {st.light_level}")
+    print(
+        f"Light: {getattr(st, 'light_level', 'normal')} | "
+        f"Style: {getattr(st, 'narrative_style', 'classic')}"
+    )
     st.normalize_inventory()
     print("Inventory:", format_inventory(st.inventory))
 

@@ -1,4 +1,4 @@
-import hashlib, sys, random
+import hashlib, json, os, sys, random
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -10,6 +10,65 @@ from .config import get_api_key, NARRATION_CACHE, append_cache_line, iter_cache
 
 
 _NARRATIVE_ROOT = Path(__file__).resolve().parents[2] / "data" / "narrative"
+
+
+# --- AI cache helpers -------------------------------------------------------
+
+
+def _ai_cache_dir() -> Path:
+    d = os.environ.get("GRIMBRAIN_AI_CACHE_DIR") or str(
+        Path.home() / ".grimbrain" / "ai_cache"
+    )
+    path = Path(d)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _ai_cache_key(model: str, style: str, section: str, prompt_text: str) -> str:
+    payload = {
+        "m": model or "",
+        "style": style or "",
+        "sec": section or "",
+        "t": prompt_text or "",
+    }
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _ai_cache_path(model: str, style: str, section: str, prompt_text: str) -> Path:
+    return _ai_cache_dir() / f"{_ai_cache_key(model, style, section, prompt_text)}.txt"
+
+
+def ai_cached_generate(
+    model: str,
+    style: str,
+    section: str,
+    prompt_text: str,
+    *,
+    debug: bool,
+    generator,
+):
+    """
+    generator(prompt_text, model) -> str  (usually the AI call).
+    Caches to disk; with GRIMBRAIN_AI_DEBUG=1 prints HIT/MISS + path.
+    """
+
+    path = _ai_cache_path(model, style, section, prompt_text)
+    dbg = debug or os.environ.get("GRIMBRAIN_AI_DEBUG") == "1"
+    if path.exists():
+        out = path.read_text(encoding="utf-8")
+        if dbg:
+            print(f"[AI cache HIT] {path}")
+        return out
+    out = generator(prompt_text, model)
+    try:
+        path.write_text(out, encoding="utf-8")
+        if dbg:
+            print(f"[AI cache MISS→WRITE] {path}")
+    except Exception as e:  # pragma: no cover - disk errors are debug noise
+        if dbg:
+            print(f"[AI cache WRITE ERROR] {e}")
+    return out
 
 
 @lru_cache(maxsize=None)
@@ -62,19 +121,26 @@ class CachedNarrator:
         self._template = TemplateNarrator()
 
     def render(self, scene_id: str, template: str, ctx: Dict[str, Any]) -> str:
-        key = _hash(scene_id, template, ctx, self.kind)
+        ctx_local: Dict[str, Any] = dict(ctx or {})
+        if "section" not in ctx_local:
+            base, _, tail = scene_id.partition("#")
+            ctx_local["section"] = tail or base or "misc"
+        ctx_local.setdefault("scene", scene_id)
+        ctx_local.setdefault("style", ctx_local.get("style") or "classic")
+        ctx_local.setdefault("_ai_debug", self.debug)
+        key = _hash(scene_id, template, ctx_local, self.kind)
         if not self.flush:
             for row in iter_cache(NARRATION_CACHE):
                 if row.get("key") == key:
                     if self.debug:
                         print(f"[narration] backend={self.kind} reason={self.reason} cache=HIT scene={scene_id}")
                     return row.get("text","")
-        text = self.backend.render(template, ctx)
+        text = self.backend.render(template, ctx_local)
         # Always preserve the underlying template text so deterministic tests can
         # assert on authored story beats even when an AI backend embellishes the
         # narration. This mirrors the template output for template narrators
         # while appending it (once) for AI responses that omit the original text.
-        fallback = self._template.render(template, ctx)
+        fallback = self._template.render(template, ctx_local)
         if self.kind != "template" and fallback:
             if fallback not in text:
                 if text and not text.endswith("\n"):
