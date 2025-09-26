@@ -1,6 +1,6 @@
 {
-  "seed": 141473664,
-  "day": 1,
+  "seed": 884920076,
+  "day": 2,
   "time_of_day": "afternoon",
   "location": "Wilderness",
   "gold": 0,
@@ -96,13 +96,13 @@
     }
   ],
   "current_hp": {
-    "Tharn": 12,
-    "Elira": 7
+    "Tharn": 0,
+    "Elira": 0
   },
   "quest_log": [],
   "last_long_rest_day": 0,
   "encounter_chance": 0,
-  "encounter_clock": 10,
+  "encounter_clock": 0,
   "encounter_clock_step": 10,
   "short_rest_hours": 4,
   "long_rest_to_morning": true,
@@ -118,6 +118,58 @@
         "chance": 0,
         "clock": 10,
         "effective": 10
+      }
+    },
+    {
+      "ts": "2025-09-26T19:11:12Z",
+      "day": 1,
+      "time": "evening",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 20,
+        "effective": 20
+      }
+    },
+    {
+      "ts": "2025-09-26T19:11:31Z",
+      "day": 1,
+      "time": "night",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 30,
+        "effective": 30
+      }
+    },
+    {
+      "ts": "2025-09-26T19:11:50Z",
+      "day": 2,
+      "time": "morning",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 40,
+        "effective": 40
+      }
+    },
+    {
+      "ts": "2025-09-26T19:11:54Z",
+      "day": 2,
+      "time": "afternoon",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; Encounter Ogre \u2014 Defeat in 6 rounds",
+      "extra": {
+        "chance": 0,
+        "clock": 0,
+        "effective": 0
       }
     }
   ],
