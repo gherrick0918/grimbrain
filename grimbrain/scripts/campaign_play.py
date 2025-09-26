@@ -417,22 +417,38 @@ def travel(
     tpl_ctx = _narration_context(st)
     narrator = _get_narrator_instance()
     style_name = getattr(st, "narrative_style", "classic")
-    start_line = pick_template_line(
+    start_line, start_tpl = pick_template_line(
         style_name, "travel_start", tpl_ctx, seed=_seed_with_offset(base_seed, 0)
     )
     if start_line:
-        print(narrator.render("travel#start", start_line, tpl_ctx))
+        start_ctx = dict(tpl_ctx)
+        start_ctx.update(
+            {
+                "style": style_name,
+                "section": "travel",
+                "tpl_id": start_tpl,
+            }
+        )
+        print(narrator.render("travel#start", start_line, start_ctx))
     if res.get("encounter"):
         winner = res.get("winner", "?")
         outcome = "Victory!" if winner == "A" else "Defeat..."
-        intro_line = pick_template_line(
+        intro_line, intro_tpl = pick_template_line(
             style_name,
             "encounter_intro",
             tpl_ctx,
             seed=_seed_with_offset(base_seed, 1),
         )
         if intro_line:
-            print(narrator.render("travel#encounter_intro", intro_line, tpl_ctx))
+            intro_ctx = dict(tpl_ctx)
+            intro_ctx.update(
+                {
+                    "style": style_name,
+                    "section": "travel",
+                    "tpl_id": intro_tpl,
+                }
+            )
+            print(narrator.render("travel#encounter_intro", intro_line, intro_ctx))
         print(f"Encounter: {res['encounter']} — {outcome}")
         if notes:
             print("\n".join(notes))
@@ -441,23 +457,45 @@ def travel(
         )
         print(f"Party HP: {hp}")
         outcome_key = "encounter_victory" if winner == "A" else "encounter_defeat"
-        outcome_line = pick_template_line(
+        outcome_line, outcome_tpl = pick_template_line(
             style_name,
             outcome_key,
             tpl_ctx,
             seed=_seed_with_offset(base_seed, 2),
         )
         if outcome_line:
-            print(narrator.render(f"travel#{outcome_key}", outcome_line, tpl_ctx))
+            outcome_ctx = dict(tpl_ctx)
+            outcome_ctx.update(
+                {
+                    "style": style_name,
+                    "section": "travel",
+                    "tpl_id": outcome_tpl,
+                }
+            )
+            print(
+                narrator.render(
+                    f"travel#{outcome_key}", outcome_line, outcome_ctx
+                )
+            )
     else:
-        no_encounter_line = pick_template_line(
+        no_encounter_line, no_tpl = pick_template_line(
             style_name,
             "travel_no_encounter",
             tpl_ctx,
             seed=_seed_with_offset(base_seed, 1),
         )
         if no_encounter_line:
-            print(narrator.render("travel#no_encounter", no_encounter_line, tpl_ctx))
+            no_ctx = dict(tpl_ctx)
+            no_ctx.update(
+                {
+                    "style": style_name,
+                    "section": "travel",
+                    "tpl_id": no_tpl,
+                }
+            )
+            print(
+                narrator.render("travel#no_encounter", no_encounter_line, no_ctx)
+            )
 
 
 @app.command()
@@ -525,14 +563,22 @@ def short_rest(
     narrator = _get_narrator_instance()
     tpl_ctx = _narration_context(st)
     style_name = getattr(st, "narrative_style", "classic")
-    rest_line = pick_template_line(
+    rest_line, rest_tpl = pick_template_line(
         style_name,
         "rest_short",
         tpl_ctx,
         seed=_seed_with_offset(_state_seed(st), 0),
     )
     if rest_line:
-        print(narrator.render("rest#short", rest_line, tpl_ctx))
+        rest_ctx = dict(tpl_ctx)
+        rest_ctx.update(
+            {
+                "style": style_name,
+                "section": "rest",
+                "tpl_id": rest_tpl,
+            }
+        )
+        print(narrator.render("rest#short", rest_line, rest_ctx))
     if notes:
         print("\n".join(notes))
 
@@ -555,14 +601,22 @@ def long_rest(ctx: typer.Context = None, load: str = typer.Option(..., "--load")
     narrator = _get_narrator_instance()
     tpl_ctx = _narration_context(st)
     style_name = getattr(st, "narrative_style", "classic")
-    rest_line = pick_template_line(
+    rest_line, rest_tpl = pick_template_line(
         style_name,
         "rest_long",
         tpl_ctx,
         seed=_seed_with_offset(_state_seed(st), 0),
     )
     if rest_line:
-        print(narrator.render("rest#long", rest_line, tpl_ctx))
+        rest_ctx = dict(tpl_ctx)
+        rest_ctx.update(
+            {
+                "style": style_name,
+                "section": "rest",
+                "tpl_id": rest_tpl,
+            }
+        )
+        print(narrator.render("rest#long", rest_line, rest_ctx))
     print("Long rest: party restored to full and conditions cleared.")
 
 

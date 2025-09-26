@@ -1,4 +1,4 @@
-import hashlib, json, os, sys, random
+import hashlib, json, os, sys, random, time
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -24,47 +24,121 @@ def _ai_cache_dir() -> Path:
     return path
 
 
-def _ai_cache_key(model: str, style: str, section: str, prompt_text: str) -> str:
+def _ai_cache_key_v2(
+    model: str,
+    style: str,
+    section: str,
+    tpl_id: str,
+    location: str,
+    time_bucket: str,
+) -> str:
     payload = {
         "m": model or "",
         "style": style or "",
         "sec": section or "",
-        "t": prompt_text or "",
+        "tpl": tpl_id or "",
+        "loc": location or "",
+        "tb": time_bucket or "",
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
 
 
-def _ai_cache_path(model: str, style: str, section: str, prompt_text: str) -> Path:
-    return _ai_cache_dir() / f"{_ai_cache_key(model, style, section, prompt_text)}.txt"
+def _ai_cache_path_from_key(key: str) -> Path:
+    return _ai_cache_dir() / f"{key}.txt"
 
 
-def ai_cached_generate(
+def _ai_index_path() -> Path:
+    return _ai_cache_dir() / "index.json"
+
+
+def _ai_index_load() -> dict:
+    path = _ai_index_path()
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def _ai_index_save(idx: dict):
+    _ai_index_path().write_text(
+        json.dumps(idx, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def _ai_index_touch(idx: dict, key: str, path: Path):
+    entry = idx.get(key) or {
+        "path": str(path),
+        "hits": 0,
+        "created_at": time.time(),
+    }
+    entry["hits"] = int(entry.get("hits", 0)) + 1
+    entry["last_used_at"] = time.time()
+    entry["path"] = str(path)
+    idx[key] = entry
+
+
+def _ai_index_lru_trim(idx: dict):
+    try:
+        limit = int(os.environ.get("GRIMBRAIN_AI_CACHE_MAX", "500"))
+    except Exception:
+        limit = 500
+    if len(idx) <= limit:
+        return idx
+    items = sorted(
+        idx.items(),
+        key=lambda item: item[1].get(
+            "last_used_at", item[1].get("created_at", 0)
+        ),
+    )
+    remove = items[0 : max(0, len(idx) - limit)]
+    for key, meta in remove:
+        try:
+            Path(meta.get("path", "")).unlink(missing_ok=True)
+        except Exception:
+            pass
+        idx.pop(key, None)
+    return idx
+
+
+def ai_cached_generate_v2(
     model: str,
     style: str,
     section: str,
-    prompt_text: str,
+    tpl_id: str,
+    location: str,
+    time_bucket: str,
     *,
     debug: bool,
     generator,
 ):
     """
-    generator(prompt_text, model) -> str  (usually the AI call).
-    Caches to disk; with GRIMBRAIN_AI_DEBUG=1 prints HIT/MISS + path.
+    generator() -> str (usually the AI call).
+    Caches to disk with structured keys and maintains an index with LRU trimming.
     """
 
-    path = _ai_cache_path(model, style, section, prompt_text)
+    key = _ai_cache_key_v2(model, style, section, tpl_id, location, time_bucket)
+    path = _ai_cache_path_from_key(key)
+    idx = _ai_index_load()
     dbg = debug or os.environ.get("GRIMBRAIN_AI_DEBUG") == "1"
     if path.exists():
         out = path.read_text(encoding="utf-8")
+        _ai_index_touch(idx, key, path)
+        _ai_index_save(idx)
         if dbg:
-            print(f"[AI cache HIT] {path}")
+            hits = idx.get(key, {}).get("hits")
+            print(f"[AI cache HIT] {path} key={key} hits={hits}")
         return out
-    out = generator(prompt_text, model)
+    out = generator()
     try:
         path.write_text(out, encoding="utf-8")
+        _ai_index_touch(idx, key, path)
+        _ai_index_save(_ai_index_lru_trim(idx))
         if dbg:
-            print(f"[AI cache MISS→WRITE] {path}")
+            hits = idx.get(key, {}).get("hits")
+            print(f"[AI cache MISS→WRITE] {path} key={key} hits={hits}")
     except Exception as e:  # pragma: no cover - disk errors are debug noise
         if dbg:
             print(f"[AI cache WRITE ERROR] {e}")
@@ -84,14 +158,16 @@ def _load_template_pack(pack: str) -> Dict[str, list[str]]:
 
 def pick_template_line(
     pack: str, section: str, ctx: Dict[str, Any], seed: int | None = None
-) -> str:
+) -> tuple[str, str]:
     data = _load_template_pack(pack)
     options = list(data.get(section) or [])
     if not options:
-        return ""
+        return "", ""
     rng = random.Random(seed)
-    raw = rng.choice(options)
-    return raw.format_map(defaultdict(str, ctx))
+    idx = rng.randrange(len(options))
+    raw = options[idx]
+    tpl_id = f"{pack}:{section}:{idx}"
+    return raw.format_map(defaultdict(str, ctx)), tpl_id
 
 class TemplateNarrator:
     KIND = "template"

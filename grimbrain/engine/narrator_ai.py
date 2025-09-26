@@ -1,5 +1,5 @@
 import json, urllib.request, urllib.error, sys, time
-from .narrator import TemplateNarrator, ai_cached_generate
+from .narrator import TemplateNarrator, ai_cached_generate_v2
 
 class AINarrator:
     KIND = "openai:gpt-4o-mini"
@@ -62,11 +62,23 @@ class AINarrator:
                 print(f"[narration] ERROR {type(e).__name__}: {e}", file=sys.stderr)
                 return TemplateNarrator().render(template, ctx)
 
-        return ai_cached_generate(
+        tpl_id = (ctx or {}).get("tpl_id", "")
+        location = (ctx or {}).get("location", "")
+        tod = ((ctx or {}).get("time") or "").lower()
+        time_bucket = {
+            "morning": "am",
+            "afternoon": "pm",
+            "evening": "pm",
+            "night": "night",
+        }.get(tod, (ctx or {}).get("time", ""))
+
+        return ai_cached_generate_v2(
             model,
             style,
             section,
-            prompt,
+            tpl_id,
+            location,
+            time_bucket,
             debug=debug,
-            generator=_call,
+            generator=lambda: _call(prompt, model),
         )
