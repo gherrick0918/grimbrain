@@ -1,7 +1,7 @@
 {
-  "seed": 4242,
+  "seed": 141473664,
   "day": 1,
-  "time_of_day": "morning",
+  "time_of_day": "afternoon",
   "location": "Wilderness",
   "gold": 0,
   "inventory": {},
@@ -46,7 +46,9 @@
       "tool_profs": [
         "Gaming Set",
         "Vehicles (Land)"
-      ]
+      ],
+      "features": {},
+      "light_emitter": false
     },
     {
       "id": "Elira",
@@ -88,16 +90,37 @@
         "Elvish",
         "Two of your choice"
       ],
-      "tool_profs": []
+      "tool_profs": [],
+      "features": {},
+      "light_emitter": false
     }
   ],
-  "current_hp": {},
+  "current_hp": {
+    "Tharn": 12,
+    "Elira": 7
+  },
   "quest_log": [],
   "last_long_rest_day": 0,
-  "encounter_chance": 30,
-  "encounter_clock": 0,
+  "encounter_chance": 0,
+  "encounter_clock": 10,
   "encounter_clock_step": 10,
   "short_rest_hours": 4,
   "long_rest_to_morning": true,
-  "journal": []
+  "journal": [
+    {
+      "ts": "2025-09-26T18:06:20Z",
+      "day": 1,
+      "time": "afternoon",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 10,
+        "effective": 10
+      }
+    }
+  ],
+  "light_level": "normal",
+  "narrative_style": "grim"
 }
