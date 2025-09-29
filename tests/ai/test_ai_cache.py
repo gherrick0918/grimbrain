@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from grimbrain.ai import CacheInputs, call_with_cache, make_cache_key
+from grimbrain.ai import CacheInputs, call_with_cache, make_key
 
 
 def _inputs(prompt: str = "Hello", **param_overrides) -> CacheInputs:
@@ -40,7 +40,7 @@ def _clear_env(monkeypatch):
     monkeypatch.delenv("GRIMBRAIN_AI_CACHE_TTL_DAYS", raising=False)
 
 
-def test_returns_cached_result(tmp_path, monkeypatch):
+def test_returns_cached_without_calling_model(tmp_path, monkeypatch):
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
     calls: list[str] = []
 
@@ -59,7 +59,7 @@ def test_returns_cached_result(tmp_path, monkeypatch):
     assert entry["hits"] == 2
 
 
-def test_different_params_produce_different_keys(tmp_path, monkeypatch):
+def test_key_sensitive_to_params(tmp_path, monkeypatch):
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
     calls: list[str] = []
 
@@ -78,12 +78,26 @@ def test_different_params_produce_different_keys(tmp_path, monkeypatch):
 
     assert {out_a, out_b} == {"A", "B"}
     assert calls == ["A", "B"]
-    assert make_cache_key(inputs_a) != make_cache_key(inputs_b)
+    assert make_key(inputs_a) != make_key(inputs_b)
     txt_files = {p.name for p in tmp_path.glob("*.txt")}
     assert len(txt_files) == 2
 
 
-def test_concurrent_calls_share_single_write(tmp_path, monkeypatch):
+def test_call_with_cache_passes_inputs(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
+    seen: list[CacheInputs] = []
+
+    inputs = _inputs("Input propagation")
+
+    def generator(received: CacheInputs) -> str:
+        seen.append(received)
+        return "ok"
+
+    assert call_with_cache(inputs, generator) == "ok"
+    assert seen == [inputs]
+
+
+def test_atomic_single_write_under_concurrency(tmp_path, monkeypatch):
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
     calls: list[str] = []
 
@@ -98,15 +112,17 @@ def test_concurrent_calls_share_single_write(tmp_path, monkeypatch):
 
     assert results == ["value"] * 5
     assert calls == ["hit"]  # generator executed once
+    txt_files = list(tmp_path.glob("*.txt"))
+    assert len(txt_files) == 1
     idx = _read_index(tmp_path)
-    key = make_cache_key(inputs)
+    key = make_key(inputs)
     assert idx["entries"][key]["hits"] == 5
 
 
 def test_stale_index_recovery(tmp_path, monkeypatch):
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
     inputs = _inputs("Stale")
-    key = make_cache_key(inputs)
+    key = make_key(inputs)
     index_path = tmp_path / "index.json"
     index_path.write_text(
         json.dumps(
@@ -177,7 +193,7 @@ def test_disable_and_refresh_flags(tmp_path, monkeypatch):
     assert entry["hits"] == 2
 
 
-def test_eviction_respects_max_bytes(tmp_path, monkeypatch):
+def test_eviction_basic(tmp_path, monkeypatch):
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_DIR", str(tmp_path))
     monkeypatch.setenv("GRIMBRAIN_AI_CACHE_MAX_BYTES", "60")
 

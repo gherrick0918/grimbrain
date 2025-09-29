@@ -4,6 +4,7 @@ import contextlib
 import dataclasses
 import datetime as _dt
 import hashlib
+import inspect
 import json
 import os
 import tempfile
@@ -34,18 +35,24 @@ class CacheInputs:
     style: str | None = None
 
 
-def call_with_cache(inputs: CacheInputs, fn_call_model: Callable[[], str]) -> str:
-    """Return cached response text for identical inputs, calling ``fn_call_model``
-    only on cache miss (or refresh)."""
+def call_with_cache(inputs: CacheInputs, fn_call_model: Callable[..., str]) -> str:
+    """Return cached response text for identical inputs.
+
+    ``fn_call_model`` will be invoked with ``inputs`` if its signature expects at
+    least one positional argument; otherwise it is invoked without arguments for
+    backwards compatibility. The callable is only executed on cache miss (or
+    when refresh is requested).
+    """
 
     if _is_cache_disabled():
         return fn_call_model()
 
     cache_dir = _cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
-    key = make_cache_key(inputs)
+    key = make_key(inputs)
     text_path = cache_dir / f"{key}{_TEXT_SUFFIX}"
     refresh = _refresh_requested()
+    expects_inputs = _fn_requires_inputs(fn_call_model)
 
     with _index_lock(cache_dir):
         index = _load_index(cache_dir)
@@ -57,16 +64,16 @@ def call_with_cache(inputs: CacheInputs, fn_call_model: Callable[[], str]) -> st
                 text = text_path.read_text(encoding="utf-8")
             except FileNotFoundError:
                 _log("STALE-INDEX", key)
-                _remove_entry(index, key)
+                _remove_entry(index, key, cache_dir)
             else:
                 _touch_entry(entry)
                 _save_index(cache_dir, index)
                 _log("HIT", key, hits=entry.get("hits"))
                 return text
         if entry and (refresh or ttl_expired):
-            _remove_entry(index, key)
+            _remove_entry(index, key, cache_dir)
 
-        text = fn_call_model()
+        text = fn_call_model(inputs) if expects_inputs else fn_call_model()
         _write_text_atomic(text_path, text)
         entry = _create_entry(inputs, text_path)
         index.setdefault("entries", {})[key] = entry
@@ -76,7 +83,7 @@ def call_with_cache(inputs: CacheInputs, fn_call_model: Callable[[], str]) -> st
         return text
 
 
-def make_cache_key(inputs: CacheInputs) -> str:
+def make_key(inputs: CacheInputs) -> str:
     payload = {
         "model": (inputs.model or ""),
         "messages": _canonical_messages(inputs.messages),
@@ -88,15 +95,23 @@ def make_cache_key(inputs: CacheInputs) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+# Backwards compatibility for older imports.
+make_cache_key = make_key
+
+
 # ---------------------------------------------------------------------------
 # Index helpers
 
 
 def _cache_dir() -> Path:
-    env_dir = os.environ.get("GRIMBRAIN_AI_CACHE_DIR")
+    return _default_cache_dir()
+
+
+def _default_cache_dir() -> Path:
+    env_dir = os.getenv("GRIMBRAIN_AI_CACHE_DIR")
     if env_dir:
         return Path(env_dir)
-    return Path.home() / ".grimbrain_cache"
+    return Path.cwd() / ".grimbrain_cache"
 
 
 def _index_path(cache_dir: Path) -> Path:
@@ -151,6 +166,7 @@ def _drop_missing_files(cache_dir: Path, entries: MutableMapping[str, Any]) -> N
             missing.append(key)
     for key in missing:
         entries.pop(key, None)
+        _log("STALE-INDEX", key)
 
 
 def _validate_entry(cache_dir: Path, key: str, entry: Mapping[str, Any] | None):
@@ -166,10 +182,18 @@ def _validate_entry(cache_dir: Path, key: str, entry: Mapping[str, Any] | None):
     return entry
 
 
-def _remove_entry(index: MutableMapping[str, Any], key: str) -> None:
+def _remove_entry(index: MutableMapping[str, Any], key: str, cache_dir: Path | None = None) -> None:
     entries = index.get("entries")
-    if isinstance(entries, dict):
-        entries.pop(key, None)
+    if not isinstance(entries, dict):
+        return
+    entry = entries.pop(key, None)
+    if cache_dir is None or not entry:
+        return
+    filename = entry.get("filename")
+    if not filename:
+        return
+    with contextlib.suppress(FileNotFoundError):
+        (cache_dir / filename).unlink()
 
 
 def _touch_entry(entry: MutableMapping[str, Any]) -> None:
@@ -212,15 +236,9 @@ def _enforce_limits(cache_dir: Path, index: MutableMapping[str, Any]) -> None:
         ),
     )
     for key, entry in sorted_items:
-        filename = entry.get("filename")
-        if filename:
-            path = cache_dir / filename
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
-        entries.pop(key, None)
-        total -= int(entry.get("size") or 0)
+        size = int(entry.get("size") or 0)
+        _remove_entry(index, key, cache_dir)
+        total -= size
         if total <= max_bytes:
             break
 
@@ -272,11 +290,30 @@ def _canonicalize(value: Any) -> Any:
 # Misc helpers
 
 
+def _fn_requires_inputs(fn: Callable[..., Any]) -> bool:
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):  # pragma: no cover - builtins without signature
+        return True
+
+    for param in sig.parameters.values():
+        if param.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ):
+            if param.default is inspect._empty:
+                return True
+        elif param.kind == inspect.Parameter.VAR_POSITIONAL:
+            return True
+    return False
+
+
 def _write_text_atomic(path: Path, text: str, *, binary: bool = False) -> None:
     if binary:
         data = text.encode("utf-8") if isinstance(text, str) else text
     else:
         data = text.encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp_fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
     try:
         with os.fdopen(tmp_fd, "wb") as fh:

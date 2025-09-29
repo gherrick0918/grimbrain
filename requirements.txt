@@ -13,3 +13,4 @@ pytest
 pytest-cov
 jsonschema
 reportlab>=4.0
+python-dotenv
