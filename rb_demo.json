@@ -1,7 +1,7 @@
 {
-  "seed": 884920076,
+  "seed": 539005078,
   "day": 2,
-  "time_of_day": "afternoon",
+  "time_of_day": "night",
   "location": "Wilderness",
   "gold": 0,
   "inventory": {},
@@ -102,7 +102,7 @@
   "quest_log": [],
   "last_long_rest_day": 0,
   "encounter_chance": 0,
-  "encounter_clock": 0,
+  "encounter_clock": 20,
   "encounter_clock_step": 10,
   "short_rest_hours": 4,
   "long_rest_to_morning": true,
@@ -170,6 +170,32 @@
         "chance": 0,
         "clock": 0,
         "effective": 0
+      }
+    },
+    {
+      "ts": "2025-09-26T20:14:10Z",
+      "day": 2,
+      "time": "evening",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 10,
+        "effective": 10
+      }
+    },
+    {
+      "ts": "2025-09-26T20:14:32Z",
+      "day": 2,
+      "time": "night",
+      "loc": "Wilderness",
+      "kind": "travel",
+      "text": "Travel 1h; No encounter",
+      "extra": {
+        "chance": 0,
+        "clock": 20,
+        "effective": 20
       }
     }
   ],
