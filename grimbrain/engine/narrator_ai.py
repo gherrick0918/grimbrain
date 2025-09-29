@@ -1,5 +1,8 @@
 import json, urllib.request, urllib.error, sys, time
-from .narrator import TemplateNarrator, ai_cached_generate_v2
+
+from grimbrain.ai import CacheInputs, call_with_cache
+
+from .narrator import TemplateNarrator
 
 class AINarrator:
     KIND = "openai:gpt-4o-mini"
@@ -62,23 +65,26 @@ class AINarrator:
                 print(f"[narration] ERROR {type(e).__name__}: {e}", file=sys.stderr)
                 return TemplateNarrator().render(template, ctx)
 
-        tpl_id = (ctx or {}).get("tpl_id", "")
-        location = (ctx or {}).get("location", "")
-        tod = ((ctx or {}).get("time") or "").lower()
-        time_bucket = {
-            "morning": "am",
-            "afternoon": "pm",
-            "evening": "pm",
-            "night": "night",
-        }.get(tod, (ctx or {}).get("time", ""))
-
-        return ai_cached_generate_v2(
-            model,
-            style,
-            section,
-            tpl_id,
-            location,
-            time_bucket,
-            debug=debug,
-            generator=lambda: _call(prompt, model),
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a concise fantasy narrator. 1–3 short sentences.",
+            },
+            {"role": "user", "content": prompt},
+        ]
+        params = {
+            "temperature": 0.7,
+            "top_p": None,
+            "presence_penalty": None,
+            "frequency_penalty": None,
+            "seed": None,
+        }
+        inputs = CacheInputs(
+            model=model,
+            messages=messages,
+            tools=None,
+            params=params,
+            style=style,
         )
+
+        return call_with_cache(inputs, lambda: _call(prompt, model))
