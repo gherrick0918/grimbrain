@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from grimbrain.config_env import load_env as _gb_load_env  # noqa: E402
+
+_gb_load_env()
+
 import argparse
 import json
 import os

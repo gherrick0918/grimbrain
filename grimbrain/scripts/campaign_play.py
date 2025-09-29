@@ -7,6 +7,10 @@ from typing import Any
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
+from grimbrain.config_env import load_env as _gb_load_env  # noqa: E402
+
+_gb_load_env()
+
 import typer
 from typer.models import ArgumentInfo, OptionInfo
 
