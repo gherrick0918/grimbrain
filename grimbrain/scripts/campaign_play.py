@@ -1,3 +1,4 @@
+import os
 import random
 import sys
 from pathlib import Path
@@ -356,8 +357,16 @@ def travel(
     ),
     dark: bool = typer.Option(False, "--dark", help="Set light to dark for this segment"),
     light: bool = typer.Option(False, "--light", help="Set light to normal for this segment"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Disable AI cache for this run"),
+    refresh_cache: bool = typer.Option(
+        False, "--refresh-cache", help="Refresh AI cache entries for this run"
+    ),
 ):
     _store_style(style, ctx)
+    if no_cache:
+        os.environ["GRIMBRAIN_AI_DISABLE_CACHE"] = "1"
+    if refresh_cache:
+        os.environ["GRIMBRAIN_AI_REFRESH_CACHE"] = "1"
     st = load_campaign(load)
     _apply_style_from_context(st, ctx)
     base_seed = seed if isinstance(seed, int) else _state_seed(st)
