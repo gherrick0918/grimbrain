@@ -13,7 +13,11 @@ from grimbrain.config_env import load_env as _gb_load_env  # noqa: E402
 _gb_load_env()
 
 import typer
-import yaml
+
+try:
+    import yaml  # type: ignore[assignment]
+except Exception:  # pragma: no cover - PyYAML is optional
+    yaml = None  # type: ignore[assignment]
 from typer.models import ArgumentInfo, OptionInfo
 
 from grimbrain.engine.campaign import (
@@ -212,12 +216,38 @@ def sample(
     item: Optional[List[str]] = typer.Option(
         None, "--item", help="Repeatable inventory overrides 'key=value' (e.g., --item potion=2)"
     ),
+    stdout: bool = typer.Option(
+        False,
+        "--stdout",
+        help="Print the sample document to stdout instead of writing a file.",
+    ),
+    output_format: Optional[str] = typer.Option(
+        None,
+        "--format",
+        help="Force the output format (yaml or json).",
+        case_sensitive=False,
+    ),
 ) -> None:
     """Write a tiny but valid campaign YAML file usable by other commands."""
 
-    p = Path(path)
-    if p.exists() and not overwrite:
-        raise typer.BadParameter(f"{p} already exists. Use --overwrite to replace.")
+    valid_formats = {"yaml", "json"}
+    normalized_format = output_format.lower() if output_format else None
+    if normalized_format is not None and normalized_format not in valid_formats:
+        raise typer.BadParameter("--format must be either 'yaml' or 'json'.")
+    if normalized_format == "yaml" and yaml is None:
+        raise typer.BadParameter(
+            "PyYAML is required for YAML output. Install pyyaml or choose --format json."
+        )
+
+    selected_format = normalized_format or ("yaml" if yaml is not None else "json")
+
+    target_path: Path | None = None
+    if not stdout:
+        target_path = Path(path)
+        if target_path.exists() and not overwrite:
+            raise typer.BadParameter(
+                f"{target_path} already exists. Use --overwrite to replace or pass --stdout."
+            )
 
     def parse_party(entries: Optional[List[str]]) -> List[dict[str, Any]]:
         result: List[dict[str, Any]] = []
@@ -295,8 +325,22 @@ def sample(
         "journal": [],
     }
 
-    p.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
-    typer.echo(str(p.resolve()))
+    if selected_format == "yaml":
+        assert yaml is not None  # for type checking only
+        text = yaml.safe_dump(data, sort_keys=False)  # type: ignore[union-attr]
+    else:
+        import json
+
+        text = json.dumps(data, indent=2)
+
+    if stdout:
+        typer.echo(text)
+        typer.echo("(stdout)")
+        return
+
+    assert target_path is not None  # for mypy - ensured when stdout is False
+    target_path.write_text(text, encoding="utf-8")
+    typer.echo(str(target_path.resolve()))
 
 
 _VALID_STYLES = {"classic", "grim", "heroic"}

@@ -1,7 +1,12 @@
+import json
 from pathlib import Path
 
 import pytest
-import yaml
+
+try:
+    import yaml  # type: ignore[assignment]
+except Exception:  # pragma: no cover - PyYAML is optional in tests too
+    yaml = None  # type: ignore[assignment]
 
 try:  # Typer <0.12 exposes the runner from click.testing instead
     from typer.testing import CliRunner  # type: ignore
@@ -25,11 +30,16 @@ def test_sample_defaults_then_status(tmp_path):
     result = runner.invoke(cp.app, ["sample", str(demo), "--overwrite"])
     assert result.exit_code == 0
     assert demo.exists()
+    out = result.stdout or result.output
+    assert str(demo.resolve()) in out
 
-    status = runner.invoke(cp.app, ["status", "--load", str(demo)])
-    assert status.exit_code == 0
-    out = status.stdout or status.output
-    assert "day" in out.lower() or "location" in out.lower()
+    if cp.yaml is not None:
+        status = runner.invoke(cp.app, ["status", "--load", str(demo)])
+        assert status.exit_code == 0
+        status_out = status.stdout or status.output
+        assert "day" in status_out.lower() or "location" in status_out.lower()
+    else:
+        assert demo.read_text(encoding="utf-8").strip()
 
 
 def test_sample_switches_and_parse(tmp_path):
@@ -66,8 +76,14 @@ def test_sample_switches_and_parse(tmp_path):
     ]
     result = runner.invoke(cp.app, args)
     assert result.exit_code == 0
+    out = result.stdout or result.output
+    assert str(demo.resolve()) in out
 
-    data = yaml.safe_load(Path(demo).read_text(encoding="utf-8"))
+    raw = Path(demo).read_text(encoding="utf-8")
+    if cp.yaml is not None and yaml is not None:
+        data = yaml.safe_load(raw)
+    else:
+        data = json.loads(raw)
     assert data["style"] == "heroic"
     assert data["clock"]["day"] == 3
     assert data["clock"]["time"] == "evening"
@@ -84,3 +100,30 @@ def test_sample_switches_and_parse(tmp_path):
     assert members[0]["hp"]["current"] == 6
     assert members[1]["name"] == "Borin"
     assert members[1]["hp"]["max"] == 12
+
+
+def test_sample_no_yaml(tmp_path, monkeypatch):
+    _require_real_typer()
+    import grimbrain.scripts.campaign_play as cp_module
+
+    monkeypatch.setattr(cp_module, "yaml", None)
+    demo = tmp_path / "demo.json"
+    result = runner.invoke(
+        cp_module.app,
+        ["sample", str(demo), "-f", "--format", "json"],
+    )
+    assert result.exit_code == 0
+    assert demo.exists()
+    output = result.stdout or result.output
+    assert str(demo.resolve()) in output
+    assert demo.read_text(encoding="utf-8").strip().startswith("{")
+
+
+def test_sample_stdout_json():
+    _require_real_typer()
+    result = runner.invoke(cp.app, ["sample", "--stdout", "--format", "json"])
+    assert result.exit_code == 0
+    output = result.stdout or result.output
+    lines = [line for line in output.splitlines() if line.strip()]
+    assert lines[0].startswith("{")
+    assert lines[-1] == "(stdout)"

@@ -17,4 +17,4 @@ def test_module_help_runs():
     )
     assert result.returncode == 0
     out = result.stdout or result.stderr
-    assert "Usage" in out or "usage" in out
+    assert "Usage:" in out
