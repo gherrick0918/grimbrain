@@ -1,8 +1,9 @@
 import os
 import random
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -12,6 +13,7 @@ from grimbrain.config_env import load_env as _gb_load_env  # noqa: E402
 _gb_load_env()
 
 import typer
+import yaml
 from typer.models import ArgumentInfo, OptionInfo
 
 from grimbrain.engine.campaign import (
@@ -190,6 +192,111 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+@app.command(help="Generate a minimal valid YAML campaign save.")
+def sample(
+    path: str = typer.Argument("demo_campaign.yaml", help="Where to write the YAML save"),
+    overwrite: bool = typer.Option(False, "--overwrite", "-f", help="Overwrite if exists"),
+    style: str = typer.Option("classic", "--style", help="Narrative style: classic|grim|heroic"),
+    day: int = typer.Option(1, "--day", help="Starting day number"),
+    time_of_day: str = typer.Option("morning", "--time", help="morning|noon|evening|night"),
+    region: str = typer.Option("Greenfields", "--region", help="World region name"),
+    place: str = typer.Option("Village Gate", "--place", help="Specific place name"),
+    gold: int = typer.Option(10, "--gold", help="Party starting gold"),
+    rations: int = typer.Option(3, "--rations", help="Rations count"),
+    torches: int = typer.Option(2, "--torches", help="Torches count"),
+    party: Optional[List[str]] = typer.Option(
+        None, "--party", help="Repeatable. Format: Name,Class,Level[,HPmax[,HPcur]]"
+    ),
+    item: Optional[List[str]] = typer.Option(
+        None, "--item", help="Repeatable inventory overrides 'key=value' (e.g., --item potion=2)"
+    ),
+) -> None:
+    """Write a tiny but valid campaign YAML file usable by other commands."""
+
+    p = Path(path)
+    if p.exists() and not overwrite:
+        raise typer.BadParameter(f"{p} already exists. Use --overwrite to replace.")
+
+    def parse_party(entries: Optional[List[str]]) -> List[dict[str, Any]]:
+        result: List[dict[str, Any]] = []
+        if not entries:
+            return [
+                {
+                    "name": "Tomas",
+                    "class": "Fighter",
+                    "level": 1,
+                    "hp": {"max": 12, "current": 12},
+                }
+            ]
+        for entry in entries:
+            parts = [segment.strip() for segment in entry.split(",") if segment.strip()]
+            if len(parts) < 3:
+                raise typer.BadParameter(
+                    f"--party needs Name,Class,Level[,HPmax[,HPcur]]; got: {entry}"
+                )
+            name, klass, level_raw = parts[0], parts[1], parts[2]
+            try:
+                level = int(level_raw)
+            except ValueError as exc:
+                raise typer.BadParameter(f"Level must be an integer; got: {level_raw}") from exc
+            hp_max = 12
+            if len(parts) >= 4:
+                try:
+                    hp_max = int(parts[3])
+                except ValueError as exc:  # pragma: no cover - defensive guard
+                    raise typer.BadParameter(f"HP max must be an integer; got: {parts[3]}") from exc
+            hp_current = hp_max
+            if len(parts) >= 5:
+                try:
+                    hp_current = int(parts[4])
+                except ValueError as exc:  # pragma: no cover - defensive guard
+                    raise typer.BadParameter(f"HP current must be an integer; got: {parts[4]}") from exc
+            result.append(
+                {
+                    "name": name,
+                    "class": klass,
+                    "level": level,
+                    "hp": {"max": hp_max, "current": hp_current},
+                }
+            )
+        return result
+
+    def parse_items(entries: Optional[List[str]]) -> dict[str, Any]:
+        inventory: dict[str, Any] = {"rations": rations, "torches": torches}
+        if not entries:
+            return inventory
+        for kv in entries:
+            if "=" not in kv:
+                raise typer.BadParameter(f"--item must be key=value; got: {kv}")
+            key, value_raw = kv.split("=", 1)
+            key = key.strip()
+            value_raw = value_raw.strip()
+            if not key:
+                raise typer.BadParameter(f"--item must have a key before '='; got: {kv}")
+            if not value_raw:
+                raise typer.BadParameter(f"--item must have a value after '='; got: {kv}")
+            try:
+                value: Any = int(value_raw)
+            except ValueError:
+                value = value_raw
+            inventory[key] = value
+        return inventory
+
+    data = {
+        "meta": {"version": 1, "created_at": datetime.utcnow().isoformat() + "Z"},
+        "clock": {"day": day, "time": time_of_day},
+        "location": {"region": region, "place": place},
+        "party": {"gold": gold, "members": parse_party(party)},
+        "inventory": parse_items(item),
+        "style": style,
+        "flags": {},
+        "journal": [],
+    }
+
+    p.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    typer.echo(str(p.resolve()))
 
 
 _VALID_STYLES = {"classic", "grim", "heroic"}
