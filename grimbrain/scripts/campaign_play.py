@@ -185,7 +185,11 @@ def _party_status_line(st: CampaignState) -> str:
     gold = getattr(st, "gold", 0)
     return f"Party: {', '.join(parts)} | Gold: {gold}"
 
-app = typer.Typer(help="Play a lightweight solo campaign loop.")
+app = typer.Typer(
+    help="Play a lightweight solo campaign loop.",
+    no_args_is_help=True,
+    add_completion=False,
+)
 
 
 _VALID_STYLES = {"classic", "grim", "heroic"}
@@ -1180,5 +1184,9 @@ def campaign_loop(path: str, ctx: typer.Context | None = None) -> None:
             print("Unknown command.")
 
 
-if __name__ == "__main__":
+def _main() -> None:
     app()
+
+
+if __name__ == "__main__":
+    _main()
