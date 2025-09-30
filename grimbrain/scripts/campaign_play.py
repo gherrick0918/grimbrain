@@ -27,10 +27,14 @@ from grimbrain.engine.campaign import (
     advance_time,
     load_yaml_campaign,
     load_party,
-    PartyMemberRef,
+    PartyMemberRef as EnginePartyMemberRef,
     party_to_combatants,
     apply_combat_results,
-    CampaignState,
+    CampaignState as EngineCampaignState,
+)
+from grimbrain.models.campaign import (
+    CampaignState as IOCampaignState,
+    PartyMemberRef as IOPartyMemberRef,
 )
 from grimbrain.engine.bestiary import make_combatant_from_monster, weapon_names_for_monster
 from grimbrain.engine.encounters import run_encounter
@@ -60,8 +64,8 @@ def _to_bool(value: Any) -> bool:
     return bool(value)
 
 
-def load_campaign(path: str | Path) -> CampaignDocument:
-    """Load a campaign document from JSON or YAML."""
+def _load_dict(path: str | Path) -> CampaignDocument:
+    """Load a raw campaign document from JSON or YAML."""
 
     p = Path(path)
     if not p.exists():
@@ -89,7 +93,14 @@ def load_campaign(path: str | Path) -> CampaignDocument:
     return dict(data)
 
 
-def save_campaign(data: CampaignDocument, path: str | Path, fmt: str | None = None) -> Path:
+def load_campaign(path: str | Path) -> IOCampaignState:
+    """Load a campaign state from JSON or YAML."""
+
+    data = _load_dict(path)
+    return IOCampaignState.from_dict(data)
+
+
+def _save_dict(data: CampaignDocument, path: str | Path, fmt: str | None = None) -> Path:
     """Persist a campaign document to disk."""
 
     p = Path(path)
@@ -109,13 +120,45 @@ def save_campaign(data: CampaignDocument, path: str | Path, fmt: str | None = No
     elif chosen in {"yaml", "yml"}:
         if yaml is None:
             raise RuntimeError("Cannot write YAML: PyYAML not installed")
-        p.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        payload = _prune_empty_lists_for_yaml(data)
+        p.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     else:  # pragma: no cover - defensive fallback
         raise ValueError(f"Unknown format: {chosen}")
     return p
 
 
-def _campaign_member_from_doc(entry: Dict[str, Any] | None, idx: int) -> Tuple[PartyMemberRef, int]:
+def save_campaign(state: IOCampaignState, path: str | Path, fmt: str | None = None) -> Path:
+    """Persist a campaign state to disk."""
+
+    if not isinstance(state, IOCampaignState):
+        raise TypeError("save_campaign expects a CampaignState instance")
+    data = state.to_dict()
+    return _save_dict(data, path, fmt=fmt)
+
+
+def _prune_empty_lists_for_yaml(data: CampaignDocument) -> CampaignDocument:
+    """Remove empty list entries that the lightweight YAML writer cannot emit."""
+
+    def _clean(value: Any) -> Any:
+        if isinstance(value, dict):
+            result: Dict[str, Any] = {}
+            for key, inner in value.items():
+                cleaned = _clean(inner)
+                if isinstance(cleaned, list) and len(cleaned) == 0:
+                    continue
+                result[key] = cleaned
+            return result
+        if isinstance(value, list):
+            cleaned_items = [_clean(item) for item in value]
+            return [item for item in cleaned_items if not (isinstance(item, list) and len(item) == 0)]
+        return value
+
+    return _clean(data)
+
+
+def _campaign_member_from_doc(
+    entry: Dict[str, Any] | None, idx: int
+) -> Tuple[EnginePartyMemberRef, int]:
     payload = dict(entry or {})
     hp_info = payload.pop("hp", {}) or {}
     hp_max_raw = hp_info.get("max", payload.pop("max_hp", None))
@@ -179,7 +222,7 @@ def _campaign_member_from_doc(entry: Dict[str, Any] | None, idx: int) -> Tuple[P
         features.setdefault("class", class_value)
     if features:
         defaults["features"] = features
-    member = PartyMemberRef(**defaults)
+    member = EnginePartyMemberRef(**defaults)
     return member, hp_cur
 
 
@@ -204,24 +247,38 @@ def _quest_items_from_doc(items: Iterable[Any]) -> List[QuestLogItem]:
     return quests
 
 
-def _document_to_state(data: CampaignDocument) -> CampaignState:
-    meta = data.get("meta", {}) if isinstance(data.get("meta"), dict) else {}
-    state_info = data.get("state", {}) if isinstance(data.get("state"), dict) else {}
-    encounter_info = state_info.get("encounter", {}) if isinstance(state_info.get("encounter"), dict) else {}
-    rest_info = state_info.get("rest", {}) if isinstance(state_info.get("rest"), dict) else {}
-    day = data.get("day")
+def _document_to_state(data: CampaignDocument | IOCampaignState) -> EngineCampaignState:
+    if isinstance(data, IOCampaignState):
+        payload = data.to_dict()
+    else:
+        payload = dict(data)
+    meta = payload.get("meta", {}) if isinstance(payload.get("meta"), dict) else {}
+    state_info = (
+        payload.get("state", {}) if isinstance(payload.get("state"), dict) else {}
+    )
+    encounter_info = (
+        state_info.get("encounter", {})
+        if isinstance(state_info.get("encounter"), dict)
+        else {}
+    )
+    rest_info = (
+        state_info.get("rest", {}) if isinstance(state_info.get("rest"), dict) else {}
+    )
+    day = payload.get("day")
     if day is None:
-        day = (data.get("clock", {}) or {}).get("day", 1)
-    time_of_day = data.get("time_of_day")
+        day = (payload.get("clock", {}) or {}).get("day", 1)
+    time_of_day = payload.get("time_of_day")
     if time_of_day is None:
-        time_of_day = (data.get("clock", {}) or {}).get("time", "morning")
-    if isinstance(data.get("location_info"), dict):
-        location_info = data["location_info"]
-    elif isinstance(data.get("location"), dict):
-        location_info = data["location"]
+        time_of_day = (payload.get("clock", {}) or {}).get("time", "morning")
+    if isinstance(payload.get("location_info"), dict):
+        location_info = payload["location_info"]
+    elif isinstance(payload.get("location"), dict):
+        location_info = payload["location"]
     else:
         location_info = {}
-    location = data.get("location") if isinstance(data.get("location"), str) else None
+    location = (
+        payload.get("location") if isinstance(payload.get("location"), str) else None
+    )
     if not location:
         place = location_info.get("place")
         region = location_info.get("region")
@@ -231,23 +288,23 @@ def _document_to_state(data: CampaignDocument) -> CampaignState:
         else:
             location = place or region or name or "Wilderness"
     party_info = {}
-    if isinstance(data.get("party_info"), dict):
-        party_info = data["party_info"]
-    elif isinstance(data.get("party"), dict):
-        party_info = data["party"]
+    if isinstance(payload.get("party_info"), dict):
+        party_info = payload["party_info"]
+    elif isinstance(payload.get("party"), dict):
+        party_info = payload["party"]
     members_raw: Iterable[Any]
     if isinstance(party_info.get("members"), list) and party_info.get("members"):
         members_raw = party_info["members"]
-    elif isinstance(data.get("party"), list):
-        members_raw = data["party"]  # legacy structure
+    elif isinstance(payload.get("party"), list):
+        members_raw = payload["party"]  # legacy structure
     else:
         members_raw = []
-    members: List[PartyMemberRef] = []
+    members: List[EnginePartyMemberRef] = []
     current_hp: Dict[str, int] = {}
     if isinstance(state_info.get("current_hp"), dict):
         current_hp.update({str(k): int(v) for k, v in state_info["current_hp"].items()})
-    elif isinstance(data.get("current_hp"), dict):
-        current_hp.update({str(k): int(v) for k, v in data["current_hp"].items()})
+    elif isinstance(payload.get("current_hp"), dict):
+        current_hp.update({str(k): int(v) for k, v in payload["current_hp"].items()})
     for idx, entry in enumerate(members_raw, start=1):
         member, hp_cur = _campaign_member_from_doc(entry if isinstance(entry, dict) else {}, idx)
         members.append(member)
@@ -257,29 +314,35 @@ def _document_to_state(data: CampaignDocument) -> CampaignState:
         for pm in members:
             current_hp.setdefault(pm.id, pm.max_hp)
     gold = party_info.get("gold") if isinstance(party_info, dict) else None
-    if gold is None and data.get("gold") is not None:
-        gold = data.get("gold")
+    if gold is None and payload.get("gold") is not None:
+        gold = payload.get("gold")
     inventory = {}
-    inv_source = data.get("inventory")
+    inv_source = payload.get("inventory")
     if isinstance(inv_source, dict):
         inventory = dict(inv_source)
     elif isinstance(inv_source, list):
         for item in inv_source:
             inventory[str(item)] = inventory.get(str(item), 0) + 1
-    style = data.get("style") or state_info.get("style") or meta.get("style") or data.get("narrative_style") or "classic"
-    quest_log_source = state_info.get("quest_log") or data.get("quest_log") or []
+    style = (
+        payload.get("style")
+        or state_info.get("style")
+        or meta.get("style")
+        or payload.get("narrative_style")
+        or "classic"
+    )
+    quest_log_source = state_info.get("quest_log") or payload.get("quest_log") or []
     quest_log = _quest_items_from_doc(quest_log_source if isinstance(quest_log_source, Iterable) else [])
-    journal_source = data.get("journal") or state_info.get("journal") or []
+    journal_source = payload.get("journal") or state_info.get("journal") or []
     if not isinstance(journal_source, list):
         journal_source = [journal_source]
     seed = (
         meta.get("seed")
         or state_info.get("seed")
-        or data.get("seed")
+        or payload.get("seed")
         or meta.get("random_seed")
         or random.randrange(1_000_000)
     )
-    st = CampaignState(
+    st = EngineCampaignState(
         seed=int(seed),
         day=int(day),
         time_of_day=str(time_of_day),
@@ -289,21 +352,21 @@ def _document_to_state(data: CampaignDocument) -> CampaignState:
         party=members,
         current_hp=current_hp,
         quest_log=quest_log,
-        last_long_rest_day=int(state_info.get("last_long_rest_day", data.get("last_long_rest_day", 0) or 0)),
-        encounter_chance=int(encounter_info.get("chance", data.get("encounter_chance", 30) or 0)),
-        encounter_clock=int(encounter_info.get("clock", data.get("encounter_clock", 0) or 0)),
-        encounter_clock_step=int(encounter_info.get("step", data.get("encounter_clock_step", 10) or 10)),
-        short_rest_hours=int(rest_info.get("short_hours", data.get("short_rest_hours", 4) or 4)),
-        long_rest_to_morning=bool(rest_info.get("long_to_morning", data.get("long_rest_to_morning", True))),
+        last_long_rest_day=int(state_info.get("last_long_rest_day", payload.get("last_long_rest_day", 0) or 0)),
+        encounter_chance=int(encounter_info.get("chance", payload.get("encounter_chance", 30) or 0)),
+        encounter_clock=int(encounter_info.get("clock", payload.get("encounter_clock", 0) or 0)),
+        encounter_clock_step=int(encounter_info.get("step", payload.get("encounter_clock_step", 10) or 10)),
+        short_rest_hours=int(rest_info.get("short_hours", payload.get("short_rest_hours", 4) or 4)),
+        long_rest_to_morning=bool(rest_info.get("long_to_morning", payload.get("long_rest_to_morning", True))),
         journal=list(journal_source),
-        light_level=str(state_info.get("light", data.get("light_level", "normal"))),
+        light_level=str(state_info.get("light", payload.get("light_level", "normal"))),
         narrative_style=str(style),
     )
     st.normalize_inventory()
     return st
 
 
-def _state_to_document(state: CampaignState) -> CampaignDocument:
+def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
     members_full: List[Dict[str, Any]] = []
     legacy_members: List[Dict[str, Any]] = []
     for pm in state.party:
@@ -366,17 +429,18 @@ def _state_to_document(state: CampaignState) -> CampaignDocument:
     return doc
 
 
-def _load_state(path: str | Path) -> CampaignState:
-    return _document_to_state(load_campaign(path))
+def _load_state(path: str | Path) -> EngineCampaignState:
+    return _document_to_state(_load_dict(path))
 
 
-def _save_state(state: CampaignState, path: str | Path) -> Path:
-    return save_campaign(_state_to_document(state), path)
+def _save_state(state: EngineCampaignState, path: str | Path) -> Path:
+    io_state = IOCampaignState.from_dict(_state_to_document(state))
+    return save_campaign(io_state, path)
 
 
-def _default_party() -> list[PartyMemberRef]:
+def _default_party() -> list[EnginePartyMemberRef]:
     return [
-        PartyMemberRef(
+        EnginePartyMemberRef(
             id="PC1",
             name="Fighter",
             str_mod=3,
@@ -395,7 +459,7 @@ def _default_party() -> list[PartyMemberRef]:
             prof_skills=["Athletics"],
             prof_saves=["STR", "CON"],
         ),
-        PartyMemberRef(
+        EnginePartyMemberRef(
             id="PC2",
             name="Archer",
             str_mod=0,
@@ -417,11 +481,11 @@ def _default_party() -> list[PartyMemberRef]:
     ]
 
 
-def _pc_to_ref(pc, idx: int) -> PartyMemberRef:
+def _pc_to_ref(pc, idx: int) -> EnginePartyMemberRef:
     atk = pc.attacks[0] if getattr(pc, "attacks", []) else None
     weapon = atk.name if atk else None
     ranged = atk.type == "ranged" if atk else False
-    return PartyMemberRef(
+    return EnginePartyMemberRef(
         id=f"PC{idx}",
         name=pc.name,
         str_mod=getattr(pc, "str_mod", 0),
@@ -463,7 +527,7 @@ def _parse_enemies(enc: str | list[str] | None) -> list[str]:
     return [text]
 
 
-def _skill_bonus(pm: PartyMemberRef, skill_name: str) -> int:
+def _skill_bonus(pm: EnginePartyMemberRef, skill_name: str) -> int:
     ability = None
     canonical = skill_name
     if _SRD_DATA is not None:
@@ -494,7 +558,7 @@ def _skill_bonus(pm: PartyMemberRef, skill_name: str) -> int:
     return mod
 
 
-def _party_status_line(st: CampaignState) -> str:
+def _party_status_line(st: EngineCampaignState) -> str:
     parts: list[str] = []
     hp = getattr(st, "current_hp", {}) or {}
     for pm in st.party:
@@ -546,18 +610,32 @@ def sample(
     if p.exists() and not overwrite and not stdout:
         raise typer.BadParameter(f"{p} exists. Use --overwrite.")
 
-    def parse_party(entries: Optional[List[str]]) -> List[dict[str, Any]]:
+    def parse_party(
+        entries: Optional[List[str]],
+    ) -> tuple[list[IOPartyMemberRef], dict[str, int]]:
+        members: list[IOPartyMemberRef] = []
+        hp_map: dict[str, int] = {}
         if not entries:
-            return [
-                {
-                    "name": "Tomas",
-                    "class": "Fighter",
-                    "level": 1,
-                    "hp": {"max": 12, "current": 12},
-                }
-            ]
-        parsed: List[dict[str, Any]] = []
-        for entry in entries:
+            default = IOPartyMemberRef(
+                id="PC1",
+                name="Tomas",
+                class_="Fighter",
+                level=1,
+                str_mod=2,
+                dex_mod=1,
+                con_mod=2,
+                int_mod=0,
+                wis_mod=0,
+                cha_mod=0,
+                ac=14,
+                max_hp=12,
+                pb=2,
+                speed=30,
+            )
+            members.append(default)
+            hp_map[default.id] = default.max_hp
+            return members, hp_map
+        for idx, entry in enumerate(entries, start=1):
             parts = [segment.strip() for segment in entry.split(",") if segment.strip()]
             if len(parts) < 3:
                 raise typer.BadParameter(
@@ -586,17 +664,26 @@ def sample(
                     raise typer.BadParameter(
                         f"HP current must be an integer; got {parts[4]}"
                     ) from exc
-            parsed.append(
-                {
-                    "name": name,
-                    "class": klass,
-                    "level": level_val,
-                    "hp": {"max": hp_max, "current": hp_current},
-                }
+            member_id = f"PC{idx}"
+            member = IOPartyMemberRef(
+                id=member_id,
+                name=name,
+                class_=klass,
+                level=level_val,
+                str_mod=0,
+                dex_mod=0,
+                con_mod=0,
+                int_mod=0,
+                wis_mod=0,
+                cha_mod=0,
+                ac=12,
+                max_hp=hp_max,
+                pb=2,
+                speed=30,
             )
-        for idx, entry in enumerate(parsed, start=1):
-            entry.setdefault("id", f"PC{idx}")
-        return parsed
+            members.append(member)
+            hp_map[member_id] = hp_current
+        return members, hp_map
 
     def parse_items(entries: Optional[List[str]]) -> Dict[str, Any]:
         inventory: Dict[str, Any] = {"rations": rations, "torches": torches}
@@ -619,72 +706,24 @@ def sample(
             inventory[key] = value
         return inventory
 
-    members_info = parse_party(party)
-    legacy_members: List[Dict[str, Any]] = []
-    current_hp_map: Dict[str, int] = {}
-    for idx, member in enumerate(members_info, start=1):
-        member_id = str(member.get("id") or f"PC{idx}")
-        member["id"] = member_id
-        hp_info = member.get("hp", {}) or {}
-        hp_max = int(hp_info.get("max", 12))
-        hp_current = int(hp_info.get("current", hp_max))
-        current_hp_map[member_id] = hp_current
-        legacy_members.append(
-            {
-                "id": member_id,
-                "name": member.get("name", f"Hero {idx}"),
-                "str_mod": 0,
-                "dex_mod": 0,
-                "con_mod": 0,
-                "int_mod": 0,
-                "wis_mod": 0,
-                "cha_mod": 0,
-                "ac": 12,
-                "max_hp": hp_max,
-                "pb": 2,
-                "speed": 30,
-                "level": int(member.get("level", 1)),
-            }
-        )
-
+    members, current_hp_map = parse_party(party)
     inventory_map = parse_items(item)
 
-    data: CampaignDocument = {
-        "meta": {"version": 1, "created_at": datetime.utcnow().isoformat() + "Z"},
-        "seed": 1,
-        "day": day,
-        "time_of_day": time_of_day,
-        "clock": {"day": day, "time": time_of_day},
-        "location": place,
-        "location_info": {"region": region, "place": place, "name": place},
-        "party_info": {"gold": gold, "members": members_info},
-        "party": legacy_members,
-        "gold": gold,
-        "inventory": inventory_map,
-        "style": style,
-        "narrative_style": style,
-        "light_level": "normal",
-        "encounter_chance": 30,
-        "encounter_clock": 0,
-        "encounter_clock_step": 10,
-        "short_rest_hours": 4,
-        "long_rest_to_morning": True,
-        "last_long_rest_day": 0,
-        "flags": {},
-        "journal": [],
-        "quest_log": [],
-        "current_hp": current_hp_map,
-        "state": {
-            "seed": 1,
-            "current_hp": current_hp_map,
-            "last_long_rest_day": 0,
-            "encounter": {"chance": 30, "clock": 0, "step": 10},
-            "rest": {"short_hours": 4, "long_to_morning": True},
-            "light": "normal",
-            "quest_log": [],
-            "style": style,
-        },
-    }
+    state = IOCampaignState(
+        seed=random.randint(0, 1_000_000_000),
+        day=day,
+        time_of_day=time_of_day,
+        location=place,
+        region=region,
+        place=place,
+        gold=gold,
+        inventory=inventory_map,
+        party=members,
+        current_hp=current_hp_map,
+        style=style,
+    )
+    for member in state.party:
+        state.current_hp.setdefault(member.id, member.max_hp)
 
     if stdout:
         use_format = (fmt or "").lower() if fmt else None
@@ -697,16 +736,16 @@ def sample(
             else:
                 use_format = "json"
         if use_format == "json":
-            typer.echo(json.dumps(data, indent=2))
+            typer.echo(json.dumps(state.to_dict(), indent=2))
         elif use_format in {"yaml", "yml"}:
             if yaml is None:
                 raise typer.BadParameter("YAML requested but PyYAML not installed")
-            typer.echo(yaml.safe_dump(data, sort_keys=False))
+            typer.echo(yaml.safe_dump(state.to_dict(), sort_keys=False))
         else:
             raise typer.BadParameter("--format must be json or yaml")
         return
 
-    out_path = save_campaign(data, p, fmt=fmt)
+    out_path = save_campaign(state, p, fmt=fmt)
     typer.echo(str(out_path.resolve()))
 
 
@@ -769,7 +808,7 @@ def _style_from_context(ctx: typer.Context | None) -> str | None:
 
 
 def _apply_style_from_context(
-    state: CampaignState, ctx: typer.Context | None = None
+    state: EngineCampaignState, ctx: typer.Context | None = None
 ) -> str | None:
     ctx = _ensure_context(ctx)
     style = _style_from_context(ctx)
@@ -780,7 +819,7 @@ def _apply_style_from_context(
     return style
 
 
-def _state_seed(state: CampaignState) -> int | None:
+def _state_seed(state: EngineCampaignState) -> int | None:
     seed = getattr(state, "seed", None)
     return seed if isinstance(seed, int) else None
 
@@ -791,7 +830,7 @@ def _seed_with_offset(base: int | None, offset: int = 0) -> int | None:
     return base + offset
 
 
-def _narration_context(state: CampaignState) -> dict[str, Any]:
+def _narration_context(state: EngineCampaignState) -> dict[str, Any]:
     lead = state.party[0] if state.party else None
     race = getattr(lead, "race", "") or ""
     background = getattr(lead, "background", "") or ""
@@ -1120,7 +1159,7 @@ def short_rest(
 
 @app.command()
 def long_rest(ctx: typer.Context = None, load: str = typer.Option(..., "--load")):
-    st = load_campaign(load)
+    st = _load_state(load)
     _apply_style_from_context(st, ctx)
     for p in st.party:
         st.current_hp[p.id] = p.max_hp
@@ -1229,7 +1268,7 @@ def story(
         if style_override:
             _save_state(state, load_path)
     else:
-        state = CampaignState(seed=camp.seed or 0)
+        state = EngineCampaignState(seed=camp.seed or 0)
         _apply_style_from_context(state, ctx)
     if not state.party:
         if pcs:
