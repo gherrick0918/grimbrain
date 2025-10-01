@@ -36,7 +36,6 @@ from grimbrain.io.campaign_io import (
     load_campaign as io_load_campaign,
     save_campaign as io_save_campaign,
 )
-from grimbrain.models.campaign import CampaignState as IOCampaignState
 from grimbrain.engine.bestiary import make_combatant_from_monster, weapon_names_for_monster
 from grimbrain.engine.encounters import run_encounter
 from grimbrain.engine.loot import roll_loot
@@ -165,8 +164,8 @@ def _quest_items_from_doc(items: Iterable[Any]) -> List[QuestLogItem]:
     return quests
 
 
-def _document_to_state(data: CampaignDocument | IOCampaignState) -> EngineCampaignState:
-    if isinstance(data, IOCampaignState):
+def _document_to_state(data: CampaignDocument | Any) -> EngineCampaignState:
+    if hasattr(data, "to_dict"):
         payload = data.to_dict()
     else:
         payload = dict(data)
@@ -286,17 +285,22 @@ def _document_to_state(data: CampaignDocument | IOCampaignState) -> EngineCampai
 
 def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
     members_full: List[Dict[str, Any]] = []
-    legacy_members: List[Dict[str, Any]] = []
     for pm in state.party:
         base = asdict(pm)
         member_full = dict(base)
-        member_full["hp"] = {
-            "max": pm.max_hp,
-            "current": state.current_hp.get(pm.id, pm.max_hp),
-        }
+        hp_current = state.current_hp.get(pm.id, pm.max_hp)
+        member_full["hp_max"] = pm.max_hp
+        member_full["hp_current"] = hp_current
+        member_full["hp"] = {"max": pm.max_hp, "current": hp_current}
         members_full.append(member_full)
-        legacy_members.append(dict(base))
+
     quest_log = [asdict(q) for q in state.quest_log]
+    flags_value = getattr(state, "flags", {})
+    flags_doc = dict(flags_value) if isinstance(flags_value, dict) else {}
+    inventory_doc = dict(state.inventory or {})
+    journal_doc = list(state.journal or [])
+    current_hp_doc = {str(k): int(v) for k, v in state.current_hp.items()}
+
     doc: CampaignDocument = {
         "meta": {
             "version": 1,
@@ -310,9 +314,9 @@ def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
         "clock": {"day": state.day, "time": state.time_of_day},
         "location_info": {"name": state.location},
         "party_info": {"gold": state.gold, "members": members_full},
-        "party": legacy_members,
+        "party": members_full,
         "gold": state.gold,
-        "inventory": dict(state.inventory or {}),
+        "inventory": inventory_doc,
         "style": state.narrative_style,
         "narrative_style": state.narrative_style,
         "light_level": state.light_level,
@@ -322,13 +326,13 @@ def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
         "last_long_rest_day": state.last_long_rest_day,
         "short_rest_hours": state.short_rest_hours,
         "long_rest_to_morning": state.long_rest_to_morning,
-        "flags": {},
-        "journal": state.journal,
+        "flags": flags_doc,
+        "journal": journal_doc,
         "quest_log": quest_log,
-        "current_hp": dict(state.current_hp),
+        "current_hp": current_hp_doc,
         "state": {
             "seed": state.seed,
-            "current_hp": dict(state.current_hp),
+            "current_hp": current_hp_doc,
             "last_long_rest_day": state.last_long_rest_day,
             "encounter": {
                 "chance": state.encounter_chance,
@@ -352,8 +356,8 @@ def _load_state(path: str | Path) -> EngineCampaignState:
 
 
 def _save_state(state: EngineCampaignState, path: str | Path) -> Path:
-    io_state = IOCampaignState.from_dict(_state_to_document(state))
-    return save_campaign(io_state, path)
+    document = _state_to_document(state)
+    return save_campaign(document, path)
 
 
 def _default_party() -> list[EnginePartyMemberRef]:
@@ -628,16 +632,45 @@ def sample(
     elif not location_text:
         location_text = "Unknown"
 
-    state = IOCampaignState(
-        seed=random.randint(0, 1_000_000_000),
-        day=day,
-        time_of_day=time_of_day,
-        location=location_text,
-        gold=gold,
-        inventory=inventory_map,
-        party=members,
-        style=style,
-    )
+    member_docs: list[dict[str, Any]] = []
+    current_hp: dict[str, int] = {}
+    for member in members:
+        doc = dict(member)
+        hp_max = int(doc.get("hp_max", doc.get("max_hp", 12)))
+        hp_current = int(doc.get("hp_current", hp_max))
+        doc["hp_max"] = hp_max
+        doc["hp_current"] = hp_current
+        doc["hp"] = {"max": hp_max, "current": hp_current}
+        member_docs.append(doc)
+        member_id = doc.get("id")
+        if member_id:
+            current_hp[str(member_id)] = hp_current
+
+    state: dict[str, Any] = {
+        "seed": random.randint(0, 1_000_000_000),
+        "day": day,
+        "time_of_day": time_of_day,
+        "clock": {"day": day, "time": time_of_day},
+        "location": location_text,
+        "location_info": {"region": region or None, "place": place or None, "name": location_text},
+        "gold": gold,
+        "inventory": inventory_map,
+        "party": member_docs,
+        "party_info": {"gold": gold, "members": member_docs},
+        "current_hp": current_hp,
+        "style": style,
+        "narrative_style": style,
+        "encounter_chance": 30,
+        "encounter_clock": 0,
+        "encounter_clock_step": 10,
+        "short_rest_hours": 4,
+        "long_rest_to_morning": True,
+        "last_long_rest_day": 0,
+        "light_level": "normal",
+        "flags": {},
+        "journal": [],
+        "quest_log": [],
+    }
 
     if stdout:
         use_format = (fmt or "").lower() if fmt else None
@@ -650,13 +683,14 @@ def sample(
             else:
                 use_format = "json"
         if use_format == "json":
-            typer.echo(json.dumps(state.to_dict(), indent=2))
+            typer.echo(json.dumps(state, indent=2))
         elif use_format in {"yaml", "yml"}:
             if yaml is None:
                 raise typer.BadParameter("YAML requested but PyYAML not installed")
-            typer.echo(yaml.safe_dump(state.to_dict(), sort_keys=False))
+            typer.echo(yaml.safe_dump(state, sort_keys=False))
         else:
             raise typer.BadParameter("--format must be json or yaml")
+        typer.echo("(stdout)")
         return
 
     out_path = save_campaign(state, p, fmt=fmt)
