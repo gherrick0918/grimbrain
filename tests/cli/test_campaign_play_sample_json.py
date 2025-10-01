@@ -26,7 +26,7 @@ def test_sample_json_then_status(tmp_path):
     assert result.exit_code == 0
     assert demo.exists()
     data = json.loads(demo.read_text(encoding="utf-8"))
-    assert data["clock"]["day"] == 1
+    assert data["day"] == 1
     status = runner.invoke(cp.app, ["status", "--load", str(demo)])
     assert status.exit_code == 0
     output_text = status.stdout or status.output

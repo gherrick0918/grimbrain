@@ -32,10 +32,11 @@ from grimbrain.engine.campaign import (
     apply_combat_results,
     CampaignState as EngineCampaignState,
 )
-from grimbrain.models.campaign import (
-    CampaignState as IOCampaignState,
-    PartyMemberRef as IOPartyMemberRef,
+from grimbrain.io.campaign_io import (
+    load_campaign as io_load_campaign,
+    save_campaign as io_save_campaign,
 )
+from grimbrain.models.campaign import CampaignState as IOCampaignState
 from grimbrain.engine.bestiary import make_combatant_from_monster, weapon_names_for_monster
 from grimbrain.engine.encounters import run_encounter
 from grimbrain.engine.loot import roll_loot
@@ -63,97 +64,8 @@ def _to_bool(value: Any) -> bool:
         return value.strip().lower() in {"1", "true", "yes", "on", "y"}
     return bool(value)
 
-
-def _load_dict(path: str | Path) -> CampaignDocument:
-    """Load a raw campaign document from JSON or YAML."""
-
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(p)
-    ext = p.suffix.lower()
-    text = p.read_text(encoding="utf-8")
-    data: Any
-    if ext == ".json":
-        data = json.loads(text)
-    elif ext in (".yaml", ".yml"):
-        if yaml is None:
-            raise RuntimeError("YAML requested but PyYAML not installed")
-        data = yaml.safe_load(text)
-    else:
-        try:
-            data = json.loads(text)
-        except Exception:
-            if yaml is None:
-                raise
-            data = yaml.safe_load(text)
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise ValueError("Campaign file must contain a mapping at the top level")
-    return dict(data)
-
-
-def load_campaign(path: str | Path) -> IOCampaignState:
-    """Load a campaign state from JSON or YAML."""
-
-    data = _load_dict(path)
-    return IOCampaignState.from_dict(data)
-
-
-def _save_dict(data: CampaignDocument, path: str | Path, fmt: str | None = None) -> Path:
-    """Persist a campaign document to disk."""
-
-    p = Path(path)
-    suffix = p.suffix.lower()
-    chosen = (fmt or "").lower() if fmt else None
-    if chosen not in {"json", "yaml", "yml", None}:
-        raise ValueError(f"Unknown format: {fmt}")
-    if chosen is None:
-        if suffix in ("", ".json"):
-            chosen = "json"
-        elif suffix in (".yaml", ".yml"):
-            chosen = suffix.lstrip(".")
-        else:
-            chosen = "json"
-    if chosen == "json":
-        p.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    elif chosen in {"yaml", "yml"}:
-        if yaml is None:
-            raise RuntimeError("Cannot write YAML: PyYAML not installed")
-        payload = _prune_empty_lists_for_yaml(data)
-        p.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    else:  # pragma: no cover - defensive fallback
-        raise ValueError(f"Unknown format: {chosen}")
-    return p
-
-
-def save_campaign(state: IOCampaignState, path: str | Path, fmt: str | None = None) -> Path:
-    """Persist a campaign state to disk."""
-
-    if not isinstance(state, IOCampaignState):
-        raise TypeError("save_campaign expects a CampaignState instance")
-    data = state.to_dict()
-    return _save_dict(data, path, fmt=fmt)
-
-
-def _prune_empty_lists_for_yaml(data: CampaignDocument) -> CampaignDocument:
-    """Remove empty list entries that the lightweight YAML writer cannot emit."""
-
-    def _clean(value: Any) -> Any:
-        if isinstance(value, dict):
-            result: Dict[str, Any] = {}
-            for key, inner in value.items():
-                cleaned = _clean(inner)
-                if isinstance(cleaned, list) and len(cleaned) == 0:
-                    continue
-                result[key] = cleaned
-            return result
-        if isinstance(value, list):
-            cleaned_items = [_clean(item) for item in value]
-            return [item for item in cleaned_items if not (isinstance(item, list) and len(item) == 0)]
-        return value
-
-    return _clean(data)
+load_campaign = io_load_campaign
+save_campaign = io_save_campaign
 
 
 def _campaign_member_from_doc(
@@ -161,9 +73,15 @@ def _campaign_member_from_doc(
 ) -> Tuple[EnginePartyMemberRef, int]:
     payload = dict(entry or {})
     hp_info = payload.pop("hp", {}) or {}
-    hp_max_raw = hp_info.get("max", payload.pop("max_hp", None))
+    hp_max_raw = hp_info.get(
+        "max",
+        payload.pop("max_hp", payload.pop("hp_max", None)),
+    )
     hp_max = int(hp_max_raw) if hp_max_raw is not None else 12
-    hp_cur_raw = hp_info.get("current", payload.pop("current_hp", None))
+    hp_cur_raw = hp_info.get(
+        "current",
+        payload.pop("current_hp", payload.pop("hp_current", None)),
+    )
     hp_cur = int(hp_cur_raw) if hp_cur_raw is not None else hp_max
     defaults: Dict[str, Any] = {
         "id": payload.pop("id", None) or f"PC{idx}",
@@ -430,7 +348,7 @@ def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
 
 
 def _load_state(path: str | Path) -> EngineCampaignState:
-    return _document_to_state(_load_dict(path))
+    return _document_to_state(load_campaign(path))
 
 
 def _save_state(state: EngineCampaignState, path: str | Path) -> Path:
@@ -610,31 +528,29 @@ def sample(
     if p.exists() and not overwrite and not stdout:
         raise typer.BadParameter(f"{p} exists. Use --overwrite.")
 
-    def parse_party(
-        entries: Optional[List[str]],
-    ) -> tuple[list[IOPartyMemberRef], dict[str, int]]:
-        members: list[IOPartyMemberRef] = []
-        hp_map: dict[str, int] = {}
+    def parse_party(entries: Optional[List[str]]) -> list[dict[str, Any]]:
+        members: list[dict[str, Any]] = []
         if not entries:
-            default = IOPartyMemberRef(
-                id="PC1",
-                name="Tomas",
-                class_="Fighter",
-                level=1,
-                str_mod=2,
-                dex_mod=1,
-                con_mod=2,
-                int_mod=0,
-                wis_mod=0,
-                cha_mod=0,
-                ac=14,
-                max_hp=12,
-                pb=2,
-                speed=30,
+            members.append(
+                {
+                    "id": "PC1",
+                    "name": "Tomas",
+                    "class": "Fighter",
+                    "level": 1,
+                    "str_mod": 2,
+                    "dex_mod": 1,
+                    "con_mod": 2,
+                    "int_mod": 0,
+                    "wis_mod": 0,
+                    "cha_mod": 0,
+                    "ac": 14,
+                    "pb": 2,
+                    "speed": 30,
+                    "hp_max": 12,
+                    "hp_current": 12,
+                }
             )
-            members.append(default)
-            hp_map[default.id] = default.max_hp
-            return members, hp_map
+            return members
         for idx, entry in enumerate(entries, start=1):
             parts = [segment.strip() for segment in entry.split(",") if segment.strip()]
             if len(parts) < 3:
@@ -665,25 +581,20 @@ def sample(
                         f"HP current must be an integer; got {parts[4]}"
                     ) from exc
             member_id = f"PC{idx}"
-            member = IOPartyMemberRef(
-                id=member_id,
-                name=name,
-                class_=klass,
-                level=level_val,
-                str_mod=0,
-                dex_mod=0,
-                con_mod=0,
-                int_mod=0,
-                wis_mod=0,
-                cha_mod=0,
-                ac=12,
-                max_hp=hp_max,
-                pb=2,
-                speed=30,
+            members.append(
+                {
+                    "id": member_id,
+                    "name": name,
+                    "class": klass,
+                    "level": level_val,
+                    "ac": 12,
+                    "pb": 2,
+                    "speed": 30,
+                    "hp_max": hp_max,
+                    "hp_current": hp_current,
+                }
             )
-            members.append(member)
-            hp_map[member_id] = hp_current
-        return members, hp_map
+        return members
 
     def parse_items(entries: Optional[List[str]]) -> Dict[str, Any]:
         inventory: Dict[str, Any] = {"rations": rations, "torches": torches}
@@ -706,24 +617,27 @@ def sample(
             inventory[key] = value
         return inventory
 
-    members, current_hp_map = parse_party(party)
+    members = parse_party(party)
     inventory_map = parse_items(item)
+
+    location_text = place
+    if region and place:
+        location_text = f"{region}: {place}"
+    elif region:
+        location_text = region
+    elif not location_text:
+        location_text = "Unknown"
 
     state = IOCampaignState(
         seed=random.randint(0, 1_000_000_000),
         day=day,
         time_of_day=time_of_day,
-        location=place,
-        region=region,
-        place=place,
+        location=location_text,
         gold=gold,
         inventory=inventory_map,
         party=members,
-        current_hp=current_hp_map,
         style=style,
     )
-    for member in state.party:
-        state.current_hp.setdefault(member.id, member.max_hp)
 
     if stdout:
         use_format = (fmt or "").lower() if fmt else None
