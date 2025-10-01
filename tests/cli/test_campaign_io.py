@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 from grimbrain.models.campaign import CampaignState
-from grimbrain.scripts.campaign_play import load_campaign, save_campaign, yaml
+from grimbrain.io.campaign_io import load_campaign, save_campaign, yaml
 
 
 def test_load_json_roundtrip(tmp_path):

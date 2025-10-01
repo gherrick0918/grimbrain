@@ -251,272 +251,163 @@ class CampaignState:
     seed: int = 0
     day: int = 1
     time_of_day: str = "morning"
-    location: str = "Wilderness"
-    region: Optional[str] = None
-    place: Optional[str] = None
+    location: str = "Unknown"
     gold: int = 0
     inventory: Dict[str, Any] = field(default_factory=dict)
-    party: List[PartyMemberRef] = field(default_factory=list)
-    current_hp: Dict[str, int] = field(default_factory=dict)
+    party: List[Dict[str, Any]] = field(default_factory=list)
     style: Optional[str] = None
     flags: Dict[str, Any] = field(default_factory=dict)
     journal: List[Any] = field(default_factory=list)
-    quest_log: List[Dict[str, Any]] = field(default_factory=list)
-    last_long_rest_day: int = 0
-    encounter_chance: int = 30
-    encounter_clock: int = 0
-    encounter_clock_step: int = 10
-    short_rest_hours: int = 4
-    long_rest_to_morning: bool = True
-    light_level: str = "normal"
-    extras: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "CampaignState":
+        """Create CampaignState from both legacy and flat dict shapes."""
+
         data = dict(d or {})
         state_info = data.get("state") if isinstance(data.get("state"), dict) else {}
+        meta_info = data.get("meta") if isinstance(data.get("meta"), dict) else {}
         clock_info = data.get("clock") if isinstance(data.get("clock"), dict) else {}
-        location_value = data.get("location")
-        location_info: Dict[str, Any] = {}
-        if isinstance(location_value, dict):
-            location_info = location_value
-            location_text = location_value.get("name") or location_value.get("place")
-        else:
-            location_text = location_value
-        if not location_info and isinstance(data.get("location_info"), dict):
-            location_info = data["location_info"]
-        region = data.get("region") or location_info.get("region")
-        place = data.get("place") or location_info.get("place")
-        if not location_text:
-            location_text = place or location_info.get("name") or "Wilderness"
-        seed_sources = [
-            data.get("seed"),
-            state_info.get("seed") if isinstance(state_info, dict) else None,
-        ]
-        seed = 0
-        for candidate in seed_sources:
-            if candidate is not None:
-                try:
-                    seed = int(candidate)
-                    break
-                except (TypeError, ValueError):
-                    continue
-        day_raw = data.get("day", clock_info.get("day", 1))
-        try:
-            day = int(day_raw)
-        except (TypeError, ValueError):
-            day = 1
-        time_of_day = data.get("time_of_day") or clock_info.get("time") or "morning"
-        gold_source = data.get("gold")
-        party_info = data.get("party_info") if isinstance(data.get("party_info"), dict) else {}
-        if not party_info and isinstance(data.get("party"), dict):
-            party_info = data["party"]
-        if gold_source is None and isinstance(party_info, dict):
-            gold_source = party_info.get("gold")
-        try:
-            gold = int(gold_source) if gold_source is not None else 0
-        except (TypeError, ValueError):
-            gold = 0
-        inventory = data.get("inventory") or {}
-        if isinstance(inventory, list):
-            upgraded: Dict[str, Any] = {}
-            for item in inventory:
-                key = str(item)
-                upgraded[key] = upgraded.get(key, 0) + 1
-            inventory = upgraded
-        members_source: List[Dict[str, Any]] = []
-        if isinstance(party_info.get("members"), list):
-            members_source = [
-                m for m in party_info["members"] if isinstance(m, dict)
-            ]
-        elif isinstance(data.get("party"), list):
-            members_source = [m for m in data["party"] if isinstance(m, dict)]
-        members = [PartyMemberRef.from_dict(m) for m in members_source]
-        if not members and isinstance(data.get("party"), list):
-            members = [PartyMemberRef.from_dict(m) for m in data["party"] if isinstance(m, dict)]
-        current_hp: Dict[str, int] = {}
-        hp_sources = []
-        if isinstance(state_info, dict) and isinstance(state_info.get("current_hp"), dict):
-            hp_sources.append(state_info["current_hp"])
-        if isinstance(data.get("current_hp"), dict):
-            hp_sources.append(data["current_hp"])
-        for hp_map in hp_sources:
-            for key, value in hp_map.items():
-                try:
-                    current_hp[str(key)] = int(value)
-                except (TypeError, ValueError):
-                    continue
-        if not current_hp:
-            for entry in members_source:
-                pid = entry.get("id") or entry.get("name")
-                if not pid:
-                    continue
-                hp = entry.get("hp") or {}
-                if isinstance(hp, dict) and "current" in hp:
-                    try:
-                        current_hp[str(pid)] = int(hp["current"])
-                    except (TypeError, ValueError):
-                        pass
-        style = data.get("style") or state_info.get("style") or data.get("narrative_style")
-        flags = data.get("flags") if isinstance(data.get("flags"), dict) else {}
-        journal_source = data.get("journal")
-        if journal_source is None:
-            journal_source = state_info.get("journal") if isinstance(state_info, dict) else None
-        if journal_source is None:
-            journal: List[Any] = []
-        elif isinstance(journal_source, list):
-            journal = list(journal_source)
-        else:
-            journal = [journal_source]
-        quest_log_source = state_info.get("quest_log") if isinstance(state_info, dict) else None
-        if not quest_log_source:
-            quest_log_source = data.get("quest_log")
-        if isinstance(quest_log_source, list):
-            quest_log = [q for q in quest_log_source if isinstance(q, dict)]
-        else:
-            quest_log = []
+
         def _coerce_int(value: Any, default: int) -> int:
             try:
                 return int(value)
             except (TypeError, ValueError):
                 return default
-        last_long_rest_day = _coerce_int(
-            state_info.get("last_long_rest_day", data.get("last_long_rest_day")), 0
-        )
-        encounter_info = state_info.get("encounter") if isinstance(state_info, dict) else {}
-        if not isinstance(encounter_info, dict):
-            encounter_info = {}
-        rest_info = state_info.get("rest") if isinstance(state_info, dict) else {}
-        if not isinstance(rest_info, dict):
-            rest_info = {}
-        encounter_chance = _coerce_int(
-            encounter_info.get("chance", data.get("encounter_chance")), 30
-        )
-        encounter_clock = _coerce_int(
-            encounter_info.get("clock", data.get("encounter_clock")), 0
-        )
-        encounter_clock_step = _coerce_int(
-            encounter_info.get("step", data.get("encounter_clock_step")), 10
-        )
-        short_rest_hours = _coerce_int(
-            rest_info.get("short_hours", data.get("short_rest_hours")), 4
-        )
-        long_rest_to_morning_raw = rest_info.get(
-            "long_to_morning", data.get("long_rest_to_morning")
-        )
-        if long_rest_to_morning_raw is None:
-            long_rest_to_morning = True
-        elif isinstance(long_rest_to_morning_raw, str):
-            long_rest_to_morning = long_rest_to_morning_raw.strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-                "y",
-            }
+
+        day = _coerce_int(data.get("day", clock_info.get("day", 1)), 1)
+        time_of_day = data.get("time_of_day") or clock_info.get("time") or "morning"
+
+        location_value = data.get("location")
+        location_info: Dict[str, Any] = {}
+        if isinstance(location_value, dict):
+            location_info = location_value
+            loc_flat = None
         else:
-            long_rest_to_morning = bool(long_rest_to_morning_raw)
-        light_level = (
-            state_info.get("light")
-            if isinstance(state_info, dict) and state_info.get("light")
-            else data.get("light_level", "normal")
+            loc_flat = location_value if isinstance(location_value, str) else None
+        if not location_info and isinstance(data.get("location_info"), dict):
+            location_info = data["location_info"]
+        region = data.get("region") or location_info.get("region")
+        place = data.get("place") or location_info.get("place") or location_info.get("name")
+        location = loc_flat or place or region or "Unknown"
+
+        party_info = data.get("party_info") if isinstance(data.get("party_info"), dict) else {}
+        if not party_info and isinstance(data.get("party"), dict):
+            party_info = data["party"]
+        gold = data.get("gold", party_info.get("gold"))
+        gold_value = _coerce_int(gold, 0) if gold is not None else 0
+
+        inventory_raw = data.get("inventory")
+        if isinstance(inventory_raw, dict):
+            inventory: Dict[str, Any] = dict(inventory_raw)
+        elif isinstance(inventory_raw, list):
+            inventory = {}
+            for item in inventory_raw:
+                key = str(item)
+                inventory[key] = inventory.get(key, 0) + 1
+        else:
+            inventory = {}
+
+        current_hp_map: Dict[str, int] = {}
+        if isinstance(state_info.get("current_hp"), dict):
+            for key, value in state_info["current_hp"].items():
+                current_hp_map[str(key)] = _coerce_int(value, 0)
+        if isinstance(data.get("current_hp"), dict):
+            for key, value in data["current_hp"].items():
+                current_hp_map[str(key)] = _coerce_int(value, 0)
+
+        party_entries: List[Dict[str, Any]] = []
+        if isinstance(party_info.get("members"), list):
+            party_entries = [m for m in party_info["members"] if isinstance(m, dict)]
+        elif isinstance(data.get("party"), list):
+            party_entries = [m for m in data["party"] if isinstance(m, dict)]
+
+        party: List[Dict[str, Any]] = []
+        for entry in party_entries:
+            member = dict(entry)
+            hp_blob = member.pop("hp", None)
+            hp_max = member.pop("hp_max", member.pop("max_hp", None))
+            hp_current = member.pop("hp_current", member.pop("current_hp", None))
+            if isinstance(hp_blob, dict):
+                hp_max = hp_blob.get("max", hp_max)
+                hp_current = hp_blob.get("current", hp_current)
+            member_id = member.get("id") or member.get("name")
+            if member_id is not None and hp_current is None:
+                mapped = current_hp_map.get(str(member_id))
+                if mapped is not None:
+                    hp_current = mapped
+            if hp_max is not None:
+                try:
+                    hp_max = int(hp_max)
+                except (TypeError, ValueError):
+                    hp_max = None
+            if hp_current is not None:
+                try:
+                    hp_current = int(hp_current)
+                except (TypeError, ValueError):
+                    hp_current = None
+            if hp_max is not None:
+                member["hp_max"] = hp_max
+            if hp_current is not None:
+                member["hp_current"] = hp_current
+            if "class_" in member and "class" not in member:
+                member["class"] = member["class_"]
+            party.append(member)
+
+        style = (
+            data.get("style")
+            or state_info.get("style")
+            or data.get("narrative_style")
+            or meta_info.get("style")
         )
-        extras = {
-            "meta": data.get("meta") if isinstance(data.get("meta"), dict) else None,
-        }
-        extras = {k: v for k, v in extras.items() if v is not None}
-        state = CampaignState(
+
+        flags_raw = data.get("flags") or state_info.get("flags")
+        flags = dict(flags_raw) if isinstance(flags_raw, dict) else {}
+
+        journal_raw = data.get("journal") or state_info.get("journal")
+        if journal_raw is None:
+            journal: List[Any] = []
+        elif isinstance(journal_raw, list):
+            journal = list(journal_raw)
+        else:
+            journal = [journal_raw]
+
+        seed_value = (
+            data.get("seed")
+            or state_info.get("seed")
+            or meta_info.get("seed")
+            or meta_info.get("random_seed")
+            or 0
+        )
+        seed = _coerce_int(seed_value, 0)
+
+        return CampaignState(
             seed=seed,
             day=day,
             time_of_day=str(time_of_day),
-            location=str(location_text or "Wilderness"),
-            region=region,
-            place=place,
-            gold=gold,
-            inventory=dict(inventory),
-            party=members,
-            current_hp=current_hp,
-            style=str(style) if style else None,
-            flags=dict(flags),
+            location=str(location),
+            gold=gold_value,
+            inventory=inventory,
+            party=party,
+            style=str(style) if style is not None else None,
+            flags=flags,
             journal=journal,
-            quest_log=quest_log,
-            last_long_rest_day=last_long_rest_day,
-            encounter_chance=encounter_chance,
-            encounter_clock=encounter_clock,
-            encounter_clock_step=encounter_clock_step,
-            short_rest_hours=short_rest_hours,
-            long_rest_to_morning=long_rest_to_morning,
-            light_level=str(light_level or "normal"),
-            extras=extras,
         )
-        for member in state.party:
-            state.current_hp.setdefault(member.id, member.max_hp)
-        return state
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a flat dict representation, suitable for JSON."""
+
         data: Dict[str, Any] = {
             "seed": self.seed,
             "day": self.day,
             "time_of_day": self.time_of_day,
+            "location": self.location,
             "gold": self.gold,
-            "inventory": dict(self.inventory or {}),
-            "party": [member.to_dict() for member in self.party],
-            "current_hp": dict(self.current_hp or {}),
+            "inventory": dict(self.inventory),
+            "party": [dict(member) for member in self.party],
             "style": self.style,
-            "narrative_style": self.style,
-            "flags": dict(self.flags or {}),
-            "journal": list(self.journal or []),
-            "quest_log": list(self.quest_log or []),
-            "last_long_rest_day": self.last_long_rest_day,
-            "encounter_chance": self.encounter_chance,
-            "encounter_clock": self.encounter_clock,
-            "encounter_clock_step": self.encounter_clock_step,
-            "short_rest_hours": self.short_rest_hours,
-            "long_rest_to_morning": self.long_rest_to_morning,
-            "light_level": self.light_level,
-            "clock": {"day": self.day, "time": self.time_of_day},
+            "flags": dict(self.flags),
+            "journal": list(self.journal),
         }
-        if self.region or self.place:
-            data["location"] = {
-                "region": self.region,
-                "place": self.place or self.location,
-            }
-        else:
-            data["location"] = self.location
-        id_to_current = dict(self.current_hp or {})
-        if self.party:
-            party_info_members: List[Dict[str, Any]] = []
-            for member in self.party:
-                member_blob = member.to_dict()
-                current = id_to_current.get(member.id)
-                if current is not None and current != member.max_hp:
-                    member_blob["hp"] = {"max": member.max_hp, "current": current}
-                else:
-                    member_blob.pop("hp", None)
-                party_info_members.append(member_blob)
-            data["party_info"] = {"gold": self.gold, "members": party_info_members}
-        rest_block = {
-            "short_hours": self.short_rest_hours,
-            "long_to_morning": self.long_rest_to_morning,
-        }
-        encounter_block = {
-            "chance": self.encounter_chance,
-            "clock": self.encounter_clock,
-            "step": self.encounter_clock_step,
-        }
-        state_block = {
-            "seed": self.seed,
-            "current_hp": dict(self.current_hp or {}),
-            "last_long_rest_day": self.last_long_rest_day,
-            "encounter": encounter_block,
-            "rest": rest_block,
-            "light": self.light_level,
-            "quest_log": list(self.quest_log or []),
-            "style": self.style,
-        }
-        data["state"] = state_block
-        if self.extras:
-            data.update(self.extras)
         return data
 
 
