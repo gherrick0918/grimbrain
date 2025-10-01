@@ -9,7 +9,7 @@ def test_campaignstate_roundtrip_basic():
         location="Wilderness",
         gold=7,
         inventory={"rations": 3},
-        party=[{"id": "Aria", "name": "Aria", "hp_max": 11, "hp_current": 11}],
+        party=[{"id": "Aria", "name": "Aria", "max_hp": 11, "current_hp": 11}],
         style="classic",
         flags={"mode": "solo"},
         journal=["entry"],
@@ -19,7 +19,7 @@ def test_campaignstate_roundtrip_basic():
     assert st2.day == 2
     assert st2.time_of_day == "afternoon"
     assert st2.party[0]["name"] == "Aria"
-    assert st2.party[0]["hp_current"] == 11
+    assert st2.party[0]["current_hp"] == 11
     assert st2.flags["mode"] == "solo"
     assert st2.journal == ["entry"]
 
@@ -49,4 +49,4 @@ def test_from_dict_legacy_shapes():
     assert st.location == "Village Gate"
     assert st.gold == 12
     assert st.party[0]["name"] == "Scout"
-    assert st.party[0]["hp_current"] == 8
+    assert st.party[0]["current_hp"] == 8

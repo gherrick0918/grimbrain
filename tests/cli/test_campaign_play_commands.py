@@ -38,8 +38,8 @@ def _baseline_state() -> dict:
                 "ac": 13,
                 "pb": 2,
                 "speed": 30,
-                "hp_max": 12,
-                "hp_current": 12,
+                "max_hp": 12,
+                "current_hp": 12,
             }
         ],
         "current_hp": {"PC1": 12},
@@ -71,7 +71,7 @@ def test_short_rest_updates_hp(tmp_path):
     _require_real_typer()
     path = tmp_path / "state.json"
     state = _baseline_state()
-    state["party"][0]["hp_current"] = 5
+    state["party"][0]["current_hp"] = 5
     state["current_hp"]["PC1"] = 5
     save_campaign(state, path)
 
@@ -87,7 +87,7 @@ def test_long_rest_sets_hp_to_max(tmp_path):
     _require_real_typer()
     path = tmp_path / "state.json"
     state = _baseline_state()
-    state["party"][0]["hp_current"] = 4
+    state["party"][0]["current_hp"] = 4
     state["current_hp"]["PC1"] = 4
     save_campaign(state, path)
 
@@ -95,7 +95,7 @@ def test_long_rest_sets_hp_to_max(tmp_path):
     assert result.exit_code == 0
 
     reloaded = cp.load_campaign(path)
-    assert reloaded["current_hp"]["PC1"] == reloaded["party"][0]["hp_max"]
+    assert reloaded["current_hp"]["PC1"] == reloaded["party"][0]["max_hp"]
 
 
 def test_travel_advances_time(tmp_path, monkeypatch):

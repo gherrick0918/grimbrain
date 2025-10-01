@@ -231,7 +231,45 @@ class CampaignState:
 def load_campaign(path: str) -> CampaignState:
     with open(path, "r", encoding="utf-8") as f:
         raw = json.load(f)
-    party = [PartyMemberRef(**p) for p in raw.get("party", [])]
+
+    raw_current_hp = raw.get("current_hp", {})
+    current_hp: Dict[str, int] = {}
+    if isinstance(raw_current_hp, dict):
+        for key, value in raw_current_hp.items():
+            try:
+                current_hp[str(key)] = int(value)
+            except (TypeError, ValueError):
+                continue
+
+    member_fields = set(PartyMemberRef.__dataclass_fields__.keys())
+    party: List[PartyMemberRef] = []
+    for entry in raw.get("party", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        payload = dict(entry)
+        hp_blob = payload.pop("hp", None)
+        hp_value = payload.pop("current_hp", payload.pop("hp_current", None))
+        legacy_max = payload.pop("hp_max", None)
+        if isinstance(hp_blob, dict):
+            if "max_hp" not in payload and "max" in hp_blob:
+                payload["max_hp"] = hp_blob.get("max")
+            if hp_value is None and "current" in hp_blob:
+                hp_value = hp_blob.get("current")
+        if legacy_max is not None and "max_hp" not in payload:
+            payload["max_hp"] = legacy_max
+
+        filtered = {k: payload[k] for k in list(payload.keys()) if k in member_fields}
+        member = PartyMemberRef(**filtered)
+        party.append(member)
+
+        if hp_value is not None:
+            try:
+                current_hp[member.id] = int(hp_value)
+            except (TypeError, ValueError):
+                current_hp[member.id] = member.max_hp
+        elif member.id not in current_hp:
+            current_hp[member.id] = member.max_hp
+
     quests = [QuestLogItem(**q) for q in raw.get("quest_log", [])]
     st = CampaignState(
         seed=raw["seed"],
@@ -241,7 +279,7 @@ def load_campaign(path: str) -> CampaignState:
         gold=raw.get("gold", 0),
         inventory=raw.get("inventory", {}),
         party=party,
-        current_hp=raw.get("current_hp", {}),
+        current_hp=current_hp,
         quest_log=quests,
         last_long_rest_day=raw.get("last_long_rest_day", 0),
         encounter_chance=raw.get("encounter_chance", 30),

@@ -289,8 +289,8 @@ def _state_to_document(state: EngineCampaignState) -> CampaignDocument:
         base = asdict(pm)
         member_full = dict(base)
         hp_current = state.current_hp.get(pm.id, pm.max_hp)
-        member_full["hp_max"] = pm.max_hp
-        member_full["hp_current"] = hp_current
+        member_full["max_hp"] = pm.max_hp
+        member_full["current_hp"] = hp_current
         member_full["hp"] = {"max": pm.max_hp, "current": hp_current}
         members_full.append(member_full)
 
@@ -550,8 +550,8 @@ def sample(
                     "ac": 14,
                     "pb": 2,
                     "speed": 30,
-                    "hp_max": 12,
-                    "hp_current": 12,
+                    "max_hp": 12,
+                    "current_hp": 12,
                 }
             )
             return members
@@ -594,8 +594,8 @@ def sample(
                     "ac": 12,
                     "pb": 2,
                     "speed": 30,
-                    "hp_max": hp_max,
-                    "hp_current": hp_current,
+                    "max_hp": hp_max,
+                    "current_hp": hp_current,
                 }
             )
         return members
@@ -636,15 +636,15 @@ def sample(
     current_hp: dict[str, int] = {}
     for member in members:
         doc = dict(member)
-        hp_max = int(doc.get("hp_max", doc.get("max_hp", 12)))
-        hp_current = int(doc.get("hp_current", hp_max))
-        doc["hp_max"] = hp_max
-        doc["hp_current"] = hp_current
-        doc["hp"] = {"max": hp_max, "current": hp_current}
+        max_hp = int(doc.get("max_hp", doc.get("hp_max", 12)))
+        current_hp_value = int(doc.get("current_hp", doc.get("hp_current", max_hp)))
+        doc["max_hp"] = max_hp
+        doc["current_hp"] = current_hp_value
+        doc["hp"] = {"max": max_hp, "current": current_hp_value}
         member_docs.append(doc)
         member_id = doc.get("id")
         if member_id:
-            current_hp[str(member_id)] = hp_current
+            current_hp[str(member_id)] = current_hp_value
 
     state: dict[str, Any] = {
         "seed": random.randint(0, 1_000_000_000),
