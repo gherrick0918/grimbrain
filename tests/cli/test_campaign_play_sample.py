@@ -95,9 +95,9 @@ def test_sample_switches_and_parse(tmp_path):
     assert inv["rope"] == 1
     members = data["party"]
     assert members[0]["name"] == "Anya"
-    assert members[0]["hp_current"] == 6
+    assert members[0]["current_hp"] == 6
     assert members[1]["name"] == "Borin"
-    assert members[1]["hp_max"] == 12
+    assert members[1]["max_hp"] == 12
     assert data["party_info"]["gold"] == 25
     assert len(data["party_info"]["members"]) == 2
 

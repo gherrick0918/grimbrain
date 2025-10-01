@@ -34,7 +34,7 @@ def test_load_json_normalizes_legacy(tmp_path):
     assert state["location"] == "Greenfields: Village Gate"
     assert state["gold"] == 12
     assert state["inventory"] == {"torch": 2, "rations": 1}
-    assert state["party"][0]["hp_current"] == 7
+    assert state["party"][0]["current_hp"] == 7
     assert state["current_hp"]["PC1"] == 7
 
 
@@ -51,8 +51,8 @@ def test_save_and_reload_roundtrip(tmp_path):
             {
                 "id": "PC1",
                 "name": "Ranger",
-                "hp_max": 14,
-                "hp_current": 11,
+                "max_hp": 14,
+                "current_hp": 11,
                 "dex_mod": 3,
             }
         ],
@@ -66,7 +66,7 @@ def test_save_and_reload_roundtrip(tmp_path):
     assert reloaded["seed"] == 9
     assert reloaded["day"] == 2
     assert reloaded["time_of_day"] == "afternoon"
-    assert reloaded["party"][0]["hp_current"] == 11
+    assert reloaded["party"][0]["current_hp"] == 11
     assert reloaded["current_hp"]["PC1"] == 11
     assert reloaded["flags"]["mode"] == "solo"
     assert reloaded["journal"] == ["entry"]

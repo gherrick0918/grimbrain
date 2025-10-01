@@ -325,30 +325,30 @@ class CampaignState:
         for entry in party_entries:
             member = dict(entry)
             hp_blob = member.pop("hp", None)
-            hp_max = member.pop("hp_max", member.pop("max_hp", None))
-            hp_current = member.pop("hp_current", member.pop("current_hp", None))
+            max_hp = member.pop("max_hp", member.pop("hp_max", None))
+            current_hp = member.pop("current_hp", member.pop("hp_current", None))
             if isinstance(hp_blob, dict):
-                hp_max = hp_blob.get("max", hp_max)
-                hp_current = hp_blob.get("current", hp_current)
+                max_hp = hp_blob.get("max", max_hp)
+                current_hp = hp_blob.get("current", current_hp)
             member_id = member.get("id") or member.get("name")
-            if member_id is not None and hp_current is None:
+            if member_id is not None and current_hp is None:
                 mapped = current_hp_map.get(str(member_id))
                 if mapped is not None:
-                    hp_current = mapped
-            if hp_max is not None:
+                    current_hp = mapped
+            if max_hp is not None:
                 try:
-                    hp_max = int(hp_max)
+                    max_hp = int(max_hp)
                 except (TypeError, ValueError):
-                    hp_max = None
-            if hp_current is not None:
+                    max_hp = None
+            if current_hp is not None:
                 try:
-                    hp_current = int(hp_current)
+                    current_hp = int(current_hp)
                 except (TypeError, ValueError):
-                    hp_current = None
-            if hp_max is not None:
-                member["hp_max"] = hp_max
-            if hp_current is not None:
-                member["hp_current"] = hp_current
+                    current_hp = None
+            if max_hp is not None:
+                member["max_hp"] = max_hp
+            if current_hp is not None:
+                member["current_hp"] = current_hp
             if "class_" in member and "class" not in member:
                 member["class"] = member["class_"]
             party.append(member)

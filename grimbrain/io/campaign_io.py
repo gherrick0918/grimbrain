@@ -63,18 +63,18 @@ def _normalize_member(raw: Any, idx: int, hp_overrides: Dict[str, Any]) -> Dict[
     hp_info = payload.pop("hp", {}) or {}
     member_id = str(payload.get("id") or payload.get("name") or f"PC{idx}")
     name = str(payload.get("name") or member_id)
-    hp_max_raw = payload.pop("hp_max", payload.pop("max_hp", hp_info.get("max")))
+    hp_max_raw = payload.pop("max_hp", payload.pop("hp_max", hp_info.get("max")))
     hp_max = _coerce_int(hp_max_raw, default=12)
     hp_current_raw = payload.pop(
-        "hp_current",
-        payload.pop("current_hp", hp_info.get("current", hp_overrides.get(member_id))),
+        "current_hp",
+        payload.pop("hp_current", hp_info.get("current", hp_overrides.get(member_id))),
     )
     hp_current = _coerce_int(hp_current_raw, default=hp_max)
     member: Dict[str, Any] = {
         "id": member_id,
         "name": name,
-        "hp_max": hp_max,
-        "hp_current": max(0, min(hp_max, hp_current)),
+        "max_hp": hp_max,
+        "current_hp": max(0, min(hp_max, hp_current)),
     }
     for key in list(payload.keys()):
         value = payload[key]
@@ -152,7 +152,11 @@ def load_campaign(path: str | Path) -> Dict[str, Any]:
     for idx, entry in enumerate(members_source or [], start=1):
         member = _normalize_member(entry, idx, current_hp_source)
         members.append(member)
-        current_hp[member["id"]] = member.get("hp_current", member.get("hp_max", 0))
+        hp_value = member.get(
+            "current_hp",
+            member.get("hp_current", member.get("max_hp", member.get("hp_max", 0))),
+        )
+        current_hp[member["id"]] = _coerce_int(hp_value, default=0)
     state["party"] = members
     hp_map: Dict[str, int] = {}
     for key, value in (current_hp_source or {}).items():
@@ -217,7 +221,16 @@ def load_campaign(path: str | Path) -> Dict[str, Any]:
     state["narrative_style"] = str(style_value)
 
     if not state.get("current_hp"):
-        state["current_hp"] = {m["id"]: m.get("hp_current", m.get("hp_max", 0)) for m in members}
+        state["current_hp"] = {
+            m["id"]: _coerce_int(
+                m.get(
+                    "current_hp",
+                    m.get("hp_current", m.get("max_hp", m.get("hp_max", 0))),
+                ),
+                default=0,
+            )
+            for m in members
+        }
 
     return state
 
@@ -268,7 +281,15 @@ def save_campaign(data: Dict[str, Any], path: str | Path, fmt: str | None = None
             mid = member.get("id")
             if not mid:
                 continue
-            hp_value = member.get("hp_current", member.get("hp", member.get("hp_max", 0)))
+            hp_value = member.get("current_hp", member.get("hp_current"))
+            if hp_value is None:
+                hp_blob = member.get("hp")
+                if isinstance(hp_blob, dict):
+                    hp_value = hp_blob.get("current", hp_blob.get("max"))
+                else:
+                    hp_value = hp_blob
+            if hp_value is None:
+                hp_value = member.get("max_hp", member.get("hp_max", 0))
             current_hp_map.setdefault(str(mid), _coerce_int(hp_value, default=0))
     payload["current_hp"] = {str(k): _coerce_int(v, default=0) for k, v in current_hp_map.items()}
 
