@@ -7,7 +7,6 @@ try:  # Typer >=0.9
 except ModuleNotFoundError:  # pragma: no cover - compatibility for older Typer
     from click.testing import CliRunner  # type: ignore
 
-from grimbrain.models.campaign import CampaignState
 from grimbrain.scripts import campaign_play as cp
 
 
@@ -27,10 +26,14 @@ def test_sample_json_then_status(tmp_path):
     assert demo.exists()
     data = json.loads(demo.read_text(encoding="utf-8"))
     assert data["day"] == 1
+    assert data["party"]
+
     status = runner.invoke(cp.app, ["status", "--load", str(demo)])
     assert status.exit_code == 0
     output_text = status.stdout or status.output
     assert "day" in output_text.lower() or "location" in output_text.lower()
+
     state = cp.load_campaign(demo)
-    assert isinstance(state, CampaignState)
-    assert state.day >= 1
+    assert isinstance(state, dict)
+    assert state["day"] >= 1
+    assert "party" in state and isinstance(state["party"], list)

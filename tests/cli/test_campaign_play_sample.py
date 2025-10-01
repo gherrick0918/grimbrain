@@ -87,19 +87,19 @@ def test_sample_switches_and_parse(tmp_path):
     assert data["style"] == "heroic"
     assert data["clock"]["day"] == 3
     assert data["clock"]["time"] == "evening"
-    assert data["location"]["region"] == "Northreach"
-    assert data["location"]["place"] == "Harbor"
-    assert data["party"]["gold"] == 25
+    assert data["location"] == "Northreach: Harbor"
     inv = data["inventory"]
     assert inv["rations"] == 5
     assert inv["torches"] == 1
     assert inv["potion"] == 2
     assert inv["rope"] == 1
-    members = data["party"]["members"]
+    members = data["party"]
     assert members[0]["name"] == "Anya"
-    assert members[0]["hp"]["current"] == 6
+    assert members[0]["hp_current"] == 6
     assert members[1]["name"] == "Borin"
-    assert members[1]["hp"]["max"] == 12
+    assert members[1]["hp_max"] == 12
+    assert data["party_info"]["gold"] == 25
+    assert len(data["party_info"]["members"]) == 2
 
 
 def test_sample_no_yaml(tmp_path, monkeypatch):
